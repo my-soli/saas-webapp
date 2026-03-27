@@ -5,6 +5,21 @@ import type { ReactElement } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+    DndContext,
+    closestCenter,
+    PointerSensor,
+    useSensor,
+    useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent } from "@dnd-kit/core";
+import {
+    SortableContext,
+    verticalListSortingStrategy,
+    useSortable,
+    arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
     PlusIcon,
     Trash2Icon,
     ChevronDownIcon,
@@ -18,6 +33,7 @@ import {
     updateSpecGroup,
     deleteSpecGroup,
     fetchSpecGroups,
+    reorderSpecGroups,
     createSpecOption,
     updateSpecOption,
     deleteSpecOption,
@@ -141,6 +157,36 @@ function SpecOptionsEditor({
         }
     };
 
+    const saveOptionField = async (
+        option: SpecOption,
+        field: keyof SpecOption,
+        raw: string,
+    ): Promise<void> => {
+        const numericFields = [
+            "quantity_value",
+            "selling_price",
+            "vendor_cost",
+            "selling_price_modifier",
+            "vendor_cost_modifier",
+            "multiplier_value",
+        ] as const;
+        type NumericField = (typeof numericFields)[number];
+        const isNumeric = (numericFields as readonly string[]).includes(field);
+        const value = isNumeric
+            ? raw.trim() === ""
+                ? null
+                : Number(raw)
+            : raw.trim() || null;
+        const original = option[field];
+        if (String(value ?? "") === String(original ?? "")) return;
+        try {
+            await updateSpecOption(option.id, { [field as NumericField]: value });
+            onRefresh();
+        } catch (_e: unknown) {
+            toast.error(`Failed to update ${field}`);
+        }
+    };
+
     const isTier = group.group_type === "quantity_tier";
     const isModifier =
         group.group_type === "single_select_modifier" ||
@@ -203,24 +249,76 @@ function SpecOptionsEditor({
                                                     />
                                                 </label>
                                             )}
-                                            <span className="font-medium text-gray-800">{opt.name}</span>
+                                            <input
+                                                type="text"
+                                                defaultValue={opt.name}
+                                                onBlur={(e) => void saveOptionField(opt, "name", e.target.value)}
+                                                className="w-28 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs font-medium text-gray-800 hover:border-gray-200 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue focus:bg-white"
+                                            />
                                         </div>
                                     </td>
                                     {isTier && (
                                         <>
-                                            <td className="px-3 py-2 text-right text-gray-600">{opt.quantity_value ?? "—"}</td>
-                                            <td className="px-3 py-2 text-right text-gray-600">{opt.selling_price ?? "—"}</td>
-                                            <td className="px-3 py-2 text-right text-gray-600">{opt.vendor_cost ?? "—"}</td>
+                                            <td className="px-3 py-2 text-right">
+                                                <input
+                                                    type="number"
+                                                    defaultValue={opt.quantity_value ?? ""}
+                                                    onBlur={(e) => void saveOptionField(opt, "quantity_value", e.target.value)}
+                                                    className="w-20 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-right text-gray-700 hover:border-gray-200 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue focus:bg-white"
+                                                />
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    defaultValue={opt.selling_price ?? ""}
+                                                    onBlur={(e) => void saveOptionField(opt, "selling_price", e.target.value)}
+                                                    className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-right text-gray-700 hover:border-gray-200 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue focus:bg-white"
+                                                />
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    defaultValue={opt.vendor_cost ?? ""}
+                                                    onBlur={(e) => void saveOptionField(opt, "vendor_cost", e.target.value)}
+                                                    className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-right text-gray-700 hover:border-gray-200 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue focus:bg-white"
+                                                />
+                                            </td>
                                         </>
                                     )}
                                     {isModifier && (
                                         <>
-                                            <td className="px-3 py-2 text-right text-gray-600">{opt.selling_price_modifier ?? "—"}</td>
-                                            <td className="px-3 py-2 text-right text-gray-600">{opt.vendor_cost_modifier ?? "—"}</td>
+                                            <td className="px-3 py-2 text-right">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    defaultValue={opt.selling_price_modifier ?? ""}
+                                                    onBlur={(e) => void saveOptionField(opt, "selling_price_modifier", e.target.value)}
+                                                    className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-right text-gray-700 hover:border-gray-200 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue focus:bg-white"
+                                                />
+                                            </td>
+                                            <td className="px-3 py-2 text-right">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    defaultValue={opt.vendor_cost_modifier ?? ""}
+                                                    onBlur={(e) => void saveOptionField(opt, "vendor_cost_modifier", e.target.value)}
+                                                    className="w-24 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-right text-gray-700 hover:border-gray-200 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue focus:bg-white"
+                                                />
+                                            </td>
                                         </>
                                     )}
                                     {isMultiplier && (
-                                        <td className="px-3 py-2 text-right text-gray-600">{opt.multiplier_value ?? "—"}</td>
+                                        <td className="px-3 py-2 text-right">
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                defaultValue={opt.multiplier_value ?? ""}
+                                                onBlur={(e) => void saveOptionField(opt, "multiplier_value", e.target.value)}
+                                                className="w-20 rounded border border-transparent bg-transparent px-1 py-0.5 text-xs text-right text-gray-700 hover:border-gray-200 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue focus:bg-white"
+                                            />
+                                        </td>
                                     )}
                                     <td className="px-3 py-2 text-center">
                                         <input
@@ -357,8 +455,26 @@ function SpecRangesEditor({
         }
     };
 
+    const toggleCustomQuoteAboveMax = async (enabled: boolean): Promise<void> => {
+        try {
+            await updateSpecGroup(group.id, { custom_quote_above_max: enabled });
+            onRefresh();
+        } catch (_e: unknown) {
+            toast.error("Failed to update custom quote setting");
+        }
+    };
+
     return (
         <div className="space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded accent-brand-blue"
+                    checked={group.custom_quote_above_max ?? false}
+                    onChange={(e) => void toggleCustomQuoteAboveMax(e.target.checked)}
+                />
+                <span className="text-xs text-gray-700">When value exceeds max range, prompt customer to request a custom quote</span>
+            </label>
             {group.ranges.length > 0 && (
                 <div className="overflow-hidden rounded-lg border border-gray-200">
                     <table className="w-full text-xs">
@@ -523,10 +639,12 @@ function SpecGroupCard({
     group,
     onDeleted,
     onRefresh,
+    dragHandleProps,
 }: {
     group: ProductSpecGroup;
     onDeleted: () => void;
     onRefresh: () => void;
+    dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
 }): ReactElement {
     const [expanded, setExpanded] = useState<boolean>(false);
     const [editingName, setEditingName] = useState<boolean>(false);
@@ -564,7 +682,15 @@ function SpecGroupCard({
     return (
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-                <GripVerticalIcon className="h-4 w-4 text-gray-300 flex-shrink-0 cursor-grab" />
+                <button
+                    type="button"
+                    className="cursor-grab touch-none text-gray-300 hover:text-gray-500 flex-shrink-0 focus:outline-none"
+                    title="Drag to reorder"
+                    aria-label="Drag to reorder"
+                    {...(dragHandleProps ?? {})}
+                >
+                    <GripVerticalIcon className="h-4 w-4" />
+                </button>
                 <button
                     type="button"
                     onClick={() => setExpanded((p) => !p)}
@@ -728,6 +854,7 @@ function AddGroupPanel({
                 vendor_rate_per_sqm: null,
                 min_selling_price: null,
                 min_vendor_cost: null,
+                custom_quote_above_max: false,
             };
 
             await createSpecGroup(payload);
@@ -888,20 +1015,84 @@ function AddGroupPanel({
     );
 }
 
+function SortableSpecGroupCard({
+    group,
+    onDeleted,
+    onRefresh,
+}: {
+    group: ProductSpecGroup;
+    onDeleted: () => void;
+    onRefresh: () => void;
+}): ReactElement {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+        useSortable({ id: group.id });
+
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 10 : undefined,
+    };
+
+    return (
+        <div ref={setNodeRef} style={style}>
+            <SpecGroupCard
+                group={group}
+                onDeleted={onDeleted}
+                onRefresh={onRefresh}
+                dragHandleProps={{ ...attributes, ...listeners }}
+            />
+        </div>
+    );
+}
+
 export default function SpecGroupsBuilder({
     productId,
     pricingMode,
 }: SpecGroupsBuilderProps): ReactElement {
     const queryClient = useQueryClient();
+    const [localGroups, setLocalGroups] = useState<ProductSpecGroup[]>([]);
+    const [localSynced, setLocalSynced] = useState(false);
 
-    const { data: specGroups = [], isLoading, refetch } = useQuery<ProductSpecGroup[]>({
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+    const { data: specGroups = [], isLoading } = useQuery<ProductSpecGroup[]>({
         queryKey: ["spec-groups", productId],
         queryFn: () => fetchSpecGroups(productId),
         staleTime: 0,
     });
 
+    if (!localSynced && specGroups.length > 0) {
+        setLocalGroups(specGroups);
+        setLocalSynced(true);
+    }
+    if (!localSynced && specGroups.length === 0 && localGroups.length > 0) {
+        setLocalGroups([]);
+    }
+
     const refresh = (): void => {
+        setLocalSynced(false);
         void queryClient.invalidateQueries({ queryKey: ["spec-groups", productId] });
+    };
+
+    const handleDragEnd = async (event: DragEndEvent): Promise<void> => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+
+        const oldIndex = localGroups.findIndex((g) => g.id === active.id);
+        const newIndex = localGroups.findIndex((g) => g.id === over.id);
+        const reordered = arrayMove(localGroups, oldIndex, newIndex);
+        setLocalGroups(reordered);
+
+        try {
+            await reorderSpecGroups(
+                reordered.map((g, i) => ({ id: g.id, display_order: i }))
+            );
+            void queryClient.invalidateQueries({ queryKey: ["spec-groups", productId] });
+        } catch (_e: unknown) {
+            toast.error("Failed to save new order");
+            setLocalGroups(specGroups);
+        }
     };
 
     if (pricingMode === "quote_only") {
@@ -945,15 +1136,29 @@ export default function SpecGroupsBuilder({
                 </div>
             )}
 
-            {!isLoading &&
-                specGroups.map((group) => (
-                    <SpecGroupCard
-                        key={group.id}
-                        group={group}
-                        onDeleted={refresh}
-                        onRefresh={refresh}
-                    />
-                ))}
+            {!isLoading && localGroups.length > 0 && (
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={(e) => void handleDragEnd(e)}
+                >
+                    <SortableContext
+                        items={localGroups.map((g) => g.id)}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        <div className="space-y-3">
+                            {localGroups.map((group) => (
+                                <SortableSpecGroupCard
+                                    key={group.id}
+                                    group={group}
+                                    onDeleted={refresh}
+                                    onRefresh={refresh}
+                                />
+                            ))}
+                        </div>
+                    </SortableContext>
+                </DndContext>
+            )}
 
             <AddGroupPanel
                 productId={productId}

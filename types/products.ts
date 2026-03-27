@@ -133,6 +133,7 @@ export interface ProductSpecGroup {
     min_selling_price: string | null;
     min_vendor_cost: string | null;
     header_image: string | null;
+    custom_quote_above_max: boolean;
     options: SpecOption[];
     ranges: SpecOptionRange[];
 }
@@ -309,6 +310,7 @@ export interface CreateSpecGroupPayload {
     vendor_rate_per_sqm: string | null;
     min_selling_price: string | null;
     min_vendor_cost: string | null;
+    custom_quote_above_max: boolean;
 }
 
 export interface CreateSpecOptionPayload {

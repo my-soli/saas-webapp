@@ -162,13 +162,22 @@ function NumericInputGroup({
     value: string;
     onChange: (val: string) => void;
 }): ReactElement {
+    const parsedValue = parseFloat(value);
     const matchedRange = group.ranges.find((r: SpecOptionRange) => {
-        const num = parseFloat(value);
-        if (isNaN(num)) return false;
+        if (isNaN(parsedValue)) return false;
         const from = parseFloat(r.range_from);
         const to = r.range_to ? parseFloat(r.range_to) : Infinity;
-        return num >= from && num <= to;
+        return parsedValue >= from && parsedValue <= to;
     });
+
+    const lastRange = group.ranges[group.ranges.length - 1];
+    const maxRangeTo = lastRange?.range_to ? parseFloat(lastRange.range_to) : Infinity;
+    const isAboveMax =
+        !matchedRange &&
+        !isNaN(parsedValue) &&
+        value.trim() !== "" &&
+        parsedValue > maxRangeTo &&
+        group.custom_quote_above_max;
 
     return (
         <div className="space-y-2">
@@ -184,38 +193,57 @@ function NumericInputGroup({
                     <span className="text-sm text-gray-500 flex-shrink-0">{group.ranges[0].unit_label}</span>
                 )}
             </div>
-            {group.ranges.length > 0 && (
-                <div className="rounded-lg bg-gray-50 border border-gray-200 overflow-hidden">
-                    <table className="w-full text-xs">
-                        <thead className="bg-gray-100">
-                            <tr>
-                                <th className="px-3 py-1.5 text-left text-gray-500 font-medium">Range</th>
-                                <th className="px-3 py-1.5 text-right text-gray-500 font-medium">Base Price</th>
-                                <th className="px-3 py-1.5 text-right text-gray-500 font-medium">Per Unit</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {group.ranges.map((r: SpecOptionRange) => {
-                                const isMatch = r === matchedRange;
-                                return (
-                                    <tr key={r.id} className={isMatch ? "bg-brand-blue/5" : ""}>
-                                        <td className={cn("px-3 py-1.5 font-medium", isMatch ? "text-brand-blue" : "text-gray-600")}>
-                                            {r.range_from}–{r.range_to ?? "∞"}
-                                            {r.unit_label ? ` ${r.unit_label}` : ""}
-                                            {isMatch && <span className="ml-1.5 inline-flex h-4 w-4 rounded-full bg-brand-blue text-white items-center justify-center"><CheckIcon className="h-2.5 w-2.5" /></span>}
-                                        </td>
-                                        <td className={cn("px-3 py-1.5 text-right", isMatch ? "font-bold text-brand-blue" : "text-gray-600")}>
-                                            {formatKES(r.selling_price_base)}
-                                        </td>
-                                        <td className={cn("px-3 py-1.5 text-right", isMatch ? "font-bold text-brand-blue" : "text-gray-600")}>
-                                            {formatKES(r.selling_rate_per_unit)}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+            {isAboveMax ? (
+                <div className="rounded-xl border-2 border-brand-yellow bg-brand-yellow/10 p-4 flex flex-col gap-2">
+                    <p className="text-sm font-semibold text-brand-blue">
+                        This quantity exceeds our standard pricing ranges.
+                    </p>
+                    <p className="text-xs text-gray-600">
+                        For orders of this size, please reach out and we&apos;ll prepare a custom quote tailored to your needs.
+                    </p>
+                    <a
+                        href="https://wa.me/254700000000?text=Hi%2C%20I%20need%20a%20custom%20quote%20for%20a%20large%20order."
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 self-start rounded-lg bg-brand-yellow px-4 py-2 text-xs font-bold text-brand-blue hover:bg-brand-yellow/90 transition-colors"
+                    >
+                        Request a Custom Quote
+                    </a>
                 </div>
+            ) : (
+                group.ranges.length > 0 && (
+                    <div className="rounded-lg bg-gray-50 border border-gray-200 overflow-hidden">
+                        <table className="w-full text-xs">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className="px-3 py-1.5 text-left text-gray-500 font-medium">Range</th>
+                                    <th className="px-3 py-1.5 text-right text-gray-500 font-medium">Base Price</th>
+                                    <th className="px-3 py-1.5 text-right text-gray-500 font-medium">Per Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {group.ranges.map((r: SpecOptionRange) => {
+                                    const isMatch = r === matchedRange;
+                                    return (
+                                        <tr key={r.id} className={isMatch ? "bg-brand-blue/5" : ""}>
+                                            <td className={cn("px-3 py-1.5 font-medium", isMatch ? "text-brand-blue" : "text-gray-600")}>
+                                                {r.range_from}–{r.range_to ?? "∞"}
+                                                {r.unit_label ? ` ${r.unit_label}` : ""}
+                                                {isMatch && <span className="ml-1.5 inline-flex h-4 w-4 rounded-full bg-brand-blue text-white items-center justify-center"><CheckIcon className="h-2.5 w-2.5" /></span>}
+                                            </td>
+                                            <td className={cn("px-3 py-1.5 text-right", isMatch ? "font-bold text-brand-blue" : "text-gray-600")}>
+                                                {formatKES(r.selling_price_base)}
+                                            </td>
+                                            <td className={cn("px-3 py-1.5 text-right", isMatch ? "font-bold text-brand-blue" : "text-gray-600")}>
+                                                {formatKES(r.selling_rate_per_unit)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )
             )}
         </div>
     );
