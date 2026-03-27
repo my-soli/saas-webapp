@@ -1,0 +1,216 @@
+import type { Lead, LeadConvertPayload, LeadConvertResponse, LeadQualifyResponse, LeadsQueryParams, LeadsResponse } from "@/types/leads";
+import { getCsrfToken } from "@/lib/api/auth";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+class BusinessValidationError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "BusinessValidationError";
+    }
+}
+
+const buildQueryString = (params: LeadsQueryParams): string => {
+    const searchParams = new URLSearchParams();
+    searchParams.set("page", params.page.toString());
+    searchParams.set("page_size", params.pageSize.toString());
+
+    if (params.search.trim()) {
+        searchParams.set("search", params.search.trim());
+    }
+
+    if (params.status !== "all") {
+        searchParams.set("status", params.status);
+    }
+
+    if (params.source !== "all") {
+        searchParams.set("source", params.source);
+    }
+
+    searchParams.set("ordering", "-created_at");
+
+    return searchParams.toString();
+};
+
+const buildWriteHeaders = async (): Promise<HeadersInit> => {
+    const csrfToken = await getCsrfToken();
+    return {
+        "Content-Type": "application/json",
+        "X-CSRFToken": csrfToken,
+    };
+};
+
+const extractErrorDetail = async (response: Response): Promise<string> => {
+    try {
+        const payload = (await response.json()) as { detail?: string };
+        if (typeof payload.detail === "string" && payload.detail.trim().length > 0) {
+            return payload.detail;
+        }
+    } catch (_error: unknown) {
+    }
+
+    const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+    return errorText;
+};
+
+export async function fetchLeads(params: LeadsQueryParams): Promise<LeadsResponse> {
+    const queryString = buildQueryString(params);
+    const response = await fetch(`${API_BASE_URL}/api/v1/leads/?${queryString}`, {
+        headers: {
+            "Content-Type": "application/json",
+        },
+        credentials: "include",
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(`Failed to fetch leads: ${response.status} ${errorText}`);
+    }
+
+    return response.json();
+}
+
+export async function deleteLead(leadId: number): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/`, {
+        method: "DELETE",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        if (response.status >= 400 && response.status < 500) {
+            throw new BusinessValidationError(errorText);
+        }
+        throw new Error("Unable to delete lead. Please try again.");
+    }
+}
+
+export async function fetchLead(leadId: number): Promise<Lead> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/`, {
+        headers: {
+            "Content-Type": "application/json",
+        },
+        credentials: "include",
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to fetch lead: ${response.status} ${errorText}`);
+    }
+
+    return response.json();
+}
+
+export async function markLeadContacted(leadId: number): Promise<LeadQualifyResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/mark-contacted/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        if (response.status >= 400 && response.status < 500) {
+            throw new BusinessValidationError(errorText);
+        }
+        throw new Error("Unable to mark lead as contacted. Please try again.");
+    }
+
+    return response.json();
+}
+
+export async function qualifyLead(leadId: number): Promise<LeadQualifyResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/qualify/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        if (response.status >= 400 && response.status < 500) {
+            throw new BusinessValidationError(errorText);
+        }
+        throw new Error("Unable to qualify lead. Please try again.");
+    }
+
+    return response.json();
+}
+
+export async function convertLead(leadId: number, payload: LeadConvertPayload): Promise<LeadConvertResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/convert/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        if (response.status >= 400 && response.status < 500) {
+            throw new BusinessValidationError(errorText);
+        }
+        throw new Error("Unable to convert lead. Please try again.");
+    }
+
+    return response.json();
+}
+
+export async function markLeadLost(leadId: number): Promise<LeadQualifyResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/mark-lost/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        if (response.status >= 400 && response.status < 500) {
+            throw new BusinessValidationError(errorText);
+        }
+        throw new Error("Unable to mark lead as lost. Please try again.");
+    }
+
+    return response.json();
+}
+
+export async function createLead(payload: Partial<Lead>): Promise<Lead> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/leads/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        if (response.status >= 400 && response.status < 500) {
+            throw new BusinessValidationError(errorText);
+        }
+        throw new Error("Unable to create lead. Please try again.");
+    }
+
+    return response.json();
+}
+
+export async function updateLead(leadId: number, payload: Partial<Lead>): Promise<Lead> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/`, {
+        method: "PATCH",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        if (response.status >= 400 && response.status < 500) {
+            throw new BusinessValidationError(errorText);
+        }
+        throw new Error("Unable to update lead. Please try again.");
+    }
+
+    return response.json();
+}
