@@ -6,6 +6,8 @@ import AdminLayout from "@/components/admin/admin-layout";
 import { resolveProductsBasePath } from "@/lib/product-routes";
 import ProductForm from "@/features/products/components/ProductForm";
 import SpecGroupsBuilder from "@/features/products/components/SpecGroupsBuilder";
+import ProductFAQManager from "@/features/products/components/ProductFAQManager";
+import ProductImageManager from "@/features/products/components/ProductImageManager";
 import EditProductSkeleton from "@/features/products/components/EditProductSkeleton";
 import EditProductHeader from "@/features/products/components/EditProductHeader";
 import { useEditProduct } from "@/features/products/hooks/useEditProduct";
@@ -73,6 +75,12 @@ export default function EditProductPage(): ReactElement {
                             productId={product.id}
                             pricingMode={values.pricing_mode}
                         />
+                    </section>
+                    <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+                        <ProductFAQManager productId={product.id} />
+                    </section>
+                    <section className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+                        <ProductImageManager productId={product.id} />
                     </section>
                 </div>
             </main>

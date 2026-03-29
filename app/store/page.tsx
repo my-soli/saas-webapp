@@ -5,12 +5,10 @@ import type { ReactElement } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
-    SearchIcon,
     ShoppingCartIcon,
-    UserIcon,
-    MenuIcon,
     ArrowRightIcon,
     FilterIcon,
     ChevronRightIcon,
@@ -77,9 +75,19 @@ function ProductCard({ product }: { product: CatalogProduct }): ReactElement {
                 className="relative flex flex-col bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 h-full"
             >
                 <div className="relative aspect-[4/3] bg-gray-100 overflow-hidden">
-                    <div className="absolute inset-0 flex items-center justify-center text-gray-300">
-                        <ShoppingCartIcon className="h-12 w-12" />
-                    </div>
+                    {product.primary_image_url ? (
+                        <Image
+                            src={product.primary_image_url}
+                            alt={product.name}
+                            fill
+                            className="object-cover group-hover:scale-105 transition-transform duration-300"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        />
+                    ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-gray-300">
+                            <ShoppingCartIcon className="h-12 w-12" />
+                        </div>
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/10" />
                     <button
                         type="button"
@@ -156,10 +164,11 @@ function ProductCard({ product }: { product: CatalogProduct }): ReactElement {
 }
 
 export default function StorePage(): ReactElement {
-    const [activeCategory, setActiveCategory] = useState<string>("All");
-    const [search, setSearch] = useState<string>("");
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const activeCategory = searchParams.get("category") ?? "All";
+    const [search, setSearch] = useState<string>(searchParams.get("q") ?? "");
     const deferredSearch = useDeferredValue(search);
-    const [cartCount] = useState<number>(0);
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ["catalog-products", deferredSearch],
@@ -180,91 +189,7 @@ export default function StorePage(): ReactElement {
             : allProducts.filter((p) => p.primary_category_name === activeCategory);
 
     return (
-        <div className="min-h-screen bg-gray-50 font-sans">
-            {/* ── ANNOUNCEMENT BAR ───────────────────────────────────── */}
-            <div className="bg-brand-blue text-white text-center py-2 px-4 text-xs font-medium tracking-wide">
-                🎉&nbsp; Free delivery on orders over KES 10,000 within Nairobi &nbsp;
-                <Link href="#" className="underline underline-offset-2 hover:text-brand-yellow transition-colors">
-                    Learn more
-                </Link>
-            </div>
-
-            {/* ── HEADER ─────────────────────────────────────────────── */}
-            <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6">
-                    <div className="flex h-16 items-center gap-4">
-                        <Link href="/" className="flex-shrink-0">
-                            <Image
-                                src="/logo/logo.png"
-                                alt="Print Duka"
-                                width={160}
-                                height={72}
-                                className="h-10 w-auto"
-                                priority
-                            />
-                        </Link>
-
-                        <nav className="hidden lg:flex items-center gap-1 ml-4">
-                            {categories.map((cat) => (
-                                <button
-                                    key={cat}
-                                    type="button"
-                                    onClick={() => setActiveCategory(cat)}
-                                    className={cn(
-                                        "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                                        activeCategory === cat
-                                            ? "bg-brand-blue/10 text-brand-blue"
-                                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100",
-                                    )}
-                                >
-                                    {cat}
-                                </button>
-                            ))}
-                        </nav>
-
-                        <div className="flex-1 max-w-sm mx-auto hidden sm:block">
-                            <div className="relative">
-                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder="Search products…"
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="w-full rounded-xl bg-gray-100 pl-9 pr-4 py-2 text-sm placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue/30 transition-all"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 ml-auto">
-                            <button type="button" className="sm:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100">
-                                <SearchIcon className="h-5 w-5" />
-                            </button>
-                            <Link
-                                href="/login"
-                                className="hidden sm:flex items-center gap-1.5 px-4 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                <UserIcon className="h-4 w-4" />
-                                Sign In
-                            </Link>
-                            <button
-                                type="button"
-                                className="relative p-2 rounded-xl bg-brand-blue text-white hover:bg-brand-blue/90 transition-colors"
-                            >
-                                <ShoppingCartIcon className="h-5 w-5" />
-                                {cartCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-brand-red text-white text-[10px] font-bold flex items-center justify-center">
-                                        {cartCount}
-                                    </span>
-                                )}
-                            </button>
-                            <button type="button" className="lg:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100">
-                                <MenuIcon className="h-5 w-5" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
-
+        <>
             {/* ── HERO BANNER ────────────────────────────────────────── */}
             <section className="mx-auto max-w-7xl px-4 sm:px-6 pt-6">
                 <div className="relative overflow-hidden rounded-3xl bg-brand-blue min-h-[380px] flex">
@@ -390,7 +315,11 @@ export default function StorePage(): ReactElement {
                         <button
                             key={cat}
                             type="button"
-                            onClick={() => setActiveCategory(cat)}
+                            onClick={() => {
+                                const next = new URLSearchParams(searchParams.toString());
+                                if (cat === "All") { next.delete("category"); } else { next.set("category", cat); }
+                                router.push(`/store?${next.toString()}`);
+                            }}
                             className={cn(
                                 "flex-shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200",
                                 activeCategory === cat
@@ -609,6 +538,6 @@ export default function StorePage(): ReactElement {
                     </div>
                 </div>
             </footer>
-        </div>
+        </>
     );
 }

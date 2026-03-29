@@ -16,24 +16,24 @@ interface ProductFAQSectionProps {
 }
 
 export default function ProductFAQSection({ faqs }: ProductFAQSectionProps): ReactElement | null {
-    const [openId, setOpenId] = useState<number | null>(null);
-
     const activeFaqs = [...faqs].sort((a, b) => a.display_order - b.display_order);
+    const [openId, setOpenId] = useState<number | null>(activeFaqs[0]?.id ?? null);
 
     if (activeFaqs.length === 0) return null;
 
     return (
-        <div className="border-t border-gray-200 py-12 mt-4">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Frequently asked questions</h2>
-            <div className="divide-y divide-gray-200">
-                {activeFaqs.map((faq) => {
+        <div>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Frequently asked questions</h2>
+            <div className="rounded-2xl border border-gray-100 overflow-hidden">
+                {activeFaqs.map((faq, i) => {
                     const isOpen = openId === faq.id;
+                    const isLast = i === activeFaqs.length - 1;
                     return (
-                        <div key={faq.id}>
+                        <div key={faq.id} className={!isLast ? "border-b border-gray-100" : ""}>
                             <button
                                 type="button"
                                 onClick={() => setOpenId(isOpen ? null : faq.id)}
-                                className="flex w-full items-center justify-between gap-4 py-4 text-left"
+                                className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left hover:bg-gray-50 transition-colors"
                                 aria-expanded={isOpen}
                             >
                                 <span className="text-sm font-semibold text-gray-900">{faq.question}</span>
@@ -42,7 +42,9 @@ export default function ProductFAQSection({ faqs }: ProductFAQSectionProps): Rea
                                 />
                             </button>
                             {isOpen && (
-                                <p className="pb-4 text-sm text-gray-600 leading-relaxed">{faq.answer}</p>
+                                <div className="px-5 pb-4">
+                                    <p className="text-sm text-gray-500 leading-relaxed">{faq.answer}</p>
+                                </div>
                             )}
                         </div>
                     );

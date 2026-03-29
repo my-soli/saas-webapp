@@ -10,7 +10,6 @@ import {
     ArrowLeftIcon,
     LoaderIcon,
     AlertCircleIcon,
-    ChevronDownIcon,
     MessageSquareIcon,
 } from "lucide-react";
 import {
@@ -132,106 +131,129 @@ export default function ProductDetailPage(): ReactElement {
 
     const isQuoteOnly = product.pricing_mode === "quote_only";
 
+    const handleOrder = (): void => {
+        void (async () => {
+            setIsPricing(true);
+            setPriceError(null);
+            try {
+                const payload = buildSelectionsPayload(visibleGroups, groupStates);
+                const result = await calculatePrice(product.id, payload);
+                setPriceResult(result);
+                if (!result.valid && result.errors) {
+                    setPriceError(result.errors.join(", "));
+                }
+            } catch (e: unknown) {
+                setPriceError(e instanceof Error ? e.message : "Calculation failed");
+            } finally {
+                setIsPricing(false);
+            }
+        })();
+    };
+
     return (
-        <div className="min-h-screen bg-white">
-            <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-                <div className="mx-auto max-w-7xl px-4 sm:px-6">
-                    <div className="flex h-14 items-center gap-3">
+        <div className="bg-white">
+            {/* Breadcrumb bar */}
+            <div className="bg-gray-50 border-b border-gray-100">
+                <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                    <div className="flex h-10 items-center gap-1.5 text-xs text-gray-400">
                         <button
                             type="button"
                             onClick={() => router.back()}
-                            className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-brand-blue transition-colors"
+                            className="hover:text-brand-blue transition-colors"
                         >
-                            <ArrowLeftIcon className="h-4 w-4" />
-                            <span className="hidden sm:inline">Back</span>
+                            <ArrowLeftIcon className="h-3.5 w-3.5" />
                         </button>
-                        <div className="h-5 w-px bg-gray-200" />
-                        <nav className="flex items-center gap-1 text-xs text-gray-400 min-w-0">
-                            <Link href="/store" className="hover:text-brand-blue transition-colors flex-shrink-0">
-                                Store
-                            </Link>
-                            <ChevronDownIcon className="h-3 w-3 rotate-[-90deg] flex-shrink-0" />
-                            {product.primary_category_name && (
-                                <>
-                                    <span className="hover:text-brand-blue cursor-pointer flex-shrink-0 hidden sm:inline">
-                                        {product.primary_category_name}
-                                    </span>
-                                    <ChevronDownIcon className="h-3 w-3 rotate-[-90deg] flex-shrink-0 hidden sm:inline" />
-                                </>
-                            )}
-                            <span className="text-gray-700 font-medium truncate">{product.name}</span>
-                        </nav>
-                        <div className="ml-auto">
-                            <Link href="/" className="flex-shrink-0">
-                                <Image
-                                    src="/logo/logo.png"
-                                    alt="Print Duka"
-                                    width={120}
-                                    height={54}
-                                    className="h-8 w-auto"
-                                />
-                            </Link>
-                        </div>
+                        <span>/</span>
+                        <Link href="/store" className="hover:text-brand-blue transition-colors">Store</Link>
+                        {product.primary_category_name && (
+                            <>
+                                <span>/</span>
+                                <span className="hidden sm:inline">{product.primary_category_name}</span>
+                            </>
+                        )}
+                        <span>/</span>
+                        <span className="text-gray-600 font-medium truncate max-w-[200px]">{product.name}</span>
                     </div>
                 </div>
-            </header>
+            </div>
 
-            <div className="mx-auto max-w-7xl px-8 py-12">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+            {/* Main product section */}
+            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 lg:gap-16 items-start">
+
+                    {/* LEFT — image gallery */}
                     <ProductImageGallery product={product} />
 
-                    <div>
-                        {product.primary_category_name && (
-                            <p className="text-xs font-semibold uppercase tracking-widest text-brand-blue/70 mb-3">
-                                {product.primary_category_name}
-                                {product.sub_category_name && ` · ${product.sub_category_name}`}
-                            </p>
-                        )}
-                        <h1 className="text-2xl font-bold text-gray-900 mb-2">{product.name}</h1>
-                        {product.short_description && (
-                            <p className="text-gray-700 text-sm leading-relaxed mb-3">{product.short_description}</p>
-                        )}
-                        {!isQuoteOnly && priceResult && parseFloat(priceResult.final_selling_price) > 0 && (
-                            <div className="mb-5">
-                                <span className="text-xl font-bold text-gray-900">
-                                    {formatKES(priceResult.final_selling_price)}
-                                </span>{" "}
-                                <span className="text-sm text-gray-500">each</span>
+                    {/* RIGHT — config + purchase */}
+                    <div className="lg:sticky lg:top-6 space-y-5">
+                        {/* Title + badges */}
+                        <div>
+                            {(product.bestseller_badge || product.new_arrival || product.on_sale_badge) && (
+                                <div className="flex flex-wrap gap-1.5 mb-2">
+                                    {product.bestseller_badge && (
+                                        <span className="rounded-full bg-brand-yellow px-2.5 py-0.5 text-[11px] font-bold text-brand-black">Best Seller</span>
+                                    )}
+                                    {product.new_arrival && (
+                                        <span className="rounded-full bg-brand-green text-white px-2.5 py-0.5 text-[11px] font-bold">New</span>
+                                    )}
+                                    {product.on_sale_badge && (
+                                        <span className="rounded-full bg-brand-red text-white px-2.5 py-0.5 text-[11px] font-bold">Sale</span>
+                                    )}
+                                </div>
+                            )}
+                            <h1 className="text-2xl font-bold text-gray-900 leading-snug">{product.name}</h1>
+                            {product.short_description && (
+                                <p className="mt-2 text-sm text-gray-500 leading-relaxed">{product.short_description}</p>
+                            )}
+                        </div>
+
+                        {/* Live price */}
+                        {!isQuoteOnly && (
+                            <div className="flex items-baseline gap-2">
+                                {isPricing ? (
+                                    <span className="text-sm text-gray-400 flex items-center gap-1.5">
+                                        <LoaderIcon className="h-3.5 w-3.5 animate-spin" />
+                                        Calculating…
+                                    </span>
+                                ) : priceResult && parseFloat(priceResult.final_selling_price) > 0 ? (
+                                    <>
+                                        <span className="text-3xl font-bold text-gray-900">{formatKES(priceResult.final_selling_price)}</span>
+                                        <span className="text-sm text-gray-400">per piece</span>
+                                    </>
+                                ) : (
+                                    <span className="text-sm text-gray-400">Configure below to see price</span>
+                                )}
                             </div>
                         )}
+
+                        {/* Tags */}
                         {product.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mb-4">
+                            <div className="flex flex-wrap gap-1.5">
                                 {product.tags.map((tag) => (
-                                    <span
-                                        key={tag.id}
-                                        className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-500"
-                                    >
+                                    <span key={tag.id} className="rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
                                         {tag.name}
                                     </span>
                                 ))}
                             </div>
                         )}
 
+                        {/* Configuration or quote */}
                         {isQuoteOnly ? (
-                            <div className="border-t border-gray-200 mt-6 pt-6 space-y-4">
-                                <p className="text-gray-600 text-sm">
-                                    This product requires a custom quote. Our team will get back to you within 2 hours.
+                            <div className="rounded-2xl bg-gray-50 p-5 space-y-3">
+                                <p className="text-sm font-semibold text-gray-800">Custom quote required</p>
+                                <p className="text-sm text-gray-500">
+                                    Our team will respond within 2 hours with a tailored price.
                                 </p>
                                 <Link
                                     href="/contact"
-                                    className="inline-flex items-center gap-2 bg-brand-orange px-5 py-2.5 rounded-lg text-sm font-bold text-white hover:bg-brand-orange/90 transition-colors"
+                                    className="inline-flex items-center gap-2 bg-brand-orange px-5 py-2.5 rounded-xl text-sm font-bold text-white hover:bg-brand-orange/90 transition-colors"
                                 >
                                     <MessageSquareIcon className="h-4 w-4" />
                                     Request a Quote
                                 </Link>
                             </div>
                         ) : (
-                            <>
-                                {visibleGroups.length === 0 && (
-                                    <p className="text-sm text-gray-400 mt-6">
-                                        No configuration needed for this product.
-                                    </p>
-                                )}
+                            <div className="space-y-1">
                                 {visibleGroups.map((group, i) => (
                                     <SpecGroupSection
                                         key={group.id}
@@ -245,52 +267,45 @@ export default function ProductDetailPage(): ReactElement {
                                     result={priceResult}
                                     isPending={isPricing}
                                     error={priceError}
-                                    onOrder={() => {
-                                        void (async () => {
-                                            setIsPricing(true);
-                                            setPriceError(null);
-                                            try {
-                                                const payload = buildSelectionsPayload(visibleGroups, groupStates);
-                                                const result = await calculatePrice(product.id, payload);
-                                                setPriceResult(result);
-                                                if (!result.valid && result.errors) {
-                                                    setPriceError(result.errors.join(", "));
-                                                }
-                                            } catch (e: unknown) {
-                                                setPriceError(e instanceof Error ? e.message : "Calculation failed");
-                                            } finally {
-                                                setIsPricing(false);
-                                            }
-                                        })();
-                                    }}
+                                    onOrder={handleOrder}
                                 />
-                            </>
+                            </div>
                         )}
                     </div>
                 </div>
 
-                {(product.long_description || product.internal_code) && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 border-t border-gray-200 py-12 mt-4">
-                        {product.long_description && (
-                            <div className="space-y-4">
-                                <h2 className="text-xl font-bold text-gray-900">{product.name}</h2>
-                                <ul className="space-y-2">
-                                    {product.long_description.split("\n").filter(Boolean).map((line, idx) => (
-                                        <li key={idx} className="flex gap-3 text-gray-700 text-sm">
-                                            <span className="text-brand-blue font-bold flex-shrink-0">•</span>
-                                            <span>{line}</span>
-                                        </li>
-                                    ))}
-                                </ul>
+                {/* Bottom content — description, specs, FAQs */}
+                {(product.long_description || product.internal_code || product.faqs.length > 0) && (
+                    <div className="mt-16 pt-12 border-t border-gray-100 space-y-12">
+                        {/* Description + specs */}
+                        {(product.long_description || product.internal_code) && (
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                                {product.long_description && (
+                                    <div>
+                                        <h2 className="text-lg font-bold text-gray-900 mb-4">About this product</h2>
+                                        <ul className="space-y-2.5">
+                                            {product.long_description.split("\n").filter(Boolean).map((line, idx) => (
+                                                <li key={idx} className="flex gap-3 text-gray-600 text-sm leading-relaxed">
+                                                    <span className="text-brand-blue font-bold flex-shrink-0 mt-0.5">•</span>
+                                                    <span>{line}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+                                {product.internal_code && (
+                                    <div>
+                                        <h2 className="text-lg font-bold text-gray-900 mb-4">Specifications</h2>
+                                        <ProductInfoTable product={product} />
+                                    </div>
+                                )}
                             </div>
                         )}
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-900 mb-4">Product details</h2>
-                            <ProductInfoTable product={product} />
-                        </div>
+
+                        {/* FAQs */}
+                        <ProductFAQSection faqs={product.faqs} />
                     </div>
                 )}
-                <ProductFAQSection faqs={product.faqs} />
             </div>
         </div>
     );

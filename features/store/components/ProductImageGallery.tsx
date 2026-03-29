@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import type { ReactElement } from "react";
 import Image from "next/image";
-import { ShoppingCartIcon, HeartIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { PackageIcon } from "lucide-react";
 import type { CatalogProduct } from "@/services/store";
 
 interface ProductImageGalleryProps {
@@ -10,72 +11,67 @@ interface ProductImageGalleryProps {
 }
 
 export default function ProductImageGallery({ product }: ProductImageGalleryProps): ReactElement {
+    const sorted = [...product.images].sort((a, b) => {
+        if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
+        return a.display_order - b.display_order;
+    });
+
+    const [activeIndex, setActiveIndex] = useState(0);
+    const [zoomed, setZoomed] = useState(false);
+
+    const active = sorted[activeIndex] ?? null;
+    const displayUrl = active?.image_url ?? product.primary_image_url;
+
     return (
-        <div className="space-y-4">
-            <div className="relative bg-gray-100 rounded-lg aspect-square flex items-center justify-center overflow-hidden group">
-                {product.primary_image_url ? (
+        <div className="space-y-3">
+            {/* Main image */}
+            <div
+                className={`relative bg-gray-50 rounded-2xl overflow-hidden aspect-square ${displayUrl ? "cursor-zoom-in" : ""} ${zoomed ? "cursor-zoom-out" : ""}`}
+                onClick={() => { if (displayUrl) setZoomed((z) => !z); }}
+            >
+                {displayUrl ? (
                     <Image
-                        src={product.primary_image_url}
-                        alt={product.name}
+                        src={displayUrl}
+                        alt={active?.alt_text || product.name}
                         fill
-                        className="object-cover"
+                        className={`object-cover transition-transform duration-300 ${zoomed ? "scale-150" : "scale-100"}`}
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                        priority
                     />
                 ) : (
-                    <ShoppingCartIcon className="h-20 w-20 text-gray-200" />
+                    <div className="flex h-full items-center justify-center">
+                        <PackageIcon className="h-24 w-24 text-gray-200" />
+                    </div>
                 )}
-                <div className="absolute top-4 left-4 flex flex-wrap gap-1.5 z-10">
-                    {product.bestseller_badge && (
-                        <span className="rounded-full bg-brand-yellow px-2.5 py-0.5 text-[11px] font-bold text-brand-black shadow-sm">
-                            Best Seller
-                        </span>
-                    )}
-                    {product.new_arrival && (
-                        <span className="rounded-full bg-brand-green text-white px-2.5 py-0.5 text-[11px] font-bold shadow-sm">
-                            New
-                        </span>
-                    )}
-                    {product.on_sale_badge && (
-                        <span className="rounded-full bg-brand-red text-white px-2.5 py-0.5 text-[11px] font-bold shadow-sm">
-                            Sale
-                        </span>
-                    )}
-                </div>
-                <button
-                    type="button"
-                    className="absolute top-4 right-4 bg-white rounded-full p-2 hover:bg-gray-100 shadow-lg z-10"
-                    aria-label="Save to wishlist"
-                >
-                    <HeartIcon className="h-5 w-5 text-gray-600" />
-                </button>
-                <button
-                    type="button"
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-white rounded-lg p-2 hover:bg-gray-100 shadow-lg z-10"
-                    aria-label="Previous image"
-                >
-                    <ChevronLeftIcon className="h-5 w-5 text-gray-600" />
-                </button>
-                <button
-                    type="button"
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-white rounded-lg p-2 hover:bg-gray-100 shadow-lg z-10"
-                    aria-label="Next image"
-                >
-                    <ChevronRightIcon className="h-5 w-5 text-gray-600" />
-                </button>
             </div>
-            {product.primary_image_url && (
-                <div className="flex gap-3">
-                    <button
-                        type="button"
-                        className="w-20 h-20 rounded-lg overflow-hidden border-2 border-gray-900 flex-shrink-0"
-                    >
-                        <Image
-                            src={product.primary_image_url}
-                            alt={product.name}
-                            width={80}
-                            height={80}
-                            className="w-full h-full object-cover"
-                        />
-                    </button>
+
+            {/* Thumbnail strip */}
+            {sorted.length > 1 && (
+                <div className="flex gap-2 flex-wrap">
+                    {sorted.map((img, i) => (
+                        <button
+                            key={img.id}
+                            type="button"
+                            onClick={() => { setActiveIndex(i); setZoomed(false); }}
+                            className={`w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 transition-all ${i === activeIndex
+                                    ? "ring-2 ring-brand-blue ring-offset-2"
+                                    : "ring-1 ring-gray-200 opacity-70 hover:opacity-100"
+                                }`}
+                            aria-label={img.alt_text || `Image ${i + 1}`}
+                        >
+                            {img.image_url ? (
+                                <Image
+                                    src={img.image_url}
+                                    alt={img.alt_text || product.name}
+                                    width={64}
+                                    height={64}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-gray-100" />
+                            )}
+                        </button>
+                    ))}
                 </div>
             )}
         </div>

@@ -343,14 +343,14 @@ interface SpecGroupSectionProps {
 
 export default function SpecGroupSection({ group, state, onUpdate }: SpecGroupSectionProps): ReactElement {
     return (
-        <div className="py-4 border-t border-gray-200 space-y-3">
-            <div className="flex items-baseline justify-between gap-2">
-                <label className="text-sm font-semibold text-gray-900">
+        <div className="py-3.5 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+                <label className="text-sm font-semibold text-gray-800">
                     {group.display_label || group.name}
-                    {group.is_required && <span className="text-red-500 ml-1">*</span>}
+                    {group.is_required && <span className="text-red-400 ml-1 font-normal">*</span>}
                 </label>
                 {group.help_text && (
-                    <span className="text-xs text-gray-400 text-right">{group.help_text}</span>
+                    <span className="text-xs text-gray-400 text-right flex-shrink-0 max-w-[160px] leading-tight">{group.help_text}</span>
                 )}
             </div>
             <SpecGroupInput group={group} state={state} onUpdate={onUpdate} />

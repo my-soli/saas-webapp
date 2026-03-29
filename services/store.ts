@@ -28,6 +28,7 @@ export interface CatalogProduct {
     unit_of_measure: string;
     stock_status: string;
     spec_groups: ProductSpecGroup[];
+    images: Array<{ id: number; image_url: string | null; alt_text: string; is_primary: boolean; display_order: number }>;
     faqs: Array<{ id: number; question: string; answer: string; display_order: number }>;
 }
 
