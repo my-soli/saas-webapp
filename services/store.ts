@@ -6,6 +6,7 @@ export interface CatalogProduct {
     id: number;
     name: string;
     internal_code: string;
+    primary_image_url: string | null;
     short_description: string;
     long_description: string;
     print_category: number | null;
@@ -27,6 +28,7 @@ export interface CatalogProduct {
     unit_of_measure: string;
     stock_status: string;
     spec_groups: ProductSpecGroup[];
+    faqs: Array<{ id: number; question: string; answer: string; display_order: number }>;
 }
 
 export interface PriceCalculationResult {
@@ -41,7 +43,7 @@ export interface PriceCalculationResult {
         selling_price: string;
         vendor_cost: string;
     }>;
-    errors?: string[];
+    errors: string[];
 }
 
 export type SelectionValue = number | number[] | number | { width: number; height: number };

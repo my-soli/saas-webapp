@@ -46,6 +46,12 @@ function getMinPrice(product: CatalogProduct): number | null {
                 .filter((p): p is number => p !== null);
             if (prices.length > 0) return Math.min(...prices);
         }
+        if (group.group_type === "numeric_input" && group.ranges.length > 0) {
+            const prices = group.ranges
+                .map((r) => parseFloat(r.selling_price_base))
+                .filter((p) => !isNaN(p));
+            if (prices.length > 0) return Math.min(...prices);
+        }
     }
     return null;
 }

@@ -2,7 +2,6 @@
 
 import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { fetchProduct, updateProduct, uploadProductImage } from "@/services/products";
 import type { Product, ProductFormValues } from "@/types/products";
@@ -21,7 +20,6 @@ interface UseEditProductReturn {
 }
 
 export function useEditProduct(productId: number, basePath: string): UseEditProductReturn {
-    const router = useRouter();
     const queryClient = useQueryClient();
     const [localValues, setLocalValues] = useState<ProductFormValues | null>(null);
     const [image, setImage] = useState<File | null>(null);
@@ -55,10 +53,12 @@ export function useEditProduct(productId: number, basePath: string): UseEditProd
             await updateProduct(product.id, buildPayload(values));
             if (image) {
                 await uploadProductImage(product.id, image, values.name.trim());
+                setImage(null);
             }
-            await queryClient.invalidateQueries({ queryKey: ["products"] });
+            setLocalValues(null);
+            void queryClient.invalidateQueries({ queryKey: ["product", productId] });
+            void queryClient.invalidateQueries({ queryKey: ["products"] });
             toast.success("Product saved.");
-            router.push(basePath);
         } catch (_error: unknown) {
             toast.error("Unable to save product. Please try again.");
         } finally {
