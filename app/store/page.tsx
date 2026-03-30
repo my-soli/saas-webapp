@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState, useDeferredValue } from "react";
+import { memo, useMemo, useState, useDeferredValue, Suspense } from "react";
 import type { ReactElement } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -177,7 +177,7 @@ const ProductCard = memo(function ProductCard({ product }: { product: CatalogPro
 });
 ProductCard.displayName = "ProductCard";
 
-export default function StorePage(): ReactElement {
+function StorePageInner(): ReactElement {
     const router = useRouter();
     const searchParams = useSearchParams();
     const activeCategoryId = searchParams.get("category") ?? "";
@@ -477,5 +477,13 @@ export default function StorePage(): ReactElement {
                 </div>
             </footer>
         </>
+    );
+}
+
+export default function StorePage(): ReactElement {
+    return (
+        <Suspense>
+            <StorePageInner />
+        </Suspense>
     );
 }

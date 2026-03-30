@@ -359,8 +359,6 @@ export default function LeadsPage(): ReactElement {
                                     <LeadsTable
                                         leads={leads}
                                         onView={handleView}
-                                        onQualify={handleQualify}
-                                        onDelete={handleDelete}
                                         pendingLeadId={pendingLeadAction?.leadId ?? null}
                                         pendingAction={pendingLeadAction?.action ?? null}
                                     />
@@ -394,9 +392,15 @@ export default function LeadsPage(): ReactElement {
                 isLoading={isSelectedLeadLoading}
                 isQualifying={qualifyMutation.isPending}
                 isConverting={convertMutation.isPending}
+                isMarkingLost={false}
+                isMarkingContacted={false}
+                isDeleting={deleteMutation.isPending}
                 onClose={(): void => setSelectedLeadId(null)}
                 onEdit={handleEdit}
                 onQualify={handleQualify}
+                onMarkContacted={(): void => undefined}
+                onMarkLost={(): void => undefined}
+                onDelete={handleDelete}
                 onConvert={handleConvert}
             />
         </AdminLayout>

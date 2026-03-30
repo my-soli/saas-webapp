@@ -43,7 +43,7 @@ async function fetchSessionData(sessionId: string): Promise<SessionData | null> 
     }
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     const matchedRoute = ROUTE_ALLOWED_ROLES.find((r) => pathname.startsWith(r.prefix));
