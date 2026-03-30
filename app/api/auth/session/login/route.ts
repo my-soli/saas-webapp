@@ -57,18 +57,11 @@ export async function POST(request: NextRequest) {
         }
 
         const sessionSetCookie = loginRes.headers.get('set-cookie') || '';
-        const sessionMatch = sessionSetCookie.match(/sessionid=([^;]+)/);
 
         const proxyResponse = NextResponse.json(loginData);
 
-        if (sessionMatch) {
-            proxyResponse.cookies.set('sessionid', sessionMatch[1], {
-                httpOnly: true,
-                sameSite: 'lax',
-                secure: process.env.NODE_ENV === 'production',
-                path: '/',
-                maxAge: 60 * 60 * 24 * 7,
-            });
+        if (sessionSetCookie) {
+            proxyResponse.headers.set('Set-Cookie', sessionSetCookie);
         }
 
         return proxyResponse;

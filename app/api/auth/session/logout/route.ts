@@ -11,17 +11,25 @@ export async function POST(request: NextRequest) {
     const csrfCookieMatch = csrfSetCookie.match(/csrftoken=([^;]+)/);
     const csrfCookieValue = csrfCookieMatch ? csrfCookieMatch[1] : '';
 
+    let djangoSetCookie = '';
     if (sessionid) {
-        await fetch(`${API_BASE_URL}/api/auth/session/logout/`, {
+        const logoutRes = await fetch(`${API_BASE_URL}/api/auth/session/logout/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': csrfToken,
                 'Cookie': `sessionid=${sessionid}; csrftoken=${csrfCookieValue}`,
             },
         });
+        djangoSetCookie = logoutRes.headers.get('set-cookie') || '';
     }
 
     const proxyResponse = NextResponse.json({ success: true });
-    proxyResponse.cookies.delete('sessionid');
+    if (djangoSetCookie) {
+        proxyResponse.headers.set('Set-Cookie', djangoSetCookie);
+    } else {
+        const domain = process.env.SESSION_COOKIE_DOMAIN || '';
+        const domainAttr = domain ? `; Domain=${domain}` : '';
+        proxyResponse.headers.set('Set-Cookie', `sessionid=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None${domainAttr}`);
+    }
     return proxyResponse;
 }
