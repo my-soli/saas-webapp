@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import type { ReactElement, KeyboardEvent } from "react";
+import type { ReactElement } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -39,10 +39,11 @@ export default function StoreNavbar(): ReactElement {
     const activeCategory = searchParams.get("category") ?? "All";
     const isStoreListing = pathname === "/store";
 
-    const [searchValue, setSearchValue] = useState<string>("");
+    const [searchValue, setSearchValue] = useState<string>(searchParams.get("q") ?? "");
     const [showMore, setShowMore] = useState<boolean>(false);
     const [mobileOpen, setMobileOpen] = useState<boolean>(false);
     const moreRef = useRef<HTMLDivElement>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const { data: categories = [] } = useQuery<ProductCategory[]>({
         queryKey: ["product-categories"],
@@ -53,13 +54,21 @@ export default function StoreNavbar(): ReactElement {
     const visibleCats = categories.slice(0, MAX_NAV_CATS);
     const overflowCats = categories.slice(MAX_NAV_CATS);
 
-    const buildCategoryHref = (name: string): string =>
-        name === "All" ? "/store" : `/store?category=${encodeURIComponent(name)}`;
+    const buildCategoryHref = (id: number): string =>
+        `/store?category=${id}`;
 
-    const handleSearchSubmit = (e: KeyboardEvent<HTMLInputElement>): void => {
-        if (e.key !== "Enter" || !searchValue.trim()) return;
-        router.push(`/store?q=${encodeURIComponent(searchValue.trim())}`);
-        setSearchValue("");
+    const handleSearchChange = (value: string): void => {
+        setSearchValue(value);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            const next = new URLSearchParams(searchParams.toString());
+            if (value.trim()) {
+                next.set("q", value.trim());
+            } else {
+                next.delete("q");
+            }
+            router.push(`/store?${next.toString()}`);
+        }, 400);
     };
 
     useEffect(() => {
@@ -72,10 +81,10 @@ export default function StoreNavbar(): ReactElement {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const isCatActive = (name: string): boolean =>
-        isStoreListing && activeCategory === name;
+    const isCatActive = (id: number): boolean =>
+        isStoreListing && activeCategory === String(id);
 
-    const allActive = isStoreListing && activeCategory === "All" && !searchParams.get("q");
+    const allActive = isStoreListing && !activeCategory;
 
     return (
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
@@ -110,10 +119,10 @@ export default function StoreNavbar(): ReactElement {
                         {visibleCats.map((cat) => (
                             <Link
                                 key={cat.id}
-                                href={buildCategoryHref(cat.name)}
+                                href={buildCategoryHref(cat.id)}
                                 className={cn(
                                     "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
-                                    isCatActive(cat.name)
+                                    isCatActive(cat.id)
                                         ? "bg-brand-blue/10 text-brand-blue"
                                         : "text-gray-600 hover:text-gray-900 hover:bg-gray-100",
                                 )}
@@ -142,11 +151,11 @@ export default function StoreNavbar(): ReactElement {
                                         {overflowCats.map((cat) => (
                                             <Link
                                                 key={cat.id}
-                                                href={buildCategoryHref(cat.name)}
+                                                href={buildCategoryHref(cat.id)}
                                                 onClick={() => setShowMore(false)}
                                                 className={cn(
                                                     "block px-4 py-2 text-sm transition-colors",
-                                                    isCatActive(cat.name)
+                                                    isCatActive(cat.id)
                                                         ? "text-brand-blue font-semibold bg-brand-blue/5"
                                                         : "text-gray-700 hover:bg-gray-50",
                                                 )}
@@ -168,8 +177,7 @@ export default function StoreNavbar(): ReactElement {
                                 type="text"
                                 placeholder="Search products…"
                                 value={searchValue}
-                                onChange={(e) => setSearchValue(e.target.value)}
-                                onKeyDown={handleSearchSubmit}
+                                onChange={(e) => handleSearchChange(e.target.value)}
                                 className="w-full rounded-xl bg-gray-100 pl-9 pr-4 py-2 text-sm placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue/30 transition-all"
                             />
                         </div>
@@ -214,8 +222,7 @@ export default function StoreNavbar(): ReactElement {
                             type="text"
                             placeholder="Search products…"
                             value={searchValue}
-                            onChange={(e) => setSearchValue(e.target.value)}
-                            onKeyDown={handleSearchSubmit}
+                            onChange={(e) => handleSearchChange(e.target.value)}
                             className="w-full rounded-xl bg-gray-100 pl-9 pr-4 py-2 text-sm placeholder-gray-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-blue/30 transition-all"
                         />
                     </div>
@@ -238,11 +245,11 @@ export default function StoreNavbar(): ReactElement {
                     {categories.map((cat) => (
                         <Link
                             key={cat.id}
-                            href={buildCategoryHref(cat.name)}
+                            href={buildCategoryHref(cat.id)}
                             onClick={() => setMobileOpen(false)}
                             className={cn(
                                 "block rounded-xl px-4 py-2.5 text-sm font-medium transition-colors",
-                                isCatActive(cat.name) ? "bg-brand-blue/10 text-brand-blue" : "text-gray-700 hover:bg-gray-50",
+                                isCatActive(cat.id) ? "bg-brand-blue/10 text-brand-blue" : "text-gray-700 hover:bg-gray-50",
                             )}
                         >
                             {cat.name}

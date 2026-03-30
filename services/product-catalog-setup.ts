@@ -65,25 +65,33 @@ export async function fetchProductTags(): Promise<ProductTag[]> {
 
 // ── Product Categories ────────────────────────────────────────────────────────
 
-export async function createProductCategory(data: { name: string; description: string }): Promise<ProductCategory> {
+export async function createProductCategory(data: { name: string; description: string; image?: File | null }): Promise<ProductCategory> {
     const csrf = await getCsrfToken();
+    const formData = new FormData();
+    formData.append("name", data.name);
+    formData.append("description", data.description);
+    if (data.image) formData.append("image", data.image);
     const response = await fetch(`${API_BASE_URL}/api/v1/product-categories/`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        headers: { "X-CSRFToken": csrf },
         credentials: "include",
-        body: JSON.stringify(data),
+        body: formData,
     });
     if (!response.ok) throw new Error("Failed to create category");
     return response.json() as Promise<ProductCategory>;
 }
 
-export async function updateProductCategory(id: number, data: { name: string; description: string }): Promise<ProductCategory> {
+export async function updateProductCategory(id: number, data: { name: string; description: string; image?: File | null }): Promise<ProductCategory> {
     const csrf = await getCsrfToken();
+    const formData = new FormData();
+    formData.append("name", data.name);
+    formData.append("description", data.description);
+    if (data.image) formData.append("image", data.image);
     const response = await fetch(`${API_BASE_URL}/api/v1/product-categories/${id}/`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        headers: { "X-CSRFToken": csrf },
         credentials: "include",
-        body: JSON.stringify(data),
+        body: formData,
     });
     if (!response.ok) throw new Error("Failed to update category");
     return response.json() as Promise<ProductCategory>;

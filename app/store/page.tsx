@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useDeferredValue } from "react";
+import { memo, useMemo, useState, useDeferredValue } from "react";
 import type { ReactElement } from "react";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -17,13 +17,26 @@ import {
     ShieldCheckIcon,
     PhoneIcon,
     ZapIcon,
-    BadgeCheckIcon,
-    LoaderIcon,
     AlertCircleIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchCatalogProducts, type CatalogProduct } from "@/services/store";
 import type { ProductSpecGroup, SpecOption } from "@/types/products";
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+interface ProductCategory {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+async function fetchCategories(): Promise<ProductCategory[]> {
+    const res = await fetch(`${API_BASE_URL}/api/v1/product-categories/?page_size=100`);
+    if (!res.ok) return [];
+    const data = await res.json() as { results?: ProductCategory[] } | ProductCategory[];
+    return Array.isArray(data) ? data : (data.results ?? []);
+}
 
 const TRUST_ITEMS = [
     { icon: TruckIcon, title: "Nairobi Delivery", subtitle: "Same-day & next-day options" },
@@ -41,7 +54,7 @@ function getMinPrice(product: CatalogProduct): number | null {
         if (group.group_type === "quantity_tier" && group.options.length > 0) {
             const prices = group.options
                 .map((o: SpecOption) => (o.selling_price ? parseFloat(o.selling_price) : null))
-                .filter((p): p is number => p !== null);
+                .filter((p: number | null): p is number => p !== null);
             if (prices.length > 0) return Math.min(...prices);
         }
         if (group.group_type === "numeric_input" && group.ranges.length > 0) {
@@ -62,7 +75,7 @@ function getBadge(product: CatalogProduct): { label: string; cls: string } | nul
     return null;
 }
 
-function ProductCard({ product }: { product: CatalogProduct }): ReactElement {
+const ProductCard = memo(function ProductCard({ product }: { product: CatalogProduct }): ReactElement {
     const [favorited, setFavorited] = useState<boolean>(false);
     const minPrice = getMinPrice(product);
     const badge = getBadge(product);
@@ -161,32 +174,40 @@ function ProductCard({ product }: { product: CatalogProduct }): ReactElement {
             </motion.div>
         </Link>
     );
-}
+});
+ProductCard.displayName = "ProductCard";
 
 export default function StorePage(): ReactElement {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const activeCategory = searchParams.get("category") ?? "All";
-    const [search, setSearch] = useState<string>(searchParams.get("q") ?? "");
-    const deferredSearch = useDeferredValue(search);
+    const activeCategoryId = searchParams.get("category") ?? "";
+    const searchQuery = searchParams.get("q") ?? "";
+    const deferredSearch = useDeferredValue(searchQuery);
+
+    const { data: categoriesData = [] } = useQuery<ProductCategory[]>({
+        queryKey: ["product-categories"],
+        queryFn: fetchCategories,
+        staleTime: 5 * 60_000,
+    });
 
     const { data, isLoading, isError } = useQuery({
-        queryKey: ["catalog-products", deferredSearch],
+        queryKey: ["catalog-products", activeCategoryId, deferredSearch],
         queryFn: () =>
-            fetchCatalogProducts({ search: deferredSearch || undefined, page_size: 48 }),
+            fetchCatalogProducts({
+                search: deferredSearch || undefined,
+                category: activeCategoryId || undefined,
+                page_size: 48,
+            }),
         staleTime: 30_000,
+        placeholderData: (prev) => prev,
     });
 
     const allProducts = data?.results ?? [];
 
-    const categories = ["All", ...Array.from(
-        new Set(allProducts.map((p) => p.primary_category_name).filter(Boolean) as string[])
-    )];
-
-    const visibleProducts =
-        activeCategory === "All"
-            ? allProducts
-            : allProducts.filter((p) => p.primary_category_name === activeCategory);
+    const categoryLabel = useMemo(() => {
+        const match = categoriesData.find((c) => String(c.id) === activeCategoryId);
+        return match?.name ?? "All";
+    }, [categoriesData, activeCategoryId]);
 
     return (
         <>
@@ -298,7 +319,7 @@ export default function StorePage(): ReactElement {
                     <div>
                         <h2 className="text-xl font-extrabold text-gray-900">Our Products</h2>
                         <p className="text-sm text-gray-500 mt-0.5">
-                            {isLoading ? "Loading…" : `${visibleProducts.length} product${visibleProducts.length !== 1 ? "s" : ""}${activeCategory !== "All" ? ` in ${activeCategory}` : ""}`}
+                            {isLoading ? "Loading\u2026" : `${allProducts.length} product${allProducts.length !== 1 ? "s" : ""}${activeCategoryId ? ` in ${categoryLabel}` : ""}`}
                         </p>
                     </div>
                     <button
@@ -311,23 +332,40 @@ export default function StorePage(): ReactElement {
                 </div>
 
                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none -mx-1 px-1">
-                    {categories.map((cat) => (
+                    <button
+                        key="all"
+                        type="button"
+                        onClick={() => {
+                            const next = new URLSearchParams(searchParams.toString());
+                            next.delete("category");
+                            router.push(`/store?${next.toString()}`);
+                        }}
+                        className={cn(
+                            "flex-shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200",
+                            !activeCategoryId
+                                ? "bg-brand-blue text-white shadow-md shadow-brand-blue/30"
+                                : "bg-white border border-gray-200 text-gray-600 hover:border-brand-blue/40 hover:text-brand-blue",
+                        )}
+                    >
+                        All
+                    </button>
+                    {categoriesData.map((cat) => (
                         <button
-                            key={cat}
+                            key={cat.id}
                             type="button"
                             onClick={() => {
                                 const next = new URLSearchParams(searchParams.toString());
-                                if (cat === "All") { next.delete("category"); } else { next.set("category", cat); }
+                                next.set("category", String(cat.id));
                                 router.push(`/store?${next.toString()}`);
                             }}
                             className={cn(
                                 "flex-shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-all duration-200",
-                                activeCategory === cat
+                                activeCategoryId === String(cat.id)
                                     ? "bg-brand-blue text-white shadow-md shadow-brand-blue/30"
                                     : "bg-white border border-gray-200 text-gray-600 hover:border-brand-blue/40 hover:text-brand-blue",
                             )}
                         >
-                            {cat}
+                            {cat.name}
                         </button>
                     ))}
                 </div>
@@ -349,7 +387,7 @@ export default function StorePage(): ReactElement {
                         <p className="text-sm text-gray-400 mt-1">Make sure the backend is running at <code className="text-brand-blue">localhost:8000</code></p>
                     </div>
                 )}
-                {!isLoading && !isError && visibleProducts.length === 0 && (
+                {!isLoading && !isError && allProducts.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-24 text-center">
                         <span className="text-5xl mb-4">🖨️</span>
                         <p className="text-gray-500 font-medium">No products yet.</p>
@@ -358,21 +396,14 @@ export default function StorePage(): ReactElement {
                         </p>
                     </div>
                 )}
-                {!isLoading && !isError && visibleProducts.length > 0 && (
+                {!isLoading && !isError && allProducts.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5">
-                        {visibleProducts.map((product, i) => (
-                            <motion.div
-                                key={product.id}
-                                initial={{ opacity: 0, y: 12 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.04 }}
-                            >
-                                <ProductCard product={product} />
-                            </motion.div>
+                        {allProducts.map((product) => (
+                            <ProductCard key={product.id} product={product} />
                         ))}
                     </div>
                 )}
-                {!isLoading && data && data.count > visibleProducts.length && (
+                {!isLoading && data && data.count > allProducts.length && (
                     <div className="mt-8 text-center">
                         <button
                             type="button"
@@ -383,99 +414,6 @@ export default function StorePage(): ReactElement {
                         </button>
                     </div>
                 )}
-            </section>
-
-            {/* ── PROMO BLOCKS ───────────────────────────────────────── */}
-            <section className="mx-auto max-w-7xl px-4 sm:px-6 mt-16">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Promo 1 */}
-                    <div className="relative overflow-hidden rounded-3xl bg-brand-yellow min-h-[220px] flex items-end p-6">
-                        <div className="absolute inset-0">
-                            <Image src="/banner/marketing.jpg" alt="Marketing" fill className="object-cover opacity-25" />
-                        </div>
-                        <div className="absolute top-0 right-0 m-4">
-                            <span className="rounded-full bg-brand-red text-white text-[11px] font-bold px-3 py-1">
-                                Limited Time
-                            </span>
-                        </div>
-                        <div className="relative z-10">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-brand-black/60 mb-1">
-                                Marketing Bundle
-                            </p>
-                            <h3 className="text-2xl font-extrabold text-brand-black leading-tight mb-3">
-                                500 Flyers + 250
-                                <br />
-                                Business Cards
-                            </h3>
-                            <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-black px-5 py-2.5 text-sm font-bold text-brand-yellow hover:bg-brand-black/80 transition-colors"
-                            >
-                                From KES 5,999
-                                <ArrowRightIcon className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Promo 2 */}
-                    <div className="relative overflow-hidden rounded-3xl bg-brand-blue min-h-[220px] flex items-end p-6">
-                        <div className="absolute inset-0">
-                            <Image src="/banner/van.jpg" alt="Vehicle" fill className="object-cover opacity-15" />
-                        </div>
-                        <div className="absolute top-0 right-0 m-4">
-                            <span className="rounded-full bg-brand-yellow text-brand-black text-[11px] font-bold px-3 py-1">
-                                Custom Project
-                            </span>
-                        </div>
-                        <div className="relative z-10">
-                            <p className="text-xs font-semibold uppercase tracking-widest text-white/60 mb-1">
-                                Large Format
-                            </p>
-                            <h3 className="text-2xl font-extrabold text-white leading-tight mb-3">
-                                Vehicle Branding
-                                <br />
-                                & Vinyl Wraps
-                            </h3>
-                            <button
-                                type="button"
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-brand-yellow px-5 py-2.5 text-sm font-bold text-brand-black hover:bg-brand-yellow/90 transition-colors"
-                            >
-                                Request Quote
-                                <ArrowRightIcon className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* ── QUALITY CALLOUT ────────────────────────────────────── */}
-            <section className="mx-auto max-w-7xl px-4 sm:px-6 mt-16">
-                <div className="rounded-3xl bg-white border border-gray-100 shadow-sm px-8 py-10 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <div className="flex items-center gap-4">
-                        <div className="h-14 w-14 rounded-2xl bg-brand-blue/5 flex items-center justify-center flex-shrink-0">
-                            <BadgeCheckIcon className="h-7 w-7 text-brand-blue" />
-                        </div>
-                        <div>
-                            <h3 className="text-lg font-extrabold text-gray-900">ISO-Certified Quality</h3>
-                            <p className="text-sm text-gray-500 mt-0.5 max-w-md">
-                                Every order is colour-checked and inspected before dispatch.
-                                Not happy? We'll reprint or refund — no questions asked.
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex gap-10 text-center flex-shrink-0">
-                        {[
-                            { value: "50K+", label: "Orders Delivered" },
-                            { value: "4.9★", label: "Average Rating" },
-                            { value: "2 hrs", label: "Fastest Turnaround" },
-                        ].map((stat) => (
-                            <div key={stat.label}>
-                                <p className="text-2xl font-extrabold text-brand-blue">{stat.value}</p>
-                                <p className="text-xs text-gray-500 mt-0.5">{stat.label}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
             </section>
 
             {/* ── FOOTER ─────────────────────────────────────────────── */}

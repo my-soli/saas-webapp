@@ -29,6 +29,7 @@ export interface ProductCategory {
     name: string;
     slug: string;
     description: string;
+    image_url: string | null;
 }
 
 export interface ProductSubCategory {

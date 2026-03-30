@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactElement } from "react";
+import { useState, useRef, type ReactElement } from "react";
+import Image from "next/image";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { PlusIcon, PencilIcon, Trash2Icon, CheckIcon, XIcon } from "lucide-react";
@@ -31,9 +32,11 @@ interface FormState {
     name: string;
     description: string;
     category: string;
+    image: File | null;
+    existingImageUrl: string | null;
 }
 
-const EMPTY_FORM: FormState = { name: "", description: "", category: "" };
+const EMPTY_FORM: FormState = { name: "", description: "", category: "", image: null, existingImageUrl: null };
 
 const inputCls = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue";
 const selectCls = "w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue";
@@ -53,6 +56,7 @@ export default function CatalogSetupPage(): ReactElement {
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
     const [deletingId, setDeletingId] = useState<number | null>(null);
+    const imageInputRef = useRef<HTMLInputElement>(null);
 
     const qc = useQueryClient();
 
@@ -78,12 +82,12 @@ export default function CatalogSetupPage(): ReactElement {
     };
 
     const createCategoryMutation = useMutation({
-        mutationFn: (d: FormState) => createProductCategory({ name: d.name, description: d.description }),
+        mutationFn: (d: FormState) => createProductCategory({ name: d.name, description: d.description, image: d.image }),
         onSuccess: () => { invalidate(["product-categories"]); toast.success("Category created."); resetForm(); },
         onError: () => toast.error("Failed to create category."),
     });
     const updateCategoryMutation = useMutation({
-        mutationFn: (d: FormState & { id: number }) => updateProductCategory(d.id, { name: d.name, description: d.description }),
+        mutationFn: (d: FormState & { id: number }) => updateProductCategory(d.id, { name: d.name, description: d.description, image: d.image }),
         onSuccess: () => { invalidate(["product-categories"]); toast.success("Category updated."); resetForm(); },
         onError: () => toast.error("Failed to update category."),
     });
@@ -159,6 +163,8 @@ export default function CatalogSetupPage(): ReactElement {
             name: item.name,
             description: item.description ?? "",
             category: "category" in item ? String((item as ProductSubCategory).category) : "",
+            image: null,
+            existingImageUrl: "image_url" in item ? (item as ProductCategory).image_url : null,
         });
         setShowForm(true);
     };
@@ -253,8 +259,8 @@ export default function CatalogSetupPage(): ReactElement {
                             type="button"
                             onClick={() => handleTabChange(tab.id)}
                             className={`relative px-5 py-3 text-sm font-medium transition-colors border-b-2 ${activeTab === tab.id
-                                    ? "border-brand-blue text-brand-blue"
-                                    : "border-transparent text-gray-500 hover:text-gray-700"
+                                ? "border-brand-blue text-brand-blue"
+                                : "border-transparent text-gray-500 hover:text-gray-700"
                                 }`}
                         >
                             {tab.label}
@@ -303,6 +309,9 @@ export default function CatalogSetupPage(): ReactElement {
                                         {activeTab === "subcategories" && (
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Parent Category</th>
                                         )}
+                                        {activeTab === "categories" && (
+                                            <th className="w-16 px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Image</th>
+                                        )}
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Slug</th>
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
                                         <th className="w-20 px-4 py-3" />
@@ -315,6 +324,22 @@ export default function CatalogSetupPage(): ReactElement {
                                             {activeTab === "subcategories" && (
                                                 <td className="px-4 py-3 text-gray-500 text-xs">
                                                     {(item as ProductSubCategory).category_name}
+                                                </td>
+                                            )}
+                                            {activeTab === "categories" && (
+                                                <td className="px-4 py-3">
+                                                    {(item as ProductCategory).image_url ? (
+                                                        <div className="relative h-8 w-12 rounded overflow-hidden bg-gray-100">
+                                                            <Image
+                                                                src={(item as ProductCategory).image_url!}
+                                                                alt={item.name}
+                                                                fill
+                                                                className="object-cover"
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-300">—</span>
+                                                    )}
                                                 </td>
                                             )}
                                             <td className="px-4 py-3 text-xs font-mono text-gray-400">{item.slug}</td>
@@ -406,6 +431,49 @@ export default function CatalogSetupPage(): ReactElement {
                                             <option key={cat.id} value={cat.id.toString()}>{cat.name}</option>
                                         ))}
                                     </select>
+                                </div>
+                            )}
+
+                            {activeTab === "categories" && (
+                                <div>
+                                    <SectionLabel label="Image" hint="Displayed on storefront category cards" />
+                                    <div className="space-y-2">
+                                        {(form.image || form.existingImageUrl) && (
+                                            <div className="relative w-full h-28 rounded-lg overflow-hidden border border-gray-200 bg-gray-50">
+                                                <Image
+                                                    src={form.image ? URL.createObjectURL(form.image) : form.existingImageUrl!}
+                                                    alt="Category preview"
+                                                    fill
+                                                    className="object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setForm(f => ({ ...f, image: null, existingImageUrl: null }))}
+                                                    className="absolute top-1.5 right-1.5 rounded-full bg-white/80 p-1 text-gray-600 hover:bg-white hover:text-red-600 transition-colors"
+                                                    title="Remove image"
+                                                >
+                                                    <XIcon className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
+                                        <input
+                                            ref={imageInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0] ?? null;
+                                                setForm(f => ({ ...f, image: file, existingImageUrl: null }));
+                                            }}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => imageInputRef.current?.click()}
+                                            className="w-full rounded-lg border border-dashed border-gray-300 py-2 text-xs font-medium text-gray-500 hover:border-brand-blue hover:text-brand-blue transition-colors"
+                                        >
+                                            {form.image || form.existingImageUrl ? "Replace image" : "Upload image"}
+                                        </button>
+                                    </div>
                                 </div>
                             )}
 
