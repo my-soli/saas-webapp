@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
+import ImpactSection from "@/components/ImpactSection";
 import {
     ShoppingCartIcon,
     ArrowRightIcon,
@@ -415,6 +416,9 @@ function StorePageInner(): ReactElement {
                     </div>
                 )}
             </section>
+
+            {/* ── IMPACT SECTION ─────────────────────────────────────── */}
+            <ImpactSection />
 
             {/* ── FOOTER ─────────────────────────────────────────────── */}
             <footer className="mt-20 bg-brand-blue text-white">
