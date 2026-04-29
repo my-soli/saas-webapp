@@ -56,7 +56,7 @@ export default function DashboardCharts({ revenueSeries }: DashboardChartsProps)
                                 tick={{ fill: "#6B7280", fontSize: 12 }}
                             />
                             <Tooltip
-                                formatter={(value: number | string | undefined, key: string | undefined): [string, string] => {
+                                formatter={(value: any, key: any): [string, string] => {
                                     const numericValue = typeof value === "number" ? value : Number(value || 0);
 
                                     if (key === "revenue") {

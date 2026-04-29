@@ -49,7 +49,10 @@ export default function ConversionFunnel({ data }: ConversionFunnelProps) {
                     <XAxis type="number" tick={{ fill: "#6b7280", fontSize: 12 }} stroke="#d1d5db" />
                     <YAxis dataKey="stage" type="category" tick={{ fill: "#6b7280", fontSize: 12 }} stroke="#d1d5db" width={150} />
                     <Tooltip
-                        formatter={(value: number | undefined) => [(value ?? 0).toLocaleString(), "Count"]}
+                        formatter={(value: any) => [
+  Number(value ?? 0).toLocaleString(),
+  "Count"
+]}
                         contentStyle={{
                             backgroundColor: "#fff",
                             border: "1px solid #e5e7eb",

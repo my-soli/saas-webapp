@@ -39,9 +39,9 @@ export default function ProfitMarginChart({ data }: ProfitMarginChartProps) {
                         <Legend
                             verticalAlign="bottom"
                             height={36}
-                            formatter={(value, entry) =>
-                                `${value}: KES ${(entry.payload?.value ?? 0).toLocaleString()}`
-                            }
+                            formatter={(value, entry: any) =>
+  `${value}: KES ${(entry?.payload?.value ?? 0).toLocaleString()}`
+}
                         />
                     </PieChart>
                 </ResponsiveContainer>

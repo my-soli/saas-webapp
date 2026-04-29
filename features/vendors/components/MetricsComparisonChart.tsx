@@ -52,9 +52,9 @@ export default function MetricsComparisonChart({
                     <XAxis type="number" domain={[0, 100]} />
                     <YAxis dataKey="metric" type="category" />
                     <Tooltip
-                        formatter={(value: number | undefined) => {
+                        formatter={(value: any) => {
                             if (value === undefined) return ['N/A', ''];
-                            return [`${value.toFixed(1)}%`, ''];
+                            return [`${Number(value).toFixed(1)}%`, ''];
                         }}
                         labelFormatter={(label, payload) => {
                             if (!payload || payload.length === 0) return label;

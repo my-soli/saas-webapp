@@ -59,7 +59,7 @@ export default function JobsStatusChart({ overview }: JobsStatusChartProps): Rea
                                 ))}
                             </Pie>
                             <Tooltip
-                                formatter={(value: number | undefined): [string, string] => [
+                                formatter={(value: any): [string, string] => [
                                     `${value ?? 0} jobs`,
                                     "Count",
                                 ]}
@@ -68,7 +68,7 @@ export default function JobsStatusChart({ overview }: JobsStatusChartProps): Rea
                                 verticalAlign="bottom"
                                 height={36}
                                 iconType="circle"
-                                formatter={(value: string): string => value}
+                                formatter={(value: any): string => value}
                             />
                         </PieChart>
                     </ResponsiveContainer>

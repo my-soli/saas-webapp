@@ -57,7 +57,7 @@ export default function QuotesStatusChart({ overview }: QuotesStatusChartProps):
                         />
                         <Tooltip
                             cursor={{ fill: "rgba(9, 55, 86, 0.05)" }}
-                            formatter={(value: number | undefined): [string, string] => [
+                            formatter={(value: any): [string, string] => [
                                 `${value ?? 0} quotes`,
                                 "Count",
                             ]}

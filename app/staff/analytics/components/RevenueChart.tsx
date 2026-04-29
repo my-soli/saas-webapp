@@ -74,8 +74,8 @@ export default function RevenueChart({ data }: RevenueChartProps) {
                         }}
                     />
                     <Tooltip
-                        formatter={(value: number | undefined) => [
-                            `KES ${(value ?? 0).toLocaleString()}`,
+                        formatter={(value: any) => [
+                            `KES ${Number(value ?? 0).toLocaleString()}`,
                             "Revenue",
                         ]}
                         contentStyle={{
