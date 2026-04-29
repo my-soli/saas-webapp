@@ -4,9 +4,11 @@ import PaymentStatusBadge from "./PaymentStatusBadge";
 interface PaymentsTableProps {
     payments: Payment[];
     onView: (payment: Payment) => void;
+    onEdit?: (payment: Payment) => void;
+    onDelete?: (payment: Payment) => void;
 }
 
-export default function PaymentsTable({ payments, onView }: PaymentsTableProps) {
+export default function PaymentsTable({ payments, onView, onEdit, onDelete }: PaymentsTableProps) {
     const methodLabels: Record<PaymentMethod, string> = {
         cash: "Cash",
         mpesa: "M-Pesa",
@@ -66,13 +68,11 @@ export default function PaymentsTable({ payments, onView }: PaymentsTableProps) 
                                 {formatDate(payment.payment_date)}
                             </td>
                             <td className="py-3 px-4 text-right">
-                                <button
-                                    type="button"
-                                    onClick={() => onView(payment)}
-                                    className="text-brand-blue text-sm font-semibold hover:text-brand-blue/80"
-                                >
-                                    View
-                                </button>
+                                <div className="flex items-center justify-end gap-2">
+                                    <button type="button" onClick={() => onView(payment)} className="text-brand-blue text-xs font-semibold hover:text-brand-blue/80">View</button>
+                                    {onEdit && <button type="button" onClick={() => onEdit(payment)} className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50">Edit</button>}
+                                    {onDelete && <button type="button" onClick={() => onDelete(payment)} className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-red-50">Delete</button>}
+                                </div>
                             </td>
                         </tr>
                     ))}

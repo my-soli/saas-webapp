@@ -4,6 +4,7 @@ import type { Quote } from "@/types/quotes";
 interface QuotesTableProps {
     quotes: Quote[];
     onView: (quote: Quote) => void;
+    onEdit?: (quote: Quote) => void;
     onSendToPT: (quote: Quote) => void;
     onSendToCustomer: (quote: Quote) => void;
     onApprove: (quote: Quote) => void;
@@ -23,6 +24,7 @@ const statusStyles: Record<string, string> = {
 export default function QuotesTable({
     quotes,
     onView,
+    onEdit,
     onSendToPT,
     onSendToCustomer,
     onApprove,
@@ -83,6 +85,15 @@ export default function QuotesTable({
                                     >
                                         View
                                     </button>
+                                    {onEdit && (
+                                        <button
+                                            type="button"
+                                            onClick={(): void => onEdit(quote)}
+                                            className="rounded-md border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                        >
+                                            Edit
+                                        </button>
+                                    )}
                                     {quote.status === "Draft" && (
                                         <button
                                             type="button"

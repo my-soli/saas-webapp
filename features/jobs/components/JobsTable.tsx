@@ -4,13 +4,16 @@ import type { Job, JobStatus } from "@/types/jobs";
 interface JobsTableProps {
     jobs: Job[];
     onViewDetails: (job: Job) => void;
+    onEdit?: (job: Job) => void;
     onAssign?: (job: Job) => void;
     onProgress?: (job: Job) => void;
+    onDelete?: (job: Job) => void;
     onSendReminder?: (job: Job) => void;
     showAssignButton?: boolean;
     showProgressButton?: boolean;
     showReminderButton?: boolean;
     remindingJobId?: number;
+    deletingJobId?: number;
 }
 
 const statusStyles: Record<JobStatus, string> = {
@@ -23,13 +26,16 @@ const statusStyles: Record<JobStatus, string> = {
 export default function JobsTable({
     jobs,
     onViewDetails,
+    onEdit,
     onAssign,
     onProgress,
+    onDelete,
     onSendReminder,
     showAssignButton = true,
     showProgressButton = false,
     showReminderButton = false,
     remindingJobId,
+    deletingJobId,
 }: JobsTableProps): ReactElement {
     const formatDate = (value: string | null): string => {
         if (!value) {
@@ -111,6 +117,15 @@ export default function JobsTable({
                                         >
                                             View
                                         </button>
+                                        {onEdit && (
+                                            <button
+                                                type="button"
+                                                onClick={(): void => onEdit(job)}
+                                                className="rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                                            >
+                                                Edit
+                                            </button>
+                                        )}
                                         {showAssignButton && onAssign && (
                                             <button
                                                 type="button"
@@ -127,6 +142,16 @@ export default function JobsTable({
                                                 className="rounded-md bg-brand-green px-3 py-1 text-xs font-medium text-white hover:bg-brand-green/90"
                                             >
                                                 Progress
+                                            </button>
+                                        )}
+                                        {onDelete && (
+                                            <button
+                                                type="button"
+                                                onClick={(): void => onDelete(job)}
+                                                disabled={deletingJobId === job.id}
+                                                className="rounded-md border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                            >
+                                                Delete
                                             </button>
                                         )}
                                         {showReminderButton && onSendReminder && job.person_in_charge && (

@@ -4,6 +4,8 @@ import type { Lead } from "@/types/leads";
 interface LeadsTableProps {
     leads: Lead[];
     onView: (lead: Lead) => void;
+    onEdit?: (lead: Lead) => void;
+    onDelete?: (lead: Lead) => void;
     pendingLeadId: number | null;
     pendingAction: "qualify" | "delete" | "convert" | "mark_lost" | "mark_contacted" | null;
 }
@@ -19,6 +21,8 @@ const statusStyles: Record<string, string> = {
 export default function LeadsTable({
     leads,
     onView,
+    onEdit,
+    onDelete,
     pendingLeadId,
     pendingAction,
 }: LeadsTableProps): ReactElement {
@@ -50,14 +54,9 @@ export default function LeadsTable({
                                 <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${getStatusClass(lead.status)}`}>
                                     {lead.status}
                                 </span>
-                                <button
-                                    type="button"
-                                    onClick={(): void => onView(lead)}
-                                    disabled={isRowBusy}
-                                    className="rounded-md bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-50"
-                                >
-                                    View
-                                </button>
+                                <button type="button" onClick={(): void => onView(lead)} disabled={isRowBusy} className="rounded-md bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-50">View</button>
+                                {onEdit && <button type="button" onClick={(): void => onEdit(lead)} disabled={isRowBusy} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">Edit</button>}
+                                {onDelete && <button type="button" onClick={(): void => onDelete(lead)} disabled={isRowBusy} className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">Delete</button>}
                             </div>
                         </li>
                     );
@@ -100,14 +99,11 @@ export default function LeadsTable({
                                 </td>
                                 <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-500">{formatDate(lead.created_at)}</td>
                                 <td className="py-3 px-4 text-right" onClick={(e): void => e.stopPropagation()}>
-                                    <button
-                                        type="button"
-                                        onClick={(): void => onView(lead)}
-                                        disabled={isRowBusy}
-                                        className="rounded-md bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-50"
-                                    >
-                                        View
-                                    </button>
+                                    <div className="flex items-center justify-end gap-2">
+                                        <button type="button" onClick={(): void => onView(lead)} disabled={isRowBusy} className="rounded-md bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-50">View</button>
+                                        {onEdit && <button type="button" onClick={(): void => onEdit(lead)} disabled={isRowBusy} className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50">Edit</button>}
+                                        {onDelete && <button type="button" onClick={(): void => onDelete(lead)} disabled={isRowBusy} className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50">Delete</button>}
+                                    </div>
                                 </td>
                             </tr>
                         );
