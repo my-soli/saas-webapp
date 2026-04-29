@@ -1,5 +1,5 @@
 import type { ChangeEvent, FormEvent, ReactElement } from "react";
-import { VendorFormValues } from "@/types/vendors";
+import { VendorFormValues, VendorSustainablePractices } from "@/types/vendors";
 
 interface VendorFormProps {
     values: VendorFormValues;
@@ -8,6 +8,8 @@ interface VendorFormProps {
     onCancel: () => void;
     submitLabel: string;
     isSubmitting: boolean;
+    onSendInvite?: () => void;
+    isSendingInvite?: boolean;
 }
 
 export default function VendorForm({
@@ -17,6 +19,8 @@ export default function VendorForm({
     onCancel,
     submitLabel,
     isSubmitting,
+    onSendInvite,
+    isSendingInvite = false,
 }: VendorFormProps): ReactElement {
     const renderRequiredLabel = (text: string): ReactElement => (
         <span className="inline-flex items-center gap-1">
@@ -238,6 +242,86 @@ export default function VendorForm({
             </div>
 
             <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-gray-900">Ratings</h2>
+                <p className="text-xs text-gray-500 mt-2">Manual performance ratings for this vendor.</p>
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Overall Rating (0–5)</label>
+                        <p className="text-xs text-gray-500 mt-1">Composite score across all criteria.</p>
+                        <input
+                            type="number"
+                            min={0}
+                            max={5}
+                            step={0.01}
+                            value={values.rating}
+                            onChange={handleTextChange("rating")}
+                            placeholder="e.g. 4.50"
+                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Quality Rating</label>
+                        <p className="text-xs text-gray-500 mt-1">E.g. Excellent, Good, Fair, Poor.</p>
+                        <select
+                            value={values.quality_rating}
+                            onChange={(e: import("react").ChangeEvent<HTMLSelectElement>): void =>
+                                updateField("quality_rating", e.target.value)
+                            }
+                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        >
+                            <option value="">— Not rated —</option>
+                            <option value="Excellent">Excellent</option>
+                            <option value="Good">Good</option>
+                            <option value="Fair">Fair</option>
+                            <option value="Poor">Poor</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Reliability Rating</label>
+                        <p className="text-xs text-gray-500 mt-1">E.g. Excellent, Good, Fair, Poor.</p>
+                        <select
+                            value={values.reliability_rating}
+                            onChange={(e: import("react").ChangeEvent<HTMLSelectElement>): void =>
+                                updateField("reliability_rating", e.target.value)
+                            }
+                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                        >
+                            <option value="">— Not rated —</option>
+                            <option value="Excellent">Excellent</option>
+                            <option value="Good">Good</option>
+                            <option value="Fair">Fair</option>
+                            <option value="Poor">Poor</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-gray-900">Sustainability</h2>
+                <p className="text-xs text-gray-500 mt-2">Environmental responsibility of this vendor.</p>
+                <div className="mt-4">
+                    <div>
+                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                            {renderRequiredLabel("Does this vendor have sustainable practices?")}
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1">Select the level of sustainable practices this vendor follows.</p>
+                        <select
+                            value={values.sustainable_practices}
+                            onChange={(e: ChangeEvent<HTMLSelectElement>): void =>
+                                updateField("sustainable_practices", e.target.value as VendorSustainablePractices | "")
+                            }
+                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                            required
+                        >
+                            <option value="">— Select an option —</option>
+                            <option value="yes">Yes</option>
+                            <option value="partly">Partly</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
                 <h2 className="text-lg font-semibold text-gray-900">Status</h2>
                 <p className="text-xs text-gray-500 mt-2">Control visibility and availability.</p>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -265,6 +349,30 @@ export default function VendorForm({
                             <p className="text-xs text-gray-500">Can accept new work right now.</p>
                         </div>
                     </div>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="checkbox"
+                            checked={values.recommended}
+                            onChange={handleCheckboxChange("recommended")}
+                            className="h-4 w-4"
+                        />
+                        <div>
+                            <div className="text-sm font-semibold text-gray-900">Recommended</div>
+                            <p className="text-xs text-gray-500">Flag this vendor as a preferred choice.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="checkbox"
+                            checked={values.is_certified}
+                            onChange={handleCheckboxChange("is_certified")}
+                            className="h-4 w-4"
+                        />
+                        <div>
+                            <div className="text-sm font-semibold text-gray-900">Certified</div>
+                            <p className="text-xs text-gray-500">Vendor holds relevant industry certifications.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -287,6 +395,16 @@ export default function VendorForm({
                 >
                     Cancel
                 </button>
+                {onSendInvite ? (
+                    <button
+                        type="button"
+                        onClick={onSendInvite}
+                        disabled={isSendingInvite}
+                        className="rounded-md border border-brand-blue px-4 py-2 text-sm font-semibold text-brand-blue hover:bg-brand-blue/10 disabled:opacity-60"
+                    >
+                        {isSendingInvite ? "Sending..." : "Send Invite"}
+                    </button>
+                ) : null}
                 <button
                     type="submit"
                     disabled={isSubmitting}

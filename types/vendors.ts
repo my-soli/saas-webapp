@@ -1,3 +1,5 @@
+export type VendorSustainablePractices = "yes" | "partly";
+
 export interface Vendor {
     id: number;
     user: number | null;
@@ -20,6 +22,8 @@ export interface Vendor {
     reliability_rating: string | null;
     vps_score_value: string | number;
     performance_score: string | number | null;
+    sustainable_practices: VendorSustainablePractices | null;
+    is_certified: boolean;
     recommended: boolean;
     active: boolean;
     is_available: boolean;
@@ -64,6 +68,8 @@ export interface CreateVendorPayload {
     reliability_rating: string | null;
     vps_score_value: string;
     performance_score: string | number | null;
+    sustainable_practices: VendorSustainablePractices | null;
+    is_certified: boolean;
     recommended: boolean;
     active: boolean;
     is_available: boolean;
@@ -92,6 +98,8 @@ export interface VendorFormValues {
     reliability_rating: string;
     vps_score_value: string;
     performance_score: string;
+    sustainable_practices: VendorSustainablePractices | "";
+    is_certified: boolean;
     recommended: boolean;
     active: boolean;
     is_available: boolean;

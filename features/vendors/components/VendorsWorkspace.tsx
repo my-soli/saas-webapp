@@ -50,6 +50,7 @@ export default function VendorsWorkspace({
     const [pageSize, setPageSize] = useState<number>(20);
     const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
     const [inviteTarget, setInviteTarget] = useState<Vendor | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Vendor | null>(null);
 
     useEffect((): (() => void) => {
         const handleDebounce = (): void => {
@@ -83,7 +84,13 @@ export default function VendorsWorkspace({
     const deleteMutation = useMutation({
         mutationFn: (vendorId: number): Promise<void> => deleteVendor(vendorId),
         onSuccess: (): void => {
+            setNotice({ type: "success", message: "Vendor deleted successfully." });
             queryClient.invalidateQueries({ queryKey: ["vendors"] });
+            setDeleteTarget(null);
+        },
+        onError: (): void => {
+            setNotice({ type: "error", message: "Unable to delete this vendor. They may have active orders or linked records." });
+            setDeleteTarget(null);
         },
     });
 
@@ -156,11 +163,17 @@ export default function VendorsWorkspace({
     };
 
     const handleDelete = (vendor: Vendor): void => {
-        const confirmDelete = window.confirm(`Delete ${vendor.name}? This action cannot be undone.`);
-        if (!confirmDelete) {
-            return;
-        }
-        deleteMutation.mutate(vendor.id);
+        setNotice(null);
+        setDeleteTarget(vendor);
+    };
+
+    const handleDeleteConfirm = (): void => {
+        if (!deleteTarget) return;
+        deleteMutation.mutate(deleteTarget.id);
+    };
+
+    const handleDeleteCancel = (): void => {
+        setDeleteTarget(null);
     };
 
     const handleInvite = (vendor: Vendor): void => {
@@ -180,6 +193,42 @@ export default function VendorsWorkspace({
 
     return (
         <>
+            {deleteTarget ? (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                    <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+                        <div className="border-b border-gray-100 px-6 py-5">
+                            <h2 className="text-base font-semibold text-gray-900">Delete vendor</h2>
+                            <p className="mt-1 text-sm text-gray-500">
+                                This action is permanent and cannot be undone.
+                            </p>
+                        </div>
+                        <div className="px-6 py-4">
+                            <div className="rounded-md bg-gray-50 px-4 py-3">
+                                <p className="text-sm font-semibold text-gray-800">{deleteTarget.name}</p>
+                                <p className="text-xs text-gray-500">{deleteTarget.email}</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-3 border-t border-gray-100 px-6 py-4">
+                            <button
+                                type="button"
+                                onClick={handleDeleteCancel}
+                                disabled={deleteMutation.isPending}
+                                className="rounded-md px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleDeleteConfirm}
+                                disabled={deleteMutation.isPending}
+                                className="rounded-md bg-brand-red px-4 py-2 text-sm font-semibold text-white hover:bg-brand-red/90 disabled:opacity-60"
+                            >
+                                {deleteMutation.isPending ? "Deleting…" : "Delete Vendor"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : null}
             {inviteTarget ? (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
                     <div className="w-full max-w-md rounded-lg bg-white shadow-xl">

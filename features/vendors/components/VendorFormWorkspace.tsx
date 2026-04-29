@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import VendorForm from "@/features/vendors/components/VendorForm";
-import { createVendor, fetchVendor, updateVendor } from "@/services/vendors";
+import { createVendor, fetchVendor, inviteVendor, updateVendor } from "@/services/vendors";
 import type { CreateVendorPayload, UpdateVendorPayload, Vendor, VendorFormValues } from "@/types/vendors";
 
 interface VendorFormWorkspaceProps {
@@ -46,6 +46,8 @@ const buildInitialValues = (): VendorFormValues => {
         reliability_rating: "",
         vps_score_value: "0",
         performance_score: "",
+        sustainable_practices: "",
+        is_certified: false,
         recommended: false,
         active: true,
         is_available: true,
@@ -74,6 +76,8 @@ const buildFormValuesFromData = (vendor: Vendor): VendorFormValues => {
         reliability_rating: vendor.reliability_rating ?? "",
         vps_score_value: String(vendor.vps_score_value ?? "0"),
         performance_score: vendor.performance_score ? String(vendor.performance_score) : "",
+        sustainable_practices: vendor.sustainable_practices ?? "",
+        is_certified: vendor.is_certified,
         recommended: vendor.recommended,
         active: vendor.active,
         is_available: vendor.is_available,
@@ -120,6 +124,8 @@ const buildCreatePayload = (formValues: VendorFormValues): CreateVendorPayload =
         reliability_rating: formValues.reliability_rating.trim() || null,
         vps_score_value: formValues.vps_score_value.trim() || "0",
         performance_score: 0,
+        sustainable_practices: formValues.sustainable_practices || null,
+        is_certified: formValues.is_certified,
         recommended: formValues.recommended,
         active: formValues.active,
         is_available: formValues.is_available,
@@ -147,6 +153,8 @@ const buildUpdatePayload = (formValues: VendorFormValues): UpdateVendorPayload =
         quality_rating: formValues.quality_rating.trim() || null,
         reliability_rating: formValues.reliability_rating.trim() || null,
         vps_score_value: formValues.vps_score_value.trim() || "0",
+        sustainable_practices: formValues.sustainable_practices || null,
+        is_certified: formValues.is_certified,
         recommended: formValues.recommended,
         active: formValues.active,
         is_available: formValues.is_available,
@@ -171,6 +179,7 @@ export default function VendorFormWorkspace({
 }: VendorFormWorkspaceProps): ReactElement {
     const router = useRouter();
     const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+    const [isInviting, setIsInviting] = useState<boolean>(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const hasValidId = useMemo((): boolean => {
@@ -218,9 +227,9 @@ export default function VendorFormWorkspace({
 
         try {
             if (mode === "create") {
-                await createVendor(buildCreatePayload(values));
-                toast.success("Vendor created successfully.");
-                router.push(successRedirectHref);
+                const newVendor = await createVendor(buildCreatePayload(values));
+                toast.success("Vendor created. You can now send them a portal invite.");
+                router.push(`${successRedirectHref}/${newVendor.id}/edit`);
                 return;
             }
 
@@ -236,6 +245,19 @@ export default function VendorFormWorkspace({
 
     const handleCancel = (): void => {
         router.push(cancelRedirectHref);
+    };
+
+    const handleSendInvite = async (): Promise<void> => {
+        if (!vendorId) return;
+        setIsInviting(true);
+        try {
+            await inviteVendor(vendorId);
+            toast.success("Invite sent successfully to the vendor.");
+        } catch (_error: unknown) {
+            toast.error("Failed to send invite. Please try again.");
+        } finally {
+            setIsInviting(false);
+        }
     };
 
     return (
@@ -317,6 +339,8 @@ export default function VendorFormWorkspace({
                             onCancel={handleCancel}
                             submitLabel={submitLabel}
                             isSubmitting={isSubmitting}
+                            onSendInvite={mode === "edit" ? handleSendInvite : undefined}
+                            isSendingInvite={isInviting}
                         />
                     ) : null}
                 </div>
