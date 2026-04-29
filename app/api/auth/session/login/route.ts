@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE_URL = process.env.DJANGO_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 export async function POST(request: NextRequest) {
     try {
@@ -11,10 +12,6 @@ export async function POST(request: NextRequest) {
             redirect: 'manual',
             headers: { 'Accept': 'application/json' },
         });
-
-        if (!csrfRes.ok && csrfRes.status !== 0) {
-            return NextResponse.json({ error: 'Unable to process request. Please try again.' }, { status: 502 });
-        }
 
         if (!csrfRes.ok) {
             return NextResponse.json({ error: 'Unable to process request. Please try again.' }, { status: 502 });
@@ -50,18 +47,31 @@ export async function POST(request: NextRequest) {
         }
 
         if (!loginRes.ok) {
+            const errorMsg = (loginData as Record<string, string>).error
+                || (loginData as Record<string, string>).detail
+                || 'Invalid credentials.';
             return NextResponse.json(
-                { error: 'Unable to process request. Please try again.' },
+                { error: errorMsg },
                 { status: loginRes.status === 403 ? 401 : loginRes.status }
             );
         }
 
+        // Extract sessionid from Django's Set-Cookie header and set it explicitly.
+        // Using NextResponse.cookies.set() instead of headers.set('Set-Cookie', ...)
+        // because Next.js 15+ strips raw Set-Cookie headers set via headers.set().
         const sessionSetCookie = loginRes.headers.get('set-cookie') || '';
+        const sessionMatch = sessionSetCookie.match(/sessionid=([^;]+)/);
 
         const proxyResponse = NextResponse.json(loginData);
 
-        if (sessionSetCookie) {
-            proxyResponse.headers.set('Set-Cookie', sessionSetCookie);
+        if (sessionMatch) {
+            proxyResponse.cookies.set('sessionid', sessionMatch[1], {
+                httpOnly: true,
+                sameSite: IS_PRODUCTION ? 'none' : 'lax',
+                secure: IS_PRODUCTION,
+                path: '/',
+                maxAge: 60 * 60 * 24 * 7,
+            });
         }
 
         return proxyResponse;
