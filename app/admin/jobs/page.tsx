@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircleIcon } from "lucide-react";
+import { AlertCircleIcon, X } from "lucide-react";
 import AdminLayout from "@/components/admin/admin-layout";
 import JobsFilters from "@/features/jobs/components/JobsFilters";
 import JobsTable from "@/features/jobs/components/JobsTable";
@@ -15,15 +15,20 @@ import JobAssignModal from "@/features/jobs/components/JobAssignModal";
 import JobProgressModal from "@/features/jobs/components/JobProgressModal";
 import { fetchVendors } from "@/services/vendors";
 import {
+    createJob,
     createJobVendorStage,
+    deleteJob,
     fetchJob,
     fetchJobVendorStages,
     fetchJobs,
+    updateJob,
     updateJobVendorStage,
 } from "@/services/jobs";
 import type {
     CreateJobVendorStagePayload,
     Job,
+    JobPriority,
+    JobStatus,
     JobVendorStage,
     JobsQueryParams,
     JobsResponse,
@@ -31,6 +36,26 @@ import type {
 } from "@/types/jobs";
 import type { Vendor, VendorsQueryParams, VendorsResponse } from "@/types/vendors";
 import { toast } from "sonner";
+
+interface JobFormState {
+    job_name: string;
+    job_type: string;
+    product: string;
+    quantity: string;
+    priority: JobPriority;
+    status: JobStatus;
+    expected_completion: string;
+}
+
+const emptyJobForm: JobFormState = {
+    job_name: "",
+    job_type: "print",
+    product: "",
+    quantity: "1",
+    priority: "normal",
+    status: "pending",
+    expected_completion: "",
+};
 
 export default function JobsPage(): ReactElement {
     const queryClient = useQueryClient();
@@ -41,9 +66,13 @@ export default function JobsPage(): ReactElement {
     const [pageSize, setPageSize] = useState<number>(20);
 
     const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
+    const [deletingJobId, setDeletingJobId] = useState<number | null>(null);
     const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
     const [isAssignOpen, setIsAssignOpen] = useState<boolean>(false);
     const [isProgressOpen, setIsProgressOpen] = useState<boolean>(false);
+    const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
+    const [editingJob, setEditingJob] = useState<Job | null>(null);
+    const [formState, setFormState] = useState<JobFormState>(emptyJobForm);
 
     useEffect((): (() => void) => {
         const timer = setTimeout((): void => {
@@ -95,6 +124,45 @@ export default function JobsPage(): ReactElement {
         enabled: selectedJobId !== null,
     });
 
+    const deleteMutation = useMutation({
+        mutationFn: (jobId: number): Promise<void> => deleteJob(jobId),
+        onSuccess: (): void => {
+            toast.success("Job deleted.");
+            queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        },
+        onError: (): void => {
+            toast.error("Unable to delete job. Please try again.");
+        },
+        onSettled: (): void => {
+            setDeletingJobId(null);
+        },
+    });
+
+    const createMutation = useMutation({
+        mutationFn: (payload: Partial<Job>) => createJob(payload),
+        onSuccess: (): void => {
+            toast.success("Job created.");
+            setFormMode(null);
+            queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        },
+        onError: (): void => {
+            toast.error("Unable to create job. Please try again.");
+        },
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ id, payload }: { id: number; payload: Partial<Job> }) => updateJob(id, payload),
+        onSuccess: (): void => {
+            toast.success("Job updated.");
+            setFormMode(null);
+            setEditingJob(null);
+            queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        },
+        onError: (): void => {
+            toast.error("Unable to update job. Please try again.");
+        },
+    });
+
     const assignMutation = useMutation({
         mutationFn: (payload: CreateJobVendorStagePayload): Promise<JobVendorStage> => createJobVendorStage(payload),
         onSuccess: (): void => {
@@ -140,6 +208,44 @@ export default function JobsPage(): ReactElement {
         setIsProgressOpen(true);
     };
 
+    const openCreate = (): void => {
+        setFormState(emptyJobForm);
+        setEditingJob(null);
+        setFormMode("create");
+    };
+
+    const openEdit = (job: Job): void => {
+        setFormState({
+            job_name: job.job_name,
+            job_type: job.job_type,
+            product: job.product,
+            quantity: String(job.quantity),
+            priority: job.priority,
+            status: job.status,
+            expected_completion: job.expected_completion?.split("T")[0] ?? "",
+        });
+        setEditingJob(job);
+        setFormMode("edit");
+    };
+
+    const handleFormSubmit = (e: React.FormEvent): void => {
+        e.preventDefault();
+        const payload: Partial<Job> = {
+            job_name: formState.job_name,
+            job_type: formState.job_type,
+            product: formState.product,
+            quantity: Number(formState.quantity),
+            priority: formState.priority,
+            status: formState.status,
+            expected_completion: formState.expected_completion || null,
+        };
+        if (formMode === "edit" && editingJob) {
+            updateMutation.mutate({ id: editingJob.id, payload });
+        } else {
+            createMutation.mutate(payload);
+        }
+    };
+
     const closeModals = (): void => {
         setIsDetailOpen(false);
         setIsAssignOpen(false);
@@ -170,6 +276,12 @@ export default function JobsPage(): ReactElement {
     const handleStatusChange = (value: "all" | "pending" | "in_progress" | "on_hold" | "completed"): void => {
         setStatus(value);
         setPage(1);
+    };
+
+    const handleDelete = (job: Job): void => {
+        if (!window.confirm(`Delete job ${job.job_number ?? job.job_name}? This cannot be undone.`)) return;
+        setDeletingJobId(job.id);
+        deleteMutation.mutate(job.id);
     };
 
     const handleResetFilters = (): void => {
@@ -203,6 +315,13 @@ export default function JobsPage(): ReactElement {
                             <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
                             <p className="mt-2 text-sm text-gray-600">Track production jobs and vendor assignments</p>
                         </div>
+                        <button
+                            type="button"
+                            onClick={openCreate}
+                            className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90"
+                        >
+                            + New Job
+                        </button>
                     </div>
                 </div>
             </header>
@@ -239,8 +358,11 @@ export default function JobsPage(): ReactElement {
                                     <JobsTable
                                         jobs={jobs}
                                         onViewDetails={openDetailModal}
+                                        onEdit={openEdit}
                                         onAssign={openAssignModal}
                                         onProgress={openProgressModal}
+                                        onDelete={handleDelete}
+                                        deletingJobId={deletingJobId ?? undefined}
                                     />
                                     <JobsPagination
                                         count={totalCount}
@@ -253,7 +375,7 @@ export default function JobsPage(): ReactElement {
                             ) : (
                                 <JobsEmptyState
                                     title="No jobs found"
-                                    description="Try adjusting your filters or create a new job from a quote."
+                                    description="Try adjusting your filters or create a new job."
                                 />
                             )}
                         </>
@@ -285,6 +407,66 @@ export default function JobsPage(): ReactElement {
                 onClose={(): void => setIsProgressOpen(false)}
                 onSubmit={handleProgressSubmit}
             />
+
+            {formMode && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                            <h2 className="text-lg font-semibold text-gray-900">{formMode === "create" ? "New Job" : "Edit Job"}</h2>
+                            <button type="button" onClick={(): void => { setFormMode(null); setEditingJob(null); }}>
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+                        <form onSubmit={handleFormSubmit} className="px-6 py-5 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="col-span-2">
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Job Name *</label>
+                                    <input required type="text" value={formState.job_name} onChange={(e): void => setFormState(s => ({ ...s, job_name: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="e.g. Business Cards for Acme" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Job Type *</label>
+                                    <input required type="text" value={formState.job_type} onChange={(e): void => setFormState(s => ({ ...s, job_type: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="e.g. print, digital" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Product *</label>
+                                    <input required type="text" value={formState.product} onChange={(e): void => setFormState(s => ({ ...s, product: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="e.g. Business Cards" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Quantity *</label>
+                                    <input required type="number" min="1" value={formState.quantity} onChange={(e): void => setFormState(s => ({ ...s, quantity: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Priority *</label>
+                                    <select required value={formState.priority} onChange={(e): void => setFormState(s => ({ ...s, priority: e.target.value as JobPriority }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                                        <option value="normal">Normal</option>
+                                        <option value="high">High</option>
+                                        <option value="urgent">Urgent</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Status *</label>
+                                    <select required value={formState.status} onChange={(e): void => setFormState(s => ({ ...s, status: e.target.value as JobStatus }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
+                                        <option value="pending">Pending</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="on_hold">On Hold</option>
+                                        <option value="completed">Completed</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-700 mb-1">Expected Completion</label>
+                                    <input type="date" value={formState.expected_completion} onChange={(e): void => setFormState(s => ({ ...s, expected_completion: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button type="button" onClick={(): void => { setFormMode(null); setEditingJob(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+                                <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="px-4 py-2 text-sm font-medium text-white bg-brand-blue rounded-md hover:bg-brand-blue/90 disabled:opacity-50">
+                                    {createMutation.isPending || updateMutation.isPending ? "Saving..." : formMode === "create" ? "Create Job" : "Save Changes"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </AdminLayout>
     );
 }
