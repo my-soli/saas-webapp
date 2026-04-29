@@ -19,18 +19,6 @@ interface InviteUserFormData {
     send_invite: boolean;
 }
 
-function getCsrfToken(): string | null {
-    const name = "csrftoken";
-    const cookies = document.cookie.split(";");
-    for (let cookie of cookies) {
-        const trimmed = cookie.trim();
-        if (trimmed.startsWith(name + "=")) {
-            return decodeURIComponent(trimmed.substring(name.length + 1));
-        }
-    }
-    return null;
-}
-
 export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModalProps) {
     const [formData, setFormData] = useState<InviteUserFormData>({
         first_name: "",
@@ -76,21 +64,21 @@ export default function AddUserModal({ isOpen, onClose, onSuccess }: AddUserModa
         setError(null);
 
         try {
-            const csrfToken = getCsrfToken();
-            const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-            const response = await fetch(`${API_BASE_URL}/api/v1/users/invite/`, {
+            const response = await fetch(`/api/proxy/api/v1/users/invite/`, {
                 method: "POST",
-                credentials: "include",
                 headers: {
                     "Content-Type": "application/json",
-                    ...(csrfToken && { "X-CSRFToken": csrfToken }),
                 },
                 body: JSON.stringify(formData),
             });
 
             if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.detail || "Failed to invite user");
+                const ct = response.headers.get("content-type") || "";
+                if (ct.includes("application/json")) {
+                    const data = await response.json();
+                    throw new Error(data.detail || "Failed to invite user");
+                }
+                throw new Error(`Failed to invite user (${response.status})`);
             }
 
             onSuccess();

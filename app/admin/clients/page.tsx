@@ -328,7 +328,7 @@ export default function ClientsPage(): ReactElement {
 
     return (
         <AdminLayout>
-            <header className="fixed top-0 z-30 w-full border-b border-gray-200 bg-white">
+            <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
                 <div className="px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <a href="/staff" className="hover:text-brand-blue">
@@ -354,7 +354,7 @@ export default function ClientsPage(): ReactElement {
                     </div>
                 </div>
             </header>
-            <main className="bg-gray-50 min-h-screen pt-28">
+            <main className="bg-gray-50 min-h-screen">
                 <div className="px-8 py-6 space-y-6">
                     {!isLoading && (error || !data) && (
                         <div className="bg-brand-red/10 border border-brand-red/20 rounded-lg p-6">
