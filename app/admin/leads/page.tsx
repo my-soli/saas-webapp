@@ -8,10 +8,11 @@ import { AlertCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin/admin-layout";
 import LeadDetailDrawer from "@/features/leads/components/LeadDetailDrawer";
+import LeadFormDrawer from "@/features/leads/components/LeadFormDrawer";
 import LeadsFilters from "@/features/leads/components/LeadsFilters";
 import LeadsPagination from "@/features/leads/components/LeadsPagination";
 import LeadsTable from "@/features/leads/components/LeadsTable";
-import { convertLead, deleteLead, fetchLead, fetchLeads, qualifyLead } from "@/services/leads";
+import { convertLead, createLead, deleteLead, fetchLead, fetchLeads, markLeadContacted, markLeadLost, qualifyLead, updateLead } from "@/services/leads";
 import type { Lead, LeadConvertPayload, LeadConvertResponse, LeadQualifyResponse, LeadSource, LeadStatus, LeadsQueryParams, LeadsResponse } from "@/types/leads";
 
 type PendingAction = "qualify" | "delete" | "convert";
@@ -36,6 +37,8 @@ export default function LeadsPage(): ReactElement {
     const [pageSize, setPageSize] = useState<number>(20);
     const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
     const [pendingLeadAction, setPendingLeadAction] = useState<PendingLeadAction | null>(null);
+    const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
+    const [editingLead, setEditingLead] = useState<Lead | null>(null);
 
     useEffect((): (() => void) => {
         const timer = setTimeout((): void => {
@@ -136,6 +139,32 @@ export default function LeadsPage(): ReactElement {
             setPendingLeadAction(null);
             queryClient.invalidateQueries({ queryKey: ["leads"] });
             queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+        },
+    });
+
+    const createMutation = useMutation({
+        mutationFn: (payload: Partial<Lead>): Promise<Lead> => createLead(payload),
+        onSuccess: (): void => {
+            toast.success("Lead created.");
+            setFormMode(null);
+            queryClient.invalidateQueries({ queryKey: ["leads"] });
+        },
+        onError: (errorValue: unknown): void => {
+            toast.error(extractMutationMessage(errorValue, "Unable to create lead."));
+        },
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: ({ leadId, payload }: { leadId: number; payload: Partial<Lead> }): Promise<Lead> =>
+            updateLead(leadId, payload),
+        onSuccess: (): void => {
+            toast.success("Lead updated.");
+            setFormMode(null);
+            setEditingLead(null);
+            queryClient.invalidateQueries({ queryKey: ["leads"] });
+        },
+        onError: (errorValue: unknown): void => {
+            toast.error(extractMutationMessage(errorValue, "Unable to update lead."));
         },
     });
 
@@ -252,6 +281,70 @@ export default function LeadsPage(): ReactElement {
         },
     });
 
+    const markContactedMutation = useMutation({
+        mutationFn: (leadId: number): Promise<LeadQualifyResponse> => markLeadContacted(leadId),
+        onMutate: async (leadId: number): Promise<LeadsMutationContext> => {
+            await queryClient.cancelQueries({ queryKey: ["leads"] });
+            const previousLeadQueries = queryClient.getQueriesData<LeadsResponse>({ queryKey: ["leads"] });
+            const previousLeadDetail = queryClient.getQueryData<Lead>(["lead", leadId]);
+            updateLeadsInCache((lead: Lead): Lead | null =>
+                lead.id === leadId ? { ...lead, status: "Contacted" } : lead
+            );
+            queryClient.setQueryData<Lead | undefined>(["lead", leadId], (cur: Lead | undefined): Lead | undefined =>
+                cur ? { ...cur, status: "Contacted" } : cur
+            );
+            return { previousLeadQueries, previousLeadDetail };
+        },
+        onSuccess: (): void => {
+            toast.success("Lead marked as contacted.");
+        },
+        onError: (errorValue: unknown, leadId: number, context: LeadsMutationContext | undefined): void => {
+            if (context !== undefined) {
+                for (const [queryKey, previousValue] of context.previousLeadQueries) {
+                    queryClient.setQueryData(queryKey, previousValue);
+                }
+                queryClient.setQueryData(["lead", leadId], context.previousLeadDetail);
+            }
+            toast.error(extractMutationMessage(errorValue, "Unable to mark lead as contacted."));
+        },
+        onSettled: (_data: LeadQualifyResponse | undefined, _error: unknown, leadId: number): void => {
+            queryClient.invalidateQueries({ queryKey: ["leads"] });
+            queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+        },
+    });
+
+    const markLostMutation = useMutation({
+        mutationFn: (leadId: number): Promise<LeadQualifyResponse> => markLeadLost(leadId),
+        onMutate: async (leadId: number): Promise<LeadsMutationContext> => {
+            await queryClient.cancelQueries({ queryKey: ["leads"] });
+            const previousLeadQueries = queryClient.getQueriesData<LeadsResponse>({ queryKey: ["leads"] });
+            const previousLeadDetail = queryClient.getQueryData<Lead>(["lead", leadId]);
+            updateLeadsInCache((lead: Lead): Lead | null =>
+                lead.id === leadId ? { ...lead, status: "Lost" } : lead
+            );
+            queryClient.setQueryData<Lead | undefined>(["lead", leadId], (cur: Lead | undefined): Lead | undefined =>
+                cur ? { ...cur, status: "Lost" } : cur
+            );
+            return { previousLeadQueries, previousLeadDetail };
+        },
+        onSuccess: (): void => {
+            toast.success("Lead marked as lost.");
+        },
+        onError: (errorValue: unknown, leadId: number, context: LeadsMutationContext | undefined): void => {
+            if (context !== undefined) {
+                for (const [queryKey, previousValue] of context.previousLeadQueries) {
+                    queryClient.setQueryData(queryKey, previousValue);
+                }
+                queryClient.setQueryData(["lead", leadId], context.previousLeadDetail);
+            }
+            toast.error(extractMutationMessage(errorValue, "Unable to mark lead as lost."));
+        },
+        onSettled: (_data: LeadQualifyResponse | undefined, _error: unknown, leadId: number): void => {
+            queryClient.invalidateQueries({ queryKey: ["leads"] });
+            queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+        },
+    });
+
     const handleResetFilters = (): void => {
         setSearch("");
         setStatus("all");
@@ -278,10 +371,28 @@ export default function LeadsPage(): ReactElement {
 
     const handleEdit = (lead: Lead): void => {
         setSelectedLeadId(null);
+        setEditingLead(lead);
+        setFormMode("edit");
+    };
+
+    const handleFormSubmit = (payload: Partial<Lead>, leadId?: number): void => {
+        if (formMode === "edit" && leadId !== undefined) {
+            updateMutation.mutate({ leadId, payload });
+        } else {
+            createMutation.mutate(payload);
+        }
     };
 
     const handleConvert = (lead: Lead, payload: LeadConvertPayload): void => {
         convertMutation.mutate({ leadId: lead.id, payload });
+    };
+
+    const handleMarkContacted = (lead: Lead): void => {
+        markContactedMutation.mutate(lead.id);
+    };
+
+    const handleMarkLost = (lead: Lead): void => {
+        markLostMutation.mutate(lead.id);
     };
 
     const leads = data?.results ?? [];
@@ -289,7 +400,7 @@ export default function LeadsPage(): ReactElement {
 
     return (
         <AdminLayout>
-            <header className="fixed top-0 z-30 w-full border-b border-gray-200 bg-white">
+            <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
                 <div className="px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <a href="/staff" className="hover:text-brand-blue">
@@ -298,15 +409,24 @@ export default function LeadsPage(): ReactElement {
                         <span>/</span>
                         <span className="text-gray-900">Leads</span>
                     </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
-                        <p className="mt-2 text-sm text-gray-600">
-                            Track prospect lifecycle from new inquiry to conversion-ready lead.
-                        </p>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
+                            <p className="mt-2 text-sm text-gray-600">
+                                Track prospect lifecycle from new inquiry to conversion-ready lead.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={(): void => { setEditingLead(null); setFormMode("create"); }}
+                            className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90"
+                        >
+                            + New Lead
+                        </button>
                     </div>
                 </div>
             </header>
-            <main className="bg-gray-50 min-h-screen pt-24">
+            <main className="bg-gray-50 min-h-screen">
                 <div className="px-8 py-6 space-y-6">
                     {!isLoading && (error || !data) && (
                         <div className="bg-brand-red/10 border border-brand-red/20 rounded-lg p-6">
@@ -358,6 +478,8 @@ export default function LeadsPage(): ReactElement {
                                     <LeadsTable
                                         leads={leads}
                                         onView={handleView}
+                                        onEdit={handleEdit}
+                                        onDelete={handleDelete}
                                         pendingLeadId={pendingLeadAction?.leadId ?? null}
                                         pendingAction={pendingLeadAction?.action ?? null}
                                     />
@@ -385,20 +507,29 @@ export default function LeadsPage(): ReactElement {
                 </div>
             </main>
 
+            <LeadFormDrawer
+                isOpen={formMode !== null}
+                isSubmitting={createMutation.isPending || updateMutation.isPending}
+                mode={formMode ?? "create"}
+                lead={editingLead}
+                onClose={(): void => { setFormMode(null); setEditingLead(null); }}
+                onSubmit={handleFormSubmit}
+            />
+
             <LeadDetailDrawer
                 lead={selectedLead ?? null}
                 isOpen={selectedLeadId !== null}
                 isLoading={isSelectedLeadLoading}
                 isQualifying={qualifyMutation.isPending}
                 isConverting={convertMutation.isPending}
-                isMarkingLost={false}
-                isMarkingContacted={false}
+                isMarkingLost={markLostMutation.isPending}
+                isMarkingContacted={markContactedMutation.isPending}
                 isDeleting={deleteMutation.isPending}
                 onClose={(): void => setSelectedLeadId(null)}
                 onEdit={handleEdit}
                 onQualify={handleQualify}
-                onMarkContacted={(): void => undefined}
-                onMarkLost={(): void => undefined}
+                onMarkContacted={handleMarkContacted}
+                onMarkLost={handleMarkLost}
                 onDelete={handleDelete}
                 onConvert={handleConvert}
             />
