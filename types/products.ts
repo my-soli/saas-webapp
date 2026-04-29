@@ -176,6 +176,8 @@ export interface Product {
     dimension_unit: ProductDimensionUnit;
     warranty: ProductWarranty;
     country_of_origin: ProductCountryOfOrigin;
+    vendor: number | null;
+    vendor_name: string | null;
     stock_status: ProductStockStatus;
     stock_quantity: number;
     low_stock_threshold: number;
@@ -241,6 +243,7 @@ export interface ProductFormValues {
     dimension_unit: ProductDimensionUnit;
     warranty: ProductWarranty;
     country_of_origin: ProductCountryOfOrigin;
+    vendor: string;
     stock_status: ProductStockStatus;
     stock_quantity: number;
     low_stock_threshold: number;
@@ -281,6 +284,7 @@ export interface CreateProductPayload {
     dimension_unit: ProductDimensionUnit;
     warranty: ProductWarranty;
     country_of_origin: ProductCountryOfOrigin;
+    vendor: number | null;
     stock_status: ProductStockStatus;
     stock_quantity: number;
     low_stock_threshold: number;

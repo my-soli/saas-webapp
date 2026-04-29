@@ -1,7 +1,9 @@
 "use client";
 
 import type { ReactElement } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { ProductFormValues } from "@/types/products";
+import { fetchAllVendors } from "@/services/vendors";
 import FormField, { inputCls, selectCls } from "./FormField";
 
 interface InventoryTabProps {
@@ -14,8 +16,35 @@ export default function InventoryTab({ values, onValuesChange }: InventoryTabPro
         onValuesChange({ ...values, [key]: value });
     };
 
+    const { data: vendors = [], isLoading: vendorsLoading } = useQuery({
+        queryKey: ["vendors-all"],
+        queryFn: fetchAllVendors,
+        staleTime: 60_000,
+    });
+
     return (
         <div className="max-w-2xl space-y-5">
+            <FormField
+                label="Vendor"
+                hint="Primary vendor or supplier who provides this product"
+                required
+            >
+                <select
+                    className={selectCls}
+                    value={values.vendor}
+                    onChange={(e) => set("vendor", e.target.value)}
+                    required
+                    disabled={vendorsLoading}
+                >
+                    <option value="">{vendorsLoading ? "Loading vendors…" : "— Select a vendor —"}</option>
+                    {vendors.map((v) => (
+                        <option key={v.id} value={String(v.id)}>
+                            {v.name}
+                        </option>
+                    ))}
+                </select>
+            </FormField>
+
             <FormField label="Stock Status" hint="Availability shown to customers on the storefront and used in order management">
                 <select className={selectCls} value={values.stock_status} onChange={(e) => set("stock_status", e.target.value as ProductFormValues["stock_status"])}>
                     <option value="made_to_order">Made to Order</option>
