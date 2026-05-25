@@ -115,6 +115,10 @@ async function handler(
             );
         }
 
+        if (djangoResponse.status === 204 || djangoResponse.status === 205) {
+            return new NextResponse(null, { status: djangoResponse.status });
+        }
+
         const responseBody = await djangoResponse.arrayBuffer();
         const responseContentType = djangoResponse.headers.get('content-type') || 'application/json';
 

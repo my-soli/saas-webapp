@@ -1,35 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const API_BASE_URL = process.env.DJANGO_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 export async function POST(request: NextRequest) {
     const sessionid = request.cookies.get('sessionid')?.value;
+    const csrftoken = request.cookies.get('csrftoken')?.value;
 
-    const csrfResponse = await fetch(`${API_BASE_URL}/api/auth/csrf/`, { cache: 'no-store' });
-    const { csrfToken } = await csrfResponse.json() as { csrfToken: string };
-    const csrfSetCookie = csrfResponse.headers.get('set-cookie') || '';
-    const csrfCookieMatch = csrfSetCookie.match(/csrftoken=([^;]+)/);
-    const csrfCookieValue = csrfCookieMatch ? csrfCookieMatch[1] : '';
+    // Use cookies.set() with maxAge=0 — Next.js 15+ strips raw Set-Cookie headers
+    const proxyResponse = NextResponse.json({ success: true });
+    proxyResponse.cookies.set('sessionid', '', {
+        httpOnly: true,
+        sameSite: IS_PRODUCTION ? 'none' : 'lax',
+        secure: IS_PRODUCTION,
+        path: '/',
+        maxAge: 0,
+    });
 
-    let djangoSetCookie = '';
-    if (sessionid) {
-        const logoutRes = await fetch(`${API_BASE_URL}/api/auth/session/logout/`, {
+    // Best-effort: notify Django in background (fire-and-forget, no await)
+    if (sessionid && csrftoken) {
+        fetch(`${API_BASE_URL}/api/auth/session/logout/`, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': csrfToken,
-                'Cookie': `sessionid=${sessionid}; csrftoken=${csrfCookieValue}`,
+                'X-CSRFToken': csrftoken,
+                'Cookie': `sessionid=${sessionid}; csrftoken=${csrftoken}`,
             },
-        });
-        djangoSetCookie = logoutRes.headers.get('set-cookie') || '';
+        }).catch(() => { /* ignore — cookie is already cleared */ });
     }
 
-    const proxyResponse = NextResponse.json({ success: true });
-    if (djangoSetCookie) {
-        proxyResponse.headers.set('Set-Cookie', djangoSetCookie);
-    } else {
-        const domain = process.env.SESSION_COOKIE_DOMAIN || '';
-        const domainAttr = domain ? `; Domain=${domain}` : '';
-        proxyResponse.headers.set('Set-Cookie', `sessionid=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=None${domainAttr}`);
-    }
     return proxyResponse;
 }
