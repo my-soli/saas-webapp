@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import type { ReactElement } from "react";
 import AdminLayout from "@/components/admin/admin-layout";
 import ProductionMyJobsWorkspace from "@/features/production-my-jobs/components/ProductionMyJobsWorkspace";
@@ -7,7 +8,9 @@ import ProductionMyJobsWorkspace from "@/features/production-my-jobs/components/
 export default function ProductionMyJobsPage(): ReactElement {
     return (
         <AdminLayout>
-            <ProductionMyJobsWorkspace />
+            <Suspense>
+                <ProductionMyJobsWorkspace />
+            </Suspense>
         </AdminLayout>
     );
 }

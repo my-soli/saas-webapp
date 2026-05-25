@@ -232,7 +232,7 @@ export default function ProductionTeamCatalogSetupPage(): ReactElement {
 
     return (
         <AdminLayout>
-            <header className="border-b border-gray-200 bg-white px-8 py-5">
+            <header className="border-b border-gray-200 bg-white px-4 lg:px-8 py-4 lg:py-5">
                 <nav className="flex items-center gap-2 text-xs text-gray-400 mb-2">
                     <a href="/production-team/dashboard" className="hover:text-brand-blue">Production Team</a>
                     <span>/</span>
@@ -250,8 +250,8 @@ export default function ProductionTeamCatalogSetupPage(): ReactElement {
                 </div>
             </header>
 
-            <div className="border-b border-gray-200 bg-white px-8">
-                <div className="flex gap-0">
+            <div className="border-b border-gray-200 bg-white px-4 lg:px-8">
+                <div className="flex gap-0 overflow-x-auto">
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
@@ -300,7 +300,7 @@ export default function ProductionTeamCatalogSetupPage(): ReactElement {
                         </div>
                     ) : (
                         <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
-                            <table className="w-full text-sm">
+                            <div className="overflow-x-auto"><table className="w-full text-sm">
                                 <thead className="bg-gray-50 border-b border-gray-200">
                                     <tr>
                                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
@@ -387,7 +387,7 @@ export default function ProductionTeamCatalogSetupPage(): ReactElement {
                                         </tr>
                                     ))}
                                 </tbody>
-                            </table>
+                            </table></div>
                         </div>
                     )}
                 </div>

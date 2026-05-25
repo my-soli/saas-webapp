@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ChangeEvent, ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -121,7 +121,7 @@ export default function ProductionNotificationsPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-gray-900">Production Team Notifications</h1>
                     <p className="mt-2 text-sm text-gray-600">
                         Notifications from the existing production notification stream.
@@ -129,7 +129,7 @@ export default function ProductionNotificationsPage(): ReactElement {
                 </div>
             </header>
 
-            <main className="p-8">
+            <main className="p-4 lg:p-8">
                 <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-200 p-4">
                         <div className="flex flex-col gap-3 lg:flex-row">

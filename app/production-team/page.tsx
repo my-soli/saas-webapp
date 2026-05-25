@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ReactElement } from "react";
 import Link from "next/link";
@@ -67,7 +67,7 @@ export default function ProductionTeamPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-gray-900">Production Team</h1>
                     <p className="mt-2 text-sm text-gray-600">
                         Workspace for production workflows, costing, quotations, and follow-through.
@@ -75,7 +75,7 @@ export default function ProductionTeamPage(): ReactElement {
                 </div>
             </header>
 
-            <main className="p-8">
+            <main className="p-4 lg:p-8">
                 <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {productionLinks.map((item: ProductionLink): ReactElement => (
                         <Link

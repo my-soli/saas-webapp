@@ -1,23 +1,34 @@
-"use client";
+﻿"use client";
 
-import type { ReactElement } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, type ReactElement, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AdminLayout from "@/components/admin/admin-layout";
 import ProductForm from "@/features/products/components/ProductForm";
 import { useNewProduct } from "@/features/products/hooks/useNewProduct";
 
 const BASE_PATH = "/production-team/products";
 
-export default function NewProductPage(): ReactElement {
+function NewProductContent(): ReactElement {
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     const { values, isSubmitting, image, handleValuesChange, handleImageChange, handleSubmit } =
         useNewProduct(BASE_PATH);
 
+    // Pre-fill name from ?name= query param (e.g. from PT notification link)
+    useEffect(() => {
+        const prefilledName = searchParams.get("name");
+        if (prefilledName) {
+            handleValuesChange({ ...values, name: prefilledName });
+        }
+        // Only run on mount
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <nav className="flex items-center gap-2 text-xs text-gray-400 mb-3">
                         <a href="/production-team" className="hover:text-brand-blue">Production Team</a>
                         <span>/</span>
@@ -49,5 +60,13 @@ export default function NewProductPage(): ReactElement {
                 </div>
             </main>
         </AdminLayout>
+    );
+}
+
+export default function NewProductPage(): ReactElement {
+    return (
+        <Suspense>
+            <NewProductContent />
+        </Suspense>
     );
 }
