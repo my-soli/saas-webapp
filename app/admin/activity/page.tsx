@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ChangeEvent, ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -117,7 +117,7 @@ export default function ActivityPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
                         <Link href="/staff" className="hover:text-brand-blue">
                             Staff Portal
@@ -130,7 +130,7 @@ export default function ActivityPage(): ReactElement {
                 </div>
             </header>
 
-            <main className="p-8">
+            <main className="p-4 lg:p-8">
                 <section className="rounded-lg border border-gray-200 bg-white">
                     <div className="border-b border-gray-200 p-6">
                         <div className="flex flex-col gap-3 sm:flex-row">
@@ -171,7 +171,7 @@ export default function ActivityPage(): ReactElement {
                     ) : null}
 
                     {auditLogsQuery.isError ? (
-                        <div className="p-8">
+                        <div className="p-4 lg:p-8">
                             <div className="flex items-start gap-2 rounded-lg border border-brand-red/20 bg-brand-red/5 p-4">
                                 <AlertCircleIcon className="mt-0.5 h-4 w-4 text-brand-red" />
                                 <div>

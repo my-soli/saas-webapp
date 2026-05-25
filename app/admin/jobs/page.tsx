@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
@@ -302,7 +302,7 @@ export default function JobsPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <a href="/staff" className="hover:text-brand-blue">
                             Staff Portal
@@ -326,7 +326,7 @@ export default function JobsPage(): ReactElement {
                 </div>
             </header>
             <main className="bg-gray-50 min-h-screen">
-                <div className="px-8 py-6 space-y-6">
+                <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-6">
                     {isLoading && <JobsSkeleton />}
 
                     {!isLoading && (error || !data) && (
@@ -418,7 +418,7 @@ export default function JobsPage(): ReactElement {
                             </button>
                         </div>
                         <form onSubmit={handleFormSubmit} className="px-6 py-5 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="col-span-2">
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Job Name *</label>
                                     <input required type="text" value={formState.job_name} onChange={(e): void => setFormState(s => ({ ...s, job_name: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="e.g. Business Cards for Acme" />

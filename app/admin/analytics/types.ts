@@ -90,3 +90,31 @@ export interface AnalyticsData {
     collection_rate: CollectionRate;
     staff_performance: StaffPerformance;
 }
+
+export interface ActionBreakdownItem {
+    action: string;
+    label: string;
+    count: number;
+}
+
+export interface TopActiveClient {
+    client_name: string;
+    client_id: string;
+    action_count: number;
+    last_active: string | null;
+}
+
+export interface ActivityOverTimeItem {
+    date: string;
+    count: number;
+}
+
+export interface ClientActivityData {
+    total_portal_users: number;
+    active_last_n_days: number;
+    total_actions: number;
+    period_days: number;
+    action_breakdown: ActionBreakdownItem[];
+    top_active_clients: TopActiveClient[];
+    activity_over_time: ActivityOverTimeItem[];
+}

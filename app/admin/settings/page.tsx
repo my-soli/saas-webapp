@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -74,13 +74,13 @@ export default function SettingsPage() {
         return (
             <AdminLayout>
                 <header className="border-b border-gray-200 bg-white">
-                    <div className="px-8 py-6">
+                    <div className="px-4 lg:px-8 py-4 lg:py-6">
                         <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-3"></div>
                         <div className="h-4 w-96 bg-gray-200 rounded animate-pulse"></div>
                     </div>
                 </header>
-                <div className="p-8">
-                    <div className="bg-white border border-gray-200 rounded-lg p-8">
+                <div className="p-4 lg:p-8">
+                    <div className="bg-white border border-gray-200 rounded-lg p-4 lg:p-8">
                         <div className="space-y-4">
                             {Array.from({ length: 5 }).map((_, i) => (
                                 <div key={i}>
@@ -98,7 +98,7 @@ export default function SettingsPage() {
     if (error) {
         return (
             <AdminLayout>
-                <div className="p-8">
+                <div className="p-4 lg:p-8">
                     <div className="text-center py-12">
                         <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load settings</h3>
@@ -112,7 +112,7 @@ export default function SettingsPage() {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="flex items-center justify-between px-8 py-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-4 lg:px-8 py-4 lg:py-6">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
                         <p className="mt-2 text-sm text-gray-600">
@@ -149,7 +149,7 @@ export default function SettingsPage() {
                 </div>
             </header>
 
-            <div className="p-8">
+            <div className="p-4 lg:p-8">
                 <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                     <Tabs
                         tabs={tabs.map(tab => ({
@@ -162,7 +162,7 @@ export default function SettingsPage() {
                         onTabChange={(key) => setActiveTab(key as TabType)}
                     />
 
-                    <div className="p-8">
+                    <div className="p-4 lg:p-8">
                         {activeTab === "general" && (
                             <div className="space-y-6 max-w-2xl">
                                 <div>
@@ -178,7 +178,7 @@ export default function SettingsPage() {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Support Email

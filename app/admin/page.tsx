@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -41,7 +41,7 @@ export default function StaffPage() {
     return (
         <AdminLayout>
             <header className="bg-white shadow">
-                <div className="px-8 py-4 flex justify-between items-center">
+                <div className="px-4 lg:px-8 py-4 flex justify-between items-center">
                     <div>
                         <h1 className="text-3xl font-bold text-brand-black">
                             Staff Portal
@@ -59,7 +59,7 @@ export default function StaffPage() {
                 </div>
             </header>
 
-            <main className="p-8">
+            <main className="p-4 lg:p-8">
                 <div className="max-w-6xl mx-auto">
                     <div className="bg-white rounded-lg shadow p-8 mb-6">
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -119,7 +119,7 @@ export default function AlertsPage() {
     if (error) {
         return (
             <AdminLayout>
-                <div className="p-8">
+                <div className="p-4 lg:p-8">
                     <div className="text-center py-12">
                         <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 mb-2">Failed to load alerts</h3>
@@ -133,7 +133,7 @@ export default function AlertsPage() {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <Link href="/staff" className="hover:text-brand-blue">
                             Staff Portal
@@ -148,7 +148,7 @@ export default function AlertsPage() {
                 </div>
             </header>
 
-            <div className="p-8">
+            <div className="p-4 lg:p-8">
                 <div className="bg-white border border-gray-200 rounded-lg">
                     <div className="p-6 border-b border-gray-200">
                         <div className="flex flex-col sm:flex-row gap-4">

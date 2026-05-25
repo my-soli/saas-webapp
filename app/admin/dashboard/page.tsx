@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ReactElement } from "react";
 import { useMemo } from "react";
@@ -55,13 +55,13 @@ export default function DashboardPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="bg-white shadow-sm border-b border-gray-200">
-                <div className="px-8 py-6">
-                    <h1 className="text-3xl font-bold text-brand-black">Dashboard</h1>
+                <div className="px-4 lg:px-8 py-4 lg:py-6">
+                    <h1 className="text-2xl lg:text-3xl font-bold text-brand-black">Dashboard</h1>
                     <p className="mt-1 text-sm text-gray-600">Monitor your business performance and key metrics</p>
                 </div>
             </header>
 
-            <main className="p-8 space-y-6 bg-gray-50">
+            <main className="p-4 lg:p-8 space-y-6 bg-gray-50">
                 {isLoading ? (
                     <div className="space-y-6 animate-pulse">
                         {/* KPI cards */}

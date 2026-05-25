@@ -76,7 +76,7 @@ export default function UserDetailPage() {
     if (isLoading) {
         return (
             <AdminLayout>
-                <div className="p-8">
+                <div className="p-4 lg:p-8">
                     <div className="space-y-4">
                         <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
                         <div className="h-4 w-64 bg-gray-200 rounded animate-pulse"></div>
@@ -94,7 +94,7 @@ export default function UserDetailPage() {
     if (error || !user) {
         return (
             <AdminLayout>
-                <div className="p-8">
+                <div className="p-4 lg:p-8">
                     <div className="text-center py-12">
                         <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                         <h3 className="text-lg font-medium text-gray-900 mb-2">User not found</h3>
@@ -117,7 +117,7 @@ export default function UserDetailPage() {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <Link href="/staff" className="hover:text-brand-blue">Staff Portal</Link>
                         <span>/</span>
@@ -167,13 +167,13 @@ export default function UserDetailPage() {
                 </div>
             </header>
 
-            <div className="p-8 space-y-6">
+            <div className="p-4 lg:p-8 space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 space-y-6">
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
                             <h2 className="text-lg font-semibold text-gray-900 mb-4">User Information</h2>
                             <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             First Name
@@ -223,7 +223,7 @@ export default function UserDetailPage() {
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="flex items-center gap-2">
                                             <input

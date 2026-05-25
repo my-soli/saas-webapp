@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ReactElement } from "react";
 import { usePathname, useRouter } from "next/navigation";
@@ -18,7 +18,7 @@ export default function NewProductPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <nav className="flex items-center gap-2 text-xs text-gray-400 mb-3">
                         <a href="/admin" className="hover:text-brand-blue">Admin</a>
                         <span>/</span>

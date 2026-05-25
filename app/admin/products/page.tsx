@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
@@ -110,7 +110,7 @@ export default function AdminProductsPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-5 flex items-center justify-between">
+                <div className="px-4 lg:px-8 py-4 lg:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">Products</h1>
                         {data && (
@@ -130,7 +130,7 @@ export default function AdminProductsPage(): ReactElement {
                 </div>
             </header>
 
-            <main className="bg-gray-50 min-h-screen px-8 py-6 space-y-4">
+            <main className="bg-gray-50 min-h-screen px-4 lg:px-8 py-4 lg:py-6 space-y-4">
                 <ProductsFilters
                     search={search}
                     status={status}
