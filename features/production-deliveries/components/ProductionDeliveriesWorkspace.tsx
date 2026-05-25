@@ -359,7 +359,7 @@ export default function ProductionDeliveriesWorkspace(): ReactElement {
     return (
         <main className="bg-gray-50 min-h-screen">
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <Link href="/production-team" className="hover:text-brand-blue">
                             Production Team
@@ -374,7 +374,7 @@ export default function ProductionDeliveriesWorkspace(): ReactElement {
                 </div>
             </header>
 
-            <div className="max-w-7xl mx-auto px-8 py-6 space-y-6">
+            <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6 space-y-6">
                 {queueQuery.isLoading ? (
                     <section className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm animate-pulse">
                         <div className="h-5 w-56 rounded bg-gray-200" />

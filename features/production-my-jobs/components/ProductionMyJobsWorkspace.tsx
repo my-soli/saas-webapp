@@ -2,23 +2,47 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, ReactElement } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
     AlertCircleIcon,
+    BriefcaseIcon,
     CheckIcon,
     ClipboardListIcon,
     Building2Icon,
+    CalendarIcon,
+    EyeIcon,
     ImageIcon,
+    PackageIcon,
+    Plus,
     ReceiptIcon,
     LoaderCircleIcon,
     LucideIcon,
     SearchIcon,
     SendHorizonalIcon,
     UploadIcon,
+    UserIcon,
     XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { fetchJobs } from "@/services/jobs";
+import {
+    assignJobToProductionTeam,
+    deleteJob as deleteJobFn,
+    fetchJob,
+    fetchJobs,
+    sendJobReminder,
+    updateJob,
+} from "@/services/jobs";
+import { getCurrentUser, fetchAllUsers } from "@/services/users";
+import JobsStatsCards from "@/features/jobs/components/JobsStatsCards";
+import JobsFilters from "@/features/jobs/components/JobsFilters";
+import JobsTable from "@/features/jobs/components/JobsTable";
+import JobsPagination from "@/features/jobs/components/JobsPagination";
+import JobsSkeleton from "@/features/jobs/components/JobsSkeleton";
+import JobsEmptyState from "@/features/jobs/components/JobsEmptyState";
+import AccountManagerJobAssignModal from "@/features/jobs/components/AccountManagerJobAssignModal";
+import ConfirmModal from "@/features/quotes/components/ConfirmModal";
+import type { ProductionUsersResponse } from "@/types/users";
 import {
     approveInvoice,
     approveProof,
@@ -52,6 +76,11 @@ interface TabDefinition {
 }
 
 const tabs: TabDefinition[] = [
+    {
+        key: "active",
+        title: "Active Jobs",
+        icon: BriefcaseIcon,
+    },
     {
         key: "pending",
         title: "Ready for Assignment",
@@ -203,6 +232,8 @@ const applyDeadlineFilter = (jobs: Job[], deadline: DeadlineFilter): Job[] => {
 
 export default function ProductionMyJobsWorkspace(): ReactElement {
     const queryClient = useQueryClient();
+    const router = useRouter();
+    const searchParams = useSearchParams();
 
     const [activeTab, setActiveTab] = useState<MyJobsTabKey>("pending");
     const [search, setSearch] = useState<string>("");
@@ -214,6 +245,10 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
 
     const [selectedJob, setSelectedJob] = useState<Job | null>(null);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
+
+    // Job detail panel — opened by row click or ?job= URL param
+    const [detailJobId, setDetailJobId] = useState<number | null>(null);
+    const [pendingStatusUpdate, setPendingStatusUpdate] = useState<JobStatus | "">("");
     const [selectedVendorIds, setSelectedVendorIds] = useState<number[]>([]);
     const [expectedDays, setExpectedDays] = useState<number>(3);
     const [estimatedCost, setEstimatedCost] = useState<string>("");
@@ -224,6 +259,18 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
     const [selectedInvoice, setSelectedInvoice] = useState<VendorInvoiceListItem | null>(null);
     const [rejectReason, setRejectReason] = useState<string>("");
 
+    // Active Jobs tab state
+    const [activeSearch, setActiveSearch] = useState<string>("");
+    const [activeDebouncedSearch, setActiveDebouncedSearch] = useState<string>("");
+    const [activeStatus, setActiveStatus] = useState<"all" | "pending" | "in_progress" | "on_hold" | "completed">("all");
+    const [activePage, setActivePage] = useState<number>(1);
+    const [activePageSize, setActivePageSize] = useState<number>(20);
+    const [ptDeleteId, setPtDeleteId] = useState<number | null>(null);
+    const [ptAssignOpen, setPtAssignOpen] = useState<boolean>(false);
+    const [ptAssignJobId, setPtAssignJobId] = useState<number | null>(null);
+    const [ptReminderModal, setPtReminderModal] = useState<{ job: Job; note: string } | null>(null);
+    const [ptRemindingId, setPtRemindingId] = useState<number | null>(null);
+
     useEffect((): (() => void) => {
         const timer = setTimeout((): void => {
             setDebouncedSearch(search);
@@ -231,6 +278,22 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
 
         return (): void => clearTimeout(timer);
     }, [search]);
+
+    useEffect((): (() => void) => {
+        const t = setTimeout((): void => setActiveDebouncedSearch(activeSearch), 400);
+        return (): void => clearTimeout(t);
+    }, [activeSearch]);
+
+    // Open job detail panel when ?job= param is present in the URL
+    useEffect((): void => {
+        const jobParam = searchParams.get("job");
+        if (jobParam) {
+            const id = Number(jobParam);
+            if (!isNaN(id) && id > 0) {
+                setDetailJobId(id);
+            }
+        }
+    }, [searchParams]);
 
     const jobsParams = useMemo(
         (): JobsQueryParams => ({
@@ -275,6 +338,52 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
     const vendorsQuery = useQuery({
         queryKey: ["production-my-jobs", "vendors", vendorsParams],
         queryFn: (): Promise<VendorsResponse> => fetchVendors(vendorsParams),
+    });
+
+    const currentUserQuery = useQuery({
+        queryKey: ["production-my-jobs", "current-user"],
+        queryFn: getCurrentUser,
+        staleTime: 10 * 60 * 1000,
+    });
+    const currentUserId = currentUserQuery.data?.id ?? null;
+
+    const activeJobsParams = useMemo(
+        (): JobsQueryParams => ({ page: activePage, pageSize: activePageSize, search: activeDebouncedSearch, status: activeStatus }),
+        [activePage, activePageSize, activeDebouncedSearch, activeStatus]
+    );
+
+    const activeJobsQuery = useQuery({
+        queryKey: ["production-active-jobs", activeJobsParams],
+        queryFn: (): Promise<JobsResponse> => fetchJobs(activeJobsParams),
+        enabled: activeTab === "active",
+    });
+
+    const allUsersQuery = useQuery({
+        queryKey: ["all-users"],
+        queryFn: (): Promise<ProductionUsersResponse> => fetchAllUsers(),
+    });
+
+
+    const jobDetailQuery = useQuery({
+        queryKey: ["production-my-jobs", "job-detail", detailJobId],
+        queryFn: (): Promise<Job> => fetchJob(detailJobId!),
+        enabled: detailJobId !== null,
+    });
+
+    const detailJob = jobDetailQuery.data ?? null;
+
+    const updateStatusMutation = useMutation({
+        mutationFn: ({ jobId, newStatus }: { jobId: number; newStatus: JobStatus }) =>
+            updateJob(jobId, { status: newStatus }),
+        onSuccess: (updatedJob: Job): void => {
+            toast.success(`Job status updated to "${updatedJob.status.replace("_", " ")}".`);
+            queryClient.invalidateQueries({ queryKey: ["production-my-jobs", "jobs"] });
+            queryClient.invalidateQueries({ queryKey: ["production-my-jobs", "job-detail", detailJobId] });
+            setPendingStatusUpdate("");
+        },
+        onError: (): void => {
+            toast.error("Failed to update job status.");
+        },
     });
 
     const uploadMutation = useMutation({
@@ -380,6 +489,44 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
         },
     });
 
+    const deleteJobMutation = useMutation({
+        mutationFn: (jobId: number) => deleteJobFn(jobId),
+        onSuccess: (): void => {
+            toast.success("Job deleted.");
+            queryClient.invalidateQueries({ queryKey: ["production-active-jobs"] });
+            setPtDeleteId(null);
+        },
+        onError: (): void => { toast.error("Failed to delete job."); },
+    });
+
+    const ptAssignMutation = useMutation({
+        mutationFn: ({ jobId, userId, notes, remindDays }: {
+            jobId: number; userId: number; notes: string; remindDays: number;
+        }) => assignJobToProductionTeam(jobId, {
+            user_id: userId,
+            assignment_notes: notes,
+            remind_days_before: remindDays,
+        }),
+        onSuccess: (): void => {
+            toast.success("Job assigned! Notification sent.");
+            queryClient.invalidateQueries({ queryKey: ["production-active-jobs"] });
+            setPtAssignOpen(false);
+        },
+        onError: (): void => { toast.error("Unable to assign job."); },
+    });
+
+    const ptReminderMutation = useMutation({
+        mutationFn: ({ jobId, note }: { jobId: number; note: string }) => sendJobReminder(jobId, note),
+        onSuccess: (): void => {
+            toast.success("Reminder sent!");
+            setPtRemindingId(null);
+        },
+        onError: (): void => {
+            toast.error("Unable to send reminder.");
+            setPtRemindingId(null);
+        },
+    });
+
     const jobs = jobsQuery.data?.results ?? [];
     const filteredJobs = applyDeadlineFilter(jobs, deadline);
     const purchaseOrders = purchaseOrdersQuery.data?.results ?? [];
@@ -419,7 +566,12 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
         return map;
     }, [purchaseOrders]);
 
+    const activeJobs = activeJobsQuery.data?.results ?? [];
+    const activeJobsTotal = activeJobsQuery.data?.count ?? 0;
+    const allUsers = allUsersQuery.data?.users ?? [];
+
     const tabCounts = {
+        active: activeJobsTotal,
         pending: jobsQuery.data?.count ?? filteredJobs.length,
         assigned: purchaseOrders.length,
         proofs: proofs.filter((p: PurchaseOrderProofListItem): boolean => p.status === "pending").length,
@@ -516,23 +668,35 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
     return (
         <>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                        <a href="/staff" className="hover:text-brand-blue">
-                            Staff Portal
-                        </a>
-                        <span>/</span>
-                        <span className="text-gray-900">My Jobs</span>
+                <div className="px-4 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
+                            <a href="/staff" className="hover:text-brand-blue">
+                                Staff Portal
+                            </a>
+                            <span>/</span>
+                            <span className="text-gray-900">My Jobs</span>
+                        </div>
+                        <h1 className="text-2xl font-bold text-gray-900">My Jobs</h1>
+                        <p className="mt-2 text-sm text-gray-600">
+                            Manage jobs, assign to vendors, track proofs, and process invoices
+                        </p>
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900">My Jobs - Vendor Assignment</h1>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Assign jobs to vendors, track proofs, and process invoices
-                    </p>
+                    {activeTab === "active" && (
+                        <button
+                            type="button"
+                            onClick={(): void => router.push("/staff/production/my-jobs/create")}
+                            className="flex items-center gap-2 rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 transition-colors"
+                        >
+                            <Plus className="w-4 h-4" />
+                            Create Job
+                        </button>
+                    )}
                 </div>
             </header>
 
             <main className="bg-gray-50 min-h-screen">
-                <div className="max-w-7xl mx-auto px-8 py-6 space-y-6">
+                <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6 space-y-6">
                     <section className="w-full border-b border-gray-200 bg-white">
                         <div className="flex overflow-x-auto">
                             {tabs.map((tab: TabDefinition): ReactElement => {
@@ -561,6 +725,7 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                         </div>
                     </section>
 
+                    {activeTab !== "active" && (
                     <section className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
                             <div className="lg:col-span-6">
@@ -608,8 +773,9 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                             </div>
                         </div>
                     </section>
+                    )}
 
-                    {(activeTab === "pending" && isPendingLoading) || (activeTab !== "pending" && isOtherTabsLoading) ? (
+                    {(activeTab === "pending" && isPendingLoading) || (activeTab !== "pending" && activeTab !== "active" && isOtherTabsLoading) ? (
                         <div className="rounded-lg border border-gray-200 bg-white p-8 shadow-sm">
                             <div className="flex items-center gap-2 text-sm text-gray-500">
                                 <LoaderCircleIcon className="h-4 w-4 animate-spin" />
@@ -627,13 +793,71 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                         </div>
                     ) : null}
 
-                    {activeTab !== "pending" && isOtherTabsError ? (
+                    {activeTab !== "pending" && activeTab !== "active" && isOtherTabsError ? (
                         <div className="rounded-lg border border-brand-red/30 bg-brand-red/10 p-6">
                             <div className="flex items-center gap-3">
                                 <AlertCircleIcon className="h-5 w-5 text-brand-red" />
                                 <p className="text-sm text-brand-red">Unable to load tab data. Please try again.</p>
                             </div>
                         </div>
+                    ) : null}
+
+                    {activeTab === "active" ? (
+                        <>
+                            <JobsStatsCards jobs={activeJobs} />
+                            <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                                <div className="border-b border-gray-200 p-4">
+                                    <JobsFilters
+                                        search={activeSearch}
+                                        status={activeStatus}
+                                        onSearchChange={(v): void => { setActiveSearch(v); setActivePage(1); }}
+                                        onStatusChange={(v): void => { setActiveStatus(v); setActivePage(1); }}
+                                        onReset={(): void => { setActiveSearch(""); setActiveStatus("all"); setActivePage(1); }}
+                                    />
+                                </div>
+
+                                {activeJobsQuery.isLoading && <JobsSkeleton />}
+
+                                {activeJobsQuery.error && (
+                                    <div className="p-6">
+                                        <div className="rounded-lg border border-brand-red/20 bg-brand-red/5 p-4 flex items-center gap-2">
+                                            <AlertCircleIcon className="h-4 w-4 text-brand-red" />
+                                            <p className="text-sm font-medium text-brand-red">Unable to load jobs.</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!activeJobsQuery.isLoading && !activeJobsQuery.error && activeJobs.length === 0 && (
+                                    <JobsEmptyState title="No jobs found" description="No jobs match your search. Create one to get started." />
+                                )}
+
+                                {!activeJobsQuery.isLoading && !activeJobsQuery.error && activeJobs.length > 0 && (
+                                    <>
+                                        <JobsTable
+                                            jobs={activeJobs}
+                                            onViewDetails={(job): void => router.push(`/staff/production/my-jobs/${job.id}`)}
+                                            onEdit={(job): void => router.push(`/staff/production/my-jobs/${job.id}/edit`)}
+                                            onAssign={(job): void => { setPtAssignJobId(job.id); setPtAssignOpen(true); }}
+                                            onSendReminder={(job): void => setPtReminderModal({ job, note: "" })}
+                                            onDelete={(job): void => setPtDeleteId(job.id)}
+                                            showAssignButton
+                                            showReminderButton
+                                            remindingJobId={ptRemindingId ?? undefined}
+                                            deletingJobId={deleteJobMutation.isPending ? (ptDeleteId ?? undefined) : undefined}
+                                        />
+                                        <div className="border-t border-gray-200 p-4">
+                                            <JobsPagination
+                                                count={activeJobsTotal}
+                                                page={activePage}
+                                                pageSize={activePageSize}
+                                                onPageChange={setActivePage}
+                                                onPageSizeChange={setActivePageSize}
+                                            />
+                                        </div>
+                                    </>
+                                )}
+                            </section>
+                        </>
                     ) : null}
 
                     {activeTab === "pending" && !isPendingLoading && !isPendingError ? (
@@ -644,10 +868,10 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                                         <tr>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Job Number</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Product Details</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Products / Items</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Vendor Status</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Deadline</th>
-                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Assignment</th>
+                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
                                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
                                         </tr>
                                     </thead>
@@ -661,14 +885,42 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                                                 const deadlineLabel = getDeadlineLabel(job.expected_completion);
 
                                                 return (
-                                                    <tr key={job.id} className="hover:bg-gray-50">
+                                                    <tr
+                                                        key={job.id}
+                                                        className="hover:bg-gray-50 cursor-pointer"
+                                                        onClick={(): void => { setDetailJobId(job.id); setPendingStatusUpdate(""); }}
+                                                    >
                                                         <td className="px-4 py-3 font-semibold text-gray-900">{job.job_number || "—"}</td>
                                                         <td className="px-4 py-3 text-gray-700">{job.client?.name || "N/A"}</td>
                                                         <td className="px-4 py-3">
-                                                            <div className="text-gray-900">{job.product}</div>
-                                                            <div className="text-xs text-gray-500">{job.quantity} pcs</div>
+                                                            {job.job_products && job.job_products.length > 0 ? (() => {
+                                                                // Show only items assigned to me; fall back to all if none specifically assigned
+                                                                const mine = currentUserId
+                                                                    ? job.job_products.filter((jp) => jp.assigned_to === currentUserId)
+                                                                    : [];
+                                                                const display = mine.length > 0 ? mine : job.job_products;
+                                                                return (
+                                                                    <div className="space-y-1">
+                                                                        {display.slice(0, 3).map((jp) => (
+                                                                            <div key={jp.id} className="flex items-center gap-1.5">
+                                                                                <PackageIcon className="w-3 h-3 text-gray-400 shrink-0" />
+                                                                                <span className="text-xs text-gray-900 leading-tight">{jp.product_name}</span>
+                                                                                <span className="text-xs text-gray-400">× {jp.quantity}</span>
+                                                                            </div>
+                                                                        ))}
+                                                                        {display.length > 3 && (
+                                                                            <span className="text-xs text-gray-400">+{display.length - 3} more</span>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })() : (
+                                                                <div>
+                                                                    <div className="text-sm text-gray-900">{job.product}</div>
+                                                                    <div className="text-xs text-gray-500">{job.quantity} pcs</div>
+                                                                </div>
+                                                            )}
                                                         </td>
-                                                        <td className="px-4 py-3">
+                                                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                                             <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${relatedPos.length > 0
                                                                 ? "bg-brand-green/10 text-brand-green"
                                                                 : "bg-brand-yellow/15 text-brand-black"
@@ -677,24 +929,34 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3">
-                                                            <div className="text-gray-900">{formatDate(job.expected_completion)}</div>
+                                                            <div className="text-sm text-gray-900">{formatDate(job.expected_completion)}</div>
                                                             <div className={`text-xs ${deadlineLabel.isOverdue ? "text-brand-red font-semibold" : "text-gray-500"}`}>
                                                                 {deadlineLabel.text}
                                                             </div>
                                                         </td>
                                                         <td className="px-4 py-3">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(): void => openAssignModal(job)}
-                                                                className="rounded-md bg-brand-green px-3 py-1 text-xs font-semibold text-white hover:bg-brand-green/90"
-                                                            >
-                                                                Send to Vendor
-                                                            </button>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right">
                                                             <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${getStatusPillClass(job.status)}`}>
                                                                 {job.status.replace("_", " ")}
                                                             </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(): void => { setDetailJobId(job.id); setPendingStatusUpdate(""); }}
+                                                                    className="inline-flex items-center gap-1 rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:border-brand-blue hover:text-brand-blue"
+                                                                >
+                                                                    <EyeIcon className="w-3 h-3" />
+                                                                    View
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(): void => openAssignModal(job)}
+                                                                    className="rounded-md bg-brand-green px-2.5 py-1 text-xs font-semibold text-white hover:bg-brand-green/90"
+                                                                >
+                                                                    Send to Vendor
+                                                                </button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 );
@@ -898,6 +1160,262 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                     ) : null}
                 </div>
             </main>
+
+            {detailJobId !== null ? (
+                <>
+                    <div
+                        className="fixed inset-0 z-40 bg-black/30"
+                        onClick={(): void => setDetailJobId(null)}
+                    />
+                    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-xl flex flex-col bg-white shadow-2xl">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 shrink-0">
+                            <div>
+                                {jobDetailQuery.isLoading ? (
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <LoaderCircleIcon className="h-4 w-4 animate-spin" />
+                                        Loading job details…
+                                    </div>
+                                ) : detailJob ? (
+                                    <>
+                                        <h2 className="text-base font-bold text-gray-900">
+                                            {detailJob.job_number || `Job #${detailJob.id}`}
+                                        </h2>
+                                        <p className="mt-0.5 text-xs text-gray-500">
+                                            {detailJob.client?.name || "No client"} &middot; {detailJob.job_name || detailJob.product}
+                                        </p>
+                                    </>
+                                ) : (
+                                    <p className="text-sm text-gray-500">Job not found.</p>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={(): void => setDetailJobId(null)}
+                                className="rounded-md p-1 text-gray-400 hover:bg-gray-100"
+                            >
+                                <XIcon className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {detailJob && !jobDetailQuery.isLoading ? (
+                            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+                                {/* Status + Priority pills */}
+                                <div className="flex items-center gap-3">
+                                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getStatusPillClass(detailJob.status)}`}>
+                                        {detailJob.status.replace(/_/g, " ")}
+                                    </span>
+                                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                        detailJob.priority === "urgent"
+                                            ? "bg-brand-red/10 text-brand-red"
+                                            : detailJob.priority === "high"
+                                            ? "bg-brand-orange/10 text-brand-orange"
+                                            : "bg-gray-100 text-gray-600"
+                                    }`}>
+                                        {detailJob.priority} priority
+                                    </span>
+                                </div>
+
+                                {/* Update Status */}
+                                <div className="rounded-md border border-gray-200 p-4">
+                                    <p className="text-xs font-semibold uppercase text-gray-500 mb-3">Update Job Status</p>
+                                    <div className="flex items-center gap-3">
+                                        <select
+                                            value={pendingStatusUpdate || detailJob.status}
+                                            onChange={(e: ChangeEvent<HTMLSelectElement>): void =>
+                                                setPendingStatusUpdate(e.target.value as JobStatus)
+                                            }
+                                            className="flex-1 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
+                                        >
+                                            <option value="pending">Pending</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="on_hold">On Hold</option>
+                                            <option value="completed">Completed</option>
+                                        </select>
+                                        <button
+                                            type="button"
+                                            disabled={
+                                                !pendingStatusUpdate ||
+                                                pendingStatusUpdate === detailJob.status ||
+                                                updateStatusMutation.isPending
+                                            }
+                                            onClick={(): void => {
+                                                if (pendingStatusUpdate && pendingStatusUpdate !== detailJob.status) {
+                                                    updateStatusMutation.mutate({
+                                                        jobId: detailJob.id,
+                                                        newStatus: pendingStatusUpdate as JobStatus,
+                                                    });
+                                                }
+                                            }}
+                                            className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 hover:bg-brand-blue/90"
+                                        >
+                                            {updateStatusMutation.isPending ? "Saving…" : "Save"}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Key details grid */}
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <p className="text-xs font-medium uppercase text-gray-400">Person in Charge</p>
+                                        <p className="mt-1 text-gray-800 flex items-center gap-1.5">
+                                            <UserIcon className="w-3.5 h-3.5 text-gray-400" />
+                                            {detailJob.person_in_charge
+                                                ? `${detailJob.person_in_charge.first_name} ${detailJob.person_in_charge.last_name}`.trim() || detailJob.person_in_charge.username
+                                                : "—"}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium uppercase text-gray-400">Job Type</p>
+                                        <p className="mt-1 text-gray-800">{detailJob.job_type || "—"}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium uppercase text-gray-400">Start Date</p>
+                                        <p className="mt-1 text-gray-800 flex items-center gap-1.5">
+                                            <CalendarIcon className="w-3.5 h-3.5 text-gray-400" />
+                                            {formatDate(detailJob.start_date)}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium uppercase text-gray-400">Expected Completion</p>
+                                        <p className="mt-1 text-gray-800 flex items-center gap-1.5">
+                                            <CalendarIcon className="w-3.5 h-3.5 text-gray-400" />
+                                            {formatDate(detailJob.expected_completion)}
+                                        </p>
+                                    </div>
+                                    {detailJob.delivery_date ? (
+                                        <div>
+                                            <p className="text-xs font-medium uppercase text-gray-400">Delivery Date</p>
+                                            <p className="mt-1 text-gray-800 flex items-center gap-1.5">
+                                                <CalendarIcon className="w-3.5 h-3.5 text-gray-400" />
+                                                {formatDate(detailJob.delivery_date)}
+                                            </p>
+                                        </div>
+                                    ) : null}
+                                    {detailJob.delivery_method ? (
+                                        <div>
+                                            <p className="text-xs font-medium uppercase text-gray-400">Delivery Method</p>
+                                            <p className="mt-1 text-gray-800">{detailJob.delivery_method}</p>
+                                        </div>
+                                    ) : null}
+                                </div>
+
+                                {/* Products / Items */}
+                                <div>
+                                    {(() => {
+                                        const mine = currentUserId && detailJob.job_products
+                                            ? detailJob.job_products.filter((jp) => jp.assigned_to === currentUserId)
+                                            : [];
+                                        const hasFilter = mine.length > 0;
+                                        return (
+                                            <div className="flex items-center justify-between mb-3">
+                                                <p className="text-xs font-semibold uppercase text-gray-500">
+                                                    {hasFilter ? "My Assigned Items" : "Products / Items"}
+                                                </p>
+                                                {hasFilter && detailJob.job_products && detailJob.job_products.length > mine.length && (
+                                                    <span className="text-[10px] text-gray-400">
+                                                        {mine.length} of {detailJob.job_products.length} items
+                                                    </span>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
+                                    {detailJob.job_products && detailJob.job_products.length > 0 ? (() => {
+                                        const mine = currentUserId
+                                            ? detailJob.job_products.filter((jp) => jp.assigned_to === currentUserId)
+                                            : [];
+                                        const display = mine.length > 0 ? mine : detailJob.job_products;
+                                        return (
+                                        <div className="space-y-2">
+                                            {display.map((jp) => (
+                                                <div key={jp.id} className="rounded-md border border-gray-200 px-4 py-3">
+                                                    <div className="flex items-start gap-2">
+                                                        <PackageIcon className="w-4 h-4 text-brand-blue mt-0.5 shrink-0" />
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-semibold text-gray-900">{jp.product_name}</p>
+                                                            <p className="text-xs text-gray-500 mt-0.5">
+                                                                {jp.quantity} {jp.unit}
+                                                                {jp.assigned_to_name ? ` · Assigned to: ${jp.assigned_to_name}` : ""}
+                                                            </p>
+                                                            {jp.specifications ? (
+                                                                <p className="text-xs text-gray-400 mt-1 line-clamp-2">{jp.specifications}</p>
+                                                            ) : null}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    );
+                                    })() : (
+                                        <div className="rounded-md border border-gray-200 px-4 py-3">
+                                            <div className="flex items-center gap-2">
+                                                <PackageIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                                                <div>
+                                                    <p className="text-sm font-medium text-gray-900">{detailJob.product}</p>
+                                                    <p className="text-xs text-gray-500">{detailJob.quantity} pcs</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Notes */}
+                                {detailJob.notes ? (
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase text-gray-500 mb-2">Notes</p>
+                                        <div className="rounded-md bg-gray-50 border border-gray-200 px-4 py-3 text-sm text-gray-700 whitespace-pre-line">
+                                            {detailJob.notes}
+                                        </div>
+                                    </div>
+                                ) : null}
+
+                                {/* Assignment notes */}
+                                {detailJob.assignment_notes ? (
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase text-gray-500 mb-2">Assignment Notes</p>
+                                        <div className="rounded-md bg-brand-blue/5 border border-brand-blue/20 px-4 py-3 text-sm text-gray-700 whitespace-pre-line">
+                                            {detailJob.assignment_notes}
+                                        </div>
+                                    </div>
+                                ) : null}
+
+                                {/* LPO info */}
+                                {detailJob.lpo_number ? (
+                                    <div className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3 text-sm">
+                                        <span className="text-gray-500">LPO Number</span>
+                                        <span className="font-semibold text-gray-900">{detailJob.lpo_number}</span>
+                                    </div>
+                                ) : null}
+                            </div>
+                        ) : null}
+
+                        {/* Footer actions */}
+                        {detailJob && !jobDetailQuery.isLoading ? (
+                            <div className="border-t border-gray-200 px-6 py-4 shrink-0 flex items-center justify-between gap-3">
+                                <button
+                                    type="button"
+                                    onClick={(): void => setDetailJobId(null)}
+                                    className="rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                                >
+                                    Close
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={(): void => {
+                                        setSelectedJob(detailJob);
+                                        setIsAssignModalOpen(true);
+                                        setDetailJobId(null);
+                                    }}
+                                    className="inline-flex items-center gap-2 rounded-md bg-brand-green px-4 py-2 text-sm font-semibold text-white hover:bg-brand-green/90"
+                                >
+                                    <SendHorizonalIcon className="w-4 h-4" />
+                                    Send to Vendor
+                                </button>
+                            </div>
+                        ) : null}
+                    </div>
+                </>
+            ) : null}
 
             {selectedProof ? (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -1368,7 +1886,7 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                 </div>
             )}
 
-            <section className="max-w-7xl mx-auto px-8 pb-8">
+            <section className="max-w-7xl mx-auto px-4 lg:px-8 pb-8">
             </section>
 
             {(approveProofMutation.isPending || rejectProofMutation.isPending || approveInvoiceMutation.isPending || rejectInvoiceMutation.isPending) && (
@@ -1386,6 +1904,77 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                         <CheckIcon className="h-3.5 w-3.5" />
                         Job assignment sent successfully.
                     </span>
+                </div>
+            )}
+
+            {/* Delete Confirm Modal */}
+            {ptDeleteId && (
+                <ConfirmModal
+                    title="Delete Job"
+                    message="Are you sure you want to delete this job? This action cannot be undone."
+                    confirmText="Delete Job"
+                    confirmColor="red"
+                    onClose={(): void => setPtDeleteId(null)}
+                    onConfirm={(): void => { deleteJobMutation.mutate(ptDeleteId); }}
+                />
+            )}
+
+            {/* Assign to Production Team Member Modal */}
+            <AccountManagerJobAssignModal
+                open={ptAssignOpen}
+                jobId={ptAssignJobId}
+                productionUsers={allUsers}
+                onClose={(): void => { setPtAssignOpen(false); setPtAssignJobId(null); }}
+                onSubmit={(userId, notes, remindDays): void => {
+                    if (!ptAssignJobId) return;
+                    ptAssignMutation.mutate({ jobId: ptAssignJobId, userId, notes, remindDays });
+                }}
+                isSubmitting={ptAssignMutation.isPending}
+            />
+
+            {/* Reminder Modal */}
+            {ptReminderModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                        <div className="px-6 py-4 border-b border-gray-200">
+                            <h2 className="text-base font-semibold text-gray-900">Send Reminder</h2>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Sending reminder for <strong>{ptReminderModal.job.job_name}</strong>
+                            </p>
+                        </div>
+                        <div className="px-6 py-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Note (optional)</label>
+                            <textarea
+                                rows={3}
+                                value={ptReminderModal.note}
+                                onChange={(e): void => setPtReminderModal(prev => prev ? { ...prev, note: e.target.value } : null)}
+                                placeholder="e.g. Client is chasing this — please update ASAP."
+                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue resize-none"
+                            />
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={(): void => setPtReminderModal(null)}
+                                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(): void => {
+                                    if (!ptReminderModal) return;
+                                    setPtRemindingId(ptReminderModal.job.id);
+                                    ptReminderMutation.mutate({ jobId: ptReminderModal.job.id, note: ptReminderModal.note });
+                                    setPtReminderModal(null);
+                                }}
+                                disabled={ptReminderMutation.isPending}
+                                className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-50"
+                            >
+                                {ptReminderMutation.isPending ? "Sending..." : "Send Reminder"}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </>

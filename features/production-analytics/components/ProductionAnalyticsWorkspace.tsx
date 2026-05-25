@@ -1,16 +1,20 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
     AlertCircleIcon,
+    BellIcon,
     RefreshCcwIcon,
     Users2Icon,
     ArrowRightIcon,
     ActivityIcon,
+    XIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { fetchNotifications } from "@/lib/api/notifications";
 import {
     Bar,
     BarChart,
@@ -60,14 +64,6 @@ const toTitleCase = (value: string): string => {
 
 const formatPercentage = (value: number): string => {
     return `${value.toFixed(1)}%`;
-};
-
-const formatCurrency = (value: number | null): string => {
-    if (value === null) {
-        return "—";
-    }
-
-    return `KES ${value.toLocaleString()}`;
 };
 
 const formatDate = (value: string | null): string => {
@@ -150,6 +146,9 @@ const PieChartTooltip = ({ active, payload }: any) => {
 };
 
 export default function ProductionAnalyticsWorkspace(): ReactElement {
+    const router = useRouter();
+    const [notifDismissed, setNotifDismissed] = useState(false);
+
     const analyticsQuery = useQuery({
         queryKey: ["production-analytics"],
         queryFn: fetchProductionAnalyticsData,
@@ -160,7 +159,16 @@ export default function ProductionAnalyticsWorkspace(): ReactElement {
         queryFn: (): Promise<Job[]> => fetchRecentProductionJobs(6),
     });
 
+    const notifQuery = useQuery({
+        queryKey: ["production-analytics", "notifications"],
+        queryFn: () => fetchNotifications({ unreadOnly: true }),
+        staleTime: 0,
+        refetchInterval: 30_000,
+    });
+
     const analytics: ProductionAnalyticsData | undefined = analyticsQuery.data;
+    const unreadCount = notifQuery.data?.count ?? 0;
+    const latestNotif = notifQuery.data?.results?.[0];
     const statusChartData = useMemo((): StatusChartItem[] => {
         return buildStatusChartData(analytics?.job_status_distribution ?? []);
     }, [analytics?.job_status_distribution]);
@@ -174,11 +182,11 @@ export default function ProductionAnalyticsWorkspace(): ReactElement {
     if (analyticsQuery.isLoading) {
         return (
             <main className="bg-[#f8fafc] min-h-screen pb-12">
-                <header className="bg-white border-b border-gray-200 px-8 py-6">
+                <header className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4 lg:py-6">
                     <div className="h-4 w-48 animate-pulse rounded bg-gray-200" />
                     <div className="mt-4 h-8 w-72 animate-pulse rounded bg-gray-200" />
                 </header>
-                <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
+                <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 lg:py-8 space-y-8">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {Array.from({ length: 4 }).map((_, i) => (
                             <div key={i} className="h-32 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
@@ -195,10 +203,10 @@ export default function ProductionAnalyticsWorkspace(): ReactElement {
     if (analyticsQuery.isError || !analytics) {
         return (
             <main className="bg-[#f8fafc] min-h-screen pb-12">
-                <header className="bg-white border-b border-gray-200 px-8 py-6">
+                <header className="bg-white border-b border-gray-200 px-4 lg:px-8 py-4 lg:py-6">
                     <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Production Analytics</h1>
                 </header>
-                <div className="max-w-4xl mx-auto px-8 py-12">
+                <div className="max-w-4xl mx-auto px-4 lg:px-8 py-8 lg:py-12">
                     <div className="rounded-2xl border border-brand-red/20 bg-brand-red/5 p-8 text-center">
                         <AlertCircleIcon className="h-12 w-12 text-brand-red mx-auto mb-4" />
                         <h2 className="text-lg font-semibold text-brand-red">Unable to load production analytics</h2>
@@ -223,14 +231,14 @@ export default function ProductionAnalyticsWorkspace(): ReactElement {
     return (
         <main className="bg-[#f8fafc] min-h-screen pb-12">
             <header className="bg-white border-b border-gray-200">
-                <div className="max-w-7xl mx-auto px-8 py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                         <nav className="flex items-center gap-2 text-xs font-medium text-gray-500 mb-3">
                             <Link href="/production-team" className="hover:text-brand-blue transition-colors">Production Team</Link>
                             <span>/</span>
                             <span className="text-gray-900">Analytics</span>
                         </nav>
-                        <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
+                        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-3">
                             Production Analytics
                             <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-blue/10 px-2.5 py-1 text-xs font-semibold text-brand-blue">
                                 <ActivityIcon className="h-3.5 w-3.5" />
@@ -256,7 +264,44 @@ export default function ProductionAnalyticsWorkspace(): ReactElement {
                 </div>
             </header>
 
-            <div className="max-w-7xl mx-auto px-8 py-8 space-y-8">
+            {/* Notification banner */}
+            {unreadCount > 0 && !notifDismissed && (
+                <div className="max-w-7xl mx-auto px-4 lg:px-8 pt-6">
+                    <div className="flex items-start gap-3 rounded-lg border border-brand-blue/30 bg-brand-blue/10 px-4 py-3">
+                        <BellIcon className="mt-0.5 h-5 w-5 shrink-0 text-brand-blue" />
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-brand-blue">
+                                {unreadCount === 1
+                                    ? "You have 1 new notification"
+                                    : `You have ${unreadCount} unread notifications`}
+                            </p>
+                            {latestNotif && (
+                                <p className="mt-0.5 text-xs text-gray-600 truncate">
+                                    {latestNotif.title}: {latestNotif.message}
+                                </p>
+                            )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={(): void => router.push("/production-team/notifications")}
+                                className="text-xs font-medium text-brand-blue hover:underline"
+                            >
+                                View all
+                            </button>
+                            <button
+                                type="button"
+                                onClick={(): void => setNotifDismissed(true)}
+                                className="rounded p-0.5 text-gray-400 hover:bg-brand-blue/10 hover:text-gray-600"
+                            >
+                                <XIcon className="h-4 w-4" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="max-w-7xl mx-auto px-4 lg:px-8 py-6 lg:py-8 space-y-8">
                 {/* Metrics Row */}
                 <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <article className="rounded-xl border border-brand-blue/15 bg-white px-4 py-4 shadow-sm transition-colors hover:border-brand-blue/30">
@@ -270,6 +315,9 @@ export default function ProductionAnalyticsWorkspace(): ReactElement {
                     <article className="rounded-xl border border-brand-red/15 bg-white px-4 py-4 shadow-sm transition-colors hover:border-brand-red/30">
                         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">QC Rejection</p>
                         <h3 className="mt-3 text-2xl font-bold tracking-tight text-gray-900">{formatPercentage(analytics.qc_rejection_rate)}</h3>
+                        {analytics.qc_rejection_rate > 10 && (
+                            <p className="mt-1 text-[11px] font-medium text-brand-orange">Above threshold — review QC</p>
+                        )}
                     </article>
 
                     <article className="rounded-xl border border-brand-green/15 bg-white px-4 py-4 shadow-sm transition-colors hover:border-brand-green/30">
@@ -278,10 +326,11 @@ export default function ProductionAnalyticsWorkspace(): ReactElement {
                     </article>
 
                     <article className="rounded-xl border border-brand-purple/15 bg-white px-4 py-4 shadow-sm transition-colors hover:border-brand-purple/30">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">Monthly Rev</p>
-                        <h3 className="mt-3 text-xl font-bold tracking-tight text-gray-900 truncate" title={formatCurrency(analytics.monthly_revenue)}>
-                            {formatCurrency(analytics.monthly_revenue)}
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-500">Completed Jobs</p>
+                        <h3 className="mt-3 text-2xl font-bold tracking-tight text-gray-900">
+                            {analytics.job_status_distribution.find((s) => s.status === "completed")?.count ?? 0}
                         </h3>
+                        <p className="mt-0.5 text-[11px] text-gray-400">all time</p>
                     </article>
                 </section>
 
