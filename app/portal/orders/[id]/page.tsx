@@ -1,10 +1,9 @@
-"use client";
+﻿"use client";
 
 import { useState, type ReactElement } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import ClientLayout from "@/components/client/client-layout";
 import {
     ArrowLeft,
     Package,
@@ -218,6 +217,7 @@ export default function OrderDetailPage(): ReactElement {
         queryKey: ["client-order", orderId],
         queryFn: () => fetchClientOrder(orderId),
         staleTime: 30_000,
+        refetchInterval: 60_000,
         retry: 1,
         enabled: !isNaN(orderId),
     });
@@ -258,18 +258,18 @@ export default function OrderDetailPage(): ReactElement {
 
     if (isLoading) {
         return (
-            <ClientLayout>
-                <div className="p-8">
+            <>
+                <div className="p-4 lg:p-8">
                     <OrderDetailSkeleton />
                 </div>
-            </ClientLayout>
+            </>
         );
     }
 
     if (isError || !order) {
         return (
-            <ClientLayout>
-                <div className="p-8">
+            <>
+                <div className="p-4 lg:p-8">
                     <Link href="/portal/orders" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-brand-blue mb-6">
                         <ArrowLeft className="w-4 h-4" />
                         Back to Orders
@@ -279,7 +279,7 @@ export default function OrderDetailPage(): ReactElement {
                         Could not load this order. It may not exist or you may not have access.
                     </div>
                 </div>
-            </ClientLayout>
+            </>
         );
     }
 
@@ -287,8 +287,8 @@ export default function OrderDetailPage(): ReactElement {
     const canCancel = order.status === "draft" || order.status === "submitted";
 
     return (
-        <ClientLayout>
-            <div className="p-8 space-y-6">
+        <>
+            <div className="p-4 lg:p-8 space-y-6">
                 {/* Back */}
                 <Link
                     href="/portal/orders"
@@ -556,6 +556,6 @@ export default function OrderDetailPage(): ReactElement {
                     </div>
                 </div>
             </div>
-        </ClientLayout>
+        </>
     );
 }

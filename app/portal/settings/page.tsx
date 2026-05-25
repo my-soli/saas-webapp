@@ -1,8 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, type ReactElement } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import ClientLayout from "@/components/client/client-layout";
 import { User, Building2, Mail, Phone, MapPin, Lock, Save, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import {
     fetchClientPortalProfile,
@@ -145,8 +144,8 @@ export default function SettingsPage(): ReactElement {
     }
 
     return (
-        <ClientLayout>
-            <div className="p-8 space-y-6">
+        <>
+            <div className="p-4 lg:p-8 space-y-6">
                 <div>
                     <h1 className="text-3xl font-bold text-brand-black">Settings</h1>
                     <p className="text-gray-600 mt-1">Manage your account preferences and information</p>
@@ -578,6 +577,6 @@ export default function SettingsPage(): ReactElement {
                     </div>
                 )}
             </div>
-        </ClientLayout>
+        </>
     );
 }

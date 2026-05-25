@@ -1,9 +1,8 @@
-"use client";
+﻿"use client";
 
 import { type ReactElement, type ElementType } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import ClientLayout from "@/components/client/client-layout";
 import {
     Package,
     FileText,
@@ -15,12 +14,17 @@ import {
     AlertTriangle,
     X,
     ChevronRight,
+    ShoppingCart,
+    Plus,
 } from "lucide-react";
 import { fetchClientPortalProfile } from "@/services/client-portal";
 import { fetchClientOrders } from "@/services/client-orders";
 import { fetchClientInvoices } from "@/services/client-orders";
 import { fetchUnreadNotifications, markNotificationRead } from "@/services/client-notifications";
+import { fetchCart } from "@/services/client-portal-extras";
+import { fetchPortalQuotes } from "@/services/client-portal-extras";
 import type { ClientOrder, OrderStatus, ClientInvoice, ClientPortalNotification } from "@/types/client-orders";
+import type { PortalQuote } from "@/types/client-portal-extras";
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
@@ -164,6 +168,7 @@ export default function PortalDashboardPage(): ReactElement {
         queryKey: ["client-orders", 1, "all", ""],
         queryFn: () => fetchClientOrders({ page: 1 }),
         staleTime: 30_000,
+        refetchInterval: 60_000,
         retry: 1,
     });
 
@@ -171,6 +176,7 @@ export default function PortalDashboardPage(): ReactElement {
         queryKey: ["client-invoices-dashboard"],
         queryFn: () => fetchClientInvoices(),
         staleTime: 30_000,
+        refetchInterval: 120_000,
         retry: 1,
     });
 
@@ -178,6 +184,23 @@ export default function PortalDashboardPage(): ReactElement {
         queryKey: ["client-notifications-unread"],
         queryFn: fetchUnreadNotifications,
         staleTime: 15_000,
+        refetchInterval: 30_000,
+        retry: 1,
+    });
+
+    const { data: cartData } = useQuery({
+        queryKey: ["portal-cart"],
+        queryFn: fetchCart,
+        staleTime: 15_000,
+        refetchInterval: 60_000,
+        retry: 1,
+    });
+
+    const { data: quotesData, isLoading: quotesLoading } = useQuery({
+        queryKey: ["portal-quotes", "all"],
+        queryFn: () => fetchPortalQuotes("all"),
+        staleTime: 30_000,
+        refetchInterval: 60_000,
         retry: 1,
     });
 
@@ -208,6 +231,12 @@ export default function PortalDashboardPage(): ReactElement {
     const notifications: ClientPortalNotification[] = notificationsData?.results ?? [];
     const unreadCount: number = notificationsData?.count ?? 0;
 
+    const cartItemCount: number = cartData?.item_count ?? 0;
+    const recentQuotes: PortalQuote[] = (quotesData?.results ?? []).slice(0, 5);
+    const pendingQuotes = (quotesData?.results ?? []).filter(
+        (q) => q.status === "Sent to Customer"
+    ).length;
+
     const welcomeName = profileLoading
         ? ""
         : profile?.first_name
@@ -215,34 +244,47 @@ export default function PortalDashboardPage(): ReactElement {
             : profile?.email?.split("@")[0] ?? "there";
 
     return (
-        <ClientLayout>
-            <div className="p-8 space-y-8">
+        <>
+            <div className="p-4 lg:p-8 space-y-8">
                 {/* Welcome banner */}
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-6 py-5 flex items-center justify-between">
+                <div className="bg-brand-blue rounded-xl px-6 py-5 flex items-center justify-between gap-4 text-white">
                     <div>
                         {profileLoading ? (
                             <div className="space-y-2">
-                                <SkeletonBox className="h-8 w-56" />
-                                <SkeletonBox className="h-4 w-40" />
+                                <SkeletonBox className="h-7 w-56 bg-white/20" />
+                                <SkeletonBox className="h-4 w-40 bg-white/20" />
                             </div>
                         ) : (
                             <>
-                                <h1 className="text-2xl font-bold text-brand-black">
+                                <h1 className="text-xl font-bold">
                                     Welcome back, {welcomeName}!
                                 </h1>
-                                <p className="text-sm text-gray-500 mt-0.5">
-                                    {profile?.company ?? ""}
+                                {profile?.company && (
+                                    <p className="text-sm text-white/70 mt-0.5">{profile.company}</p>
+                                )}
+                                <p className="text-xs text-white/50 mt-1">
+                                    {new Date().toLocaleDateString("en-KE", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                                 </p>
                             </>
                         )}
                     </div>
-                    <div className="hidden sm:block text-right text-xs text-gray-400">
-                        {new Date().toLocaleDateString("en-KE", {
-                            weekday: "long",
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                        })}
+                    <div className="shrink-0 flex flex-col sm:flex-row items-end sm:items-center gap-2">
+                        <Link
+                            href="/portal/cart"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-white text-brand-blue text-sm font-semibold rounded-lg hover:bg-white/90 transition-colors"
+                        >
+                            <Plus className="w-4 h-4" />
+                            New Order
+                        </Link>
+                        {cartItemCount > 0 && (
+                            <Link
+                                href="/portal/cart"
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 text-white text-sm font-medium rounded-lg hover:bg-white/20 transition-colors border border-white/20"
+                            >
+                                <ShoppingCart className="w-4 h-4" />
+                                {cartItemCount} in cart
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -251,20 +293,20 @@ export default function PortalDashboardPage(): ReactElement {
                     <StatCard
                         label="Total Orders"
                         value={totalOrders}
-                        subLabel="All orders placed"
+                        subLabel={activeOrders > 0 ? `${activeOrders} active` : "All orders"}
                         icon={Package}
                         colorClass="bg-blue-50 text-blue-600"
                         href="/portal/orders"
                         loading={ordersLoading}
                     />
                     <StatCard
-                        label="Active Orders"
-                        value={activeOrders}
-                        subLabel="In progress right now"
-                        icon={Clock}
-                        colorClass="bg-yellow-50 text-yellow-600"
-                        href="/portal/orders"
-                        loading={ordersLoading}
+                        label="My Quotes"
+                        value={quotesLoading ? "—" : (quotesData?.count ?? 0)}
+                        subLabel={pendingQuotes > 0 ? `${pendingQuotes} awaiting approval` : "All quotes"}
+                        icon={FileText}
+                        colorClass="bg-indigo-50 text-indigo-600"
+                        href="/portal/quotes"
+                        loading={quotesLoading}
                     />
                     <StatCard
                         label="Outstanding Balance"
@@ -274,28 +316,31 @@ export default function PortalDashboardPage(): ReactElement {
                                 ? `${overdueCount} overdue`
                                 : `${outstandingInvoices.length} unpaid`
                         }
-                        icon={FileText}
+                        icon={TrendingUp}
                         colorClass={
                             overdueCount > 0
                                 ? "bg-red-50 text-red-600"
                                 : "bg-green-50 text-green-600"
                         }
+                        href="/portal/financials"
                         loading={invoicesLoading}
                     />
                     <StatCard
-                        label="Notifications"
-                        value={unreadCount}
-                        subLabel="Unread messages"
-                        icon={Bell}
-                        colorClass="bg-purple-50 text-purple-600"
-                        loading={notificationsLoading}
+                        label="Cart Items"
+                        value={cartItemCount}
+                        subLabel={cartItemCount > 0 ? "Ready to order" : "Cart is empty"}
+                        icon={ShoppingCart}
+                        colorClass={cartItemCount > 0 ? "bg-brand-blue/10 text-brand-blue" : "bg-gray-50 text-gray-400"}
+                        href="/portal/cart"
+                        loading={false}
                     />
                 </div>
 
                 {/* Main content: 2-column grid */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Recent Orders — 2/3 width */}
-                    <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div className="lg:col-span-2 space-y-6">
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Package className="w-4 h-4 text-gray-500" />
@@ -355,6 +400,68 @@ export default function PortalDashboardPage(): ReactElement {
                                 ))}
                             </div>
                         )}
+                    </div>
+
+                    {/* Recent Quotes */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-gray-500" />
+                                <h2 className="text-sm font-semibold text-gray-700">Recent Quotes</h2>
+                                {pendingQuotes > 0 && (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">
+                                        {pendingQuotes} need approval
+                                    </span>
+                                )}
+                            </div>
+                            <Link href="/portal/quotes" className="text-xs font-medium text-brand-blue hover:underline inline-flex items-center gap-1">
+                                View all <ArrowRight className="w-3 h-3" />
+                            </Link>
+                        </div>
+                        {quotesLoading ? (
+                            <div className="p-4 space-y-2">
+                                {[...Array(3)].map((_, i) => (
+                                    <div key={i} className="flex items-center gap-3">
+                                        <SkeletonBox className="h-4 w-24" />
+                                        <SkeletonBox className="h-5 w-20 rounded-full" />
+                                        <SkeletonBox className="h-4 w-16 ml-auto" />
+                                    </div>
+                                ))}
+                            </div>
+                        ) : recentQuotes.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-8 text-gray-400">
+                                <FileText className="w-8 h-8 mb-2 opacity-30" />
+                                <p className="text-xs">No quotes yet</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-gray-50">
+                                {recentQuotes.map((q) => {
+                                    const isPending = q.status === "Sent to Customer";
+                                    return (
+                                        <div key={q.id} className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                                            <div className="flex-1 min-w-0">
+                                                <span className="font-mono text-xs font-semibold text-brand-blue">{q.quote_id}</span>
+                                                {q.project_name && (
+                                                    <p className="text-xs text-gray-400 truncate">{q.project_name}</p>
+                                                )}
+                                            </div>
+                                            <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${isPending ? "bg-indigo-100 text-indigo-700" : "bg-gray-100 text-gray-600"}`}>
+                                                {isPending ? "Awaiting Approval" : q.status}
+                                            </span>
+                                            {isPending && (
+                                                <Link
+                                                    href="/portal/quotes"
+                                                    className="shrink-0 text-xs text-brand-blue font-medium hover:underline"
+                                                >
+                                                    Review
+                                                </Link>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                     </div>
 
                     {/* Notifications — 1/3 width */}
@@ -494,6 +601,6 @@ export default function PortalDashboardPage(): ReactElement {
                     </div>
                 )}
             </div>
-        </ClientLayout>
+        </>
     );
 }

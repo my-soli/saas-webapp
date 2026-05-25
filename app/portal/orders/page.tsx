@@ -1,9 +1,8 @@
-"use client";
+﻿"use client";
 
 import { useState, type ReactElement } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import ClientLayout from "@/components/client/client-layout";
 import { Search, Filter, Eye, Package, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 import { fetchClientOrders } from "@/services/client-orders";
 import type { ClientOrder, OrderStatus } from "@/types/client-orders";
@@ -71,14 +70,26 @@ function OrderRowSkeleton(): ReactElement {
     );
 }
 
-function EmptyState(): ReactElement {
+function EmptyState({ hasFilters }: { hasFilters: boolean }): ReactElement {
     return (
         <tr>
             <td colSpan={7}>
                 <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                     <Package className="w-12 h-12 mb-3 opacity-30" />
-                    <p className="text-sm font-medium">No orders found</p>
-                    <p className="text-xs mt-1">Try adjusting your filters</p>
+                    <p className="text-sm font-medium text-gray-500">No orders found</p>
+                    {hasFilters ? (
+                        <p className="text-xs mt-1">Try adjusting your filters</p>
+                    ) : (
+                        <>
+                            <p className="text-xs mt-1">Place an order from your cart to see it here.</p>
+                            <a
+                                href="/portal/cart"
+                                className="mt-3 text-xs text-brand-blue hover:underline font-medium"
+                            >
+                                Go to Cart →
+                            </a>
+                        </>
+                    )}
                 </div>
             </td>
         </tr>
@@ -120,8 +131,8 @@ export default function OrdersPage(): ReactElement {
     }
 
     return (
-        <ClientLayout>
-            <div className="p-8 space-y-6">
+        <>
+            <div className="p-4 lg:p-8 space-y-6">
                 <div>
                     <h1 className="text-3xl font-bold text-brand-black">Orders</h1>
                     <p className="text-gray-500 mt-1">
@@ -182,7 +193,7 @@ export default function OrdersPage(): ReactElement {
                                 {isLoading ? (
                                     [...Array(8)].map((_, i) => <OrderRowSkeleton key={i} />)
                                 ) : orders.length === 0 ? (
-                                    <EmptyState />
+                                    <EmptyState hasFilters={statusFilter !== "all" || debouncedSearch !== ""} />
                                 ) : (
                                     orders.map((order) => (
                                         <tr
@@ -251,6 +262,6 @@ export default function OrdersPage(): ReactElement {
                     )}
                 </div>
             </div>
-        </ClientLayout>
+        </>
     );
 }
