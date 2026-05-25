@@ -81,7 +81,7 @@ export default function JobProgressModal({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-                <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                <div className="border-b border-gray-200 px-4 sm:px-6 py-4 flex justify-between items-center">
                     <h2 className="text-lg font-semibold text-gray-900">Update Progress</h2>
                     <button
                         type="button"
@@ -91,7 +91,7 @@ export default function JobProgressModal({
                         Close
                     </button>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-4 sm:p-6 space-y-4">
                     {stages.length === 0 ? (
                         <div className="text-sm text-gray-500">Assign a vendor stage before updating progress.</div>
                     ) : (
@@ -153,7 +153,7 @@ export default function JobProgressModal({
                         </>
                     )}
                 </div>
-                <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                <div className="border-t border-gray-200 px-4 sm:px-6 py-4 flex justify-end gap-3">
                     <button
                         type="button"
                         onClick={onClose}

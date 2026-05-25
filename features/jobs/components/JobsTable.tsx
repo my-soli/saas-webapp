@@ -12,6 +12,7 @@ interface JobsTableProps {
     showAssignButton?: boolean;
     showProgressButton?: boolean;
     showReminderButton?: boolean;
+    hideActionsWhenCompleted?: boolean;
     remindingJobId?: number;
     deletingJobId?: number;
 }
@@ -34,6 +35,7 @@ export default function JobsTable({
     showAssignButton = true,
     showProgressButton = false,
     showReminderButton = false,
+    hideActionsWhenCompleted = false,
     remindingJobId,
     deletingJobId,
 }: JobsTableProps): ReactElement {
@@ -126,7 +128,7 @@ export default function JobsTable({
                                                 Edit
                                             </button>
                                         )}
-                                        {showAssignButton && onAssign && (
+                                        {showAssignButton && onAssign && !(hideActionsWhenCompleted && job.status === "completed") && (
                                             <button
                                                 type="button"
                                                 onClick={(): void => onAssign(job)}
@@ -154,7 +156,7 @@ export default function JobsTable({
                                                 Delete
                                             </button>
                                         )}
-                                        {showReminderButton && onSendReminder && job.person_in_charge && (
+                                        {showReminderButton && onSendReminder && job.person_in_charge && !(hideActionsWhenCompleted && job.status === "completed") && (
                                             <button
                                                 type="button"
                                                 onClick={(): void => onSendReminder(job)}

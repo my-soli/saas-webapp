@@ -92,7 +92,7 @@ export default function JobAssignModal({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-                <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                <div className="border-b border-gray-200 px-4 sm:px-6 py-4 flex justify-between items-center">
                     <h2 className="text-lg font-semibold text-gray-900">Assign Vendor</h2>
                     <button
                         type="button"
@@ -102,7 +102,7 @@ export default function JobAssignModal({
                         Close
                     </button>
                 </div>
-                <div className="p-6 space-y-4">
+                <div className="p-4 sm:p-6 space-y-4">
                     <div>
                         <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
                             Vendor <span className="text-brand-red">*</span>
@@ -218,7 +218,7 @@ export default function JobAssignModal({
                         />
                     </div>
                 </div>
-                <div className="border-t border-gray-200 px-6 py-4 flex justify-end gap-3">
+                <div className="border-t border-gray-200 px-4 sm:px-6 py-4 flex justify-end gap-3">
                     <button
                         type="button"
                         onClick={onClose}
