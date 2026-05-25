@@ -1,6 +1,6 @@
 import type { Job, JobStatus } from "@/types/jobs";
 
-export type MyJobsTabKey = "pending" | "assigned" | "proofs" | "invoices";
+export type MyJobsTabKey = "active" | "pending" | "assigned" | "proofs" | "invoices";
 
 export type DeadlineFilter = "all" | "today" | "week" | "overdue";
 

@@ -17,9 +17,21 @@ export interface AccountManagerPerformance {
         total: number;
         converted: number;
         conversion_rate_percent: number;
+        by_status?: Record<string, number>;
     };
     clients: {
         managed: number;
+        b2b?: number;
+        b2c?: number;
+        other?: number;
+    };
+    jobs?: {
+        total: number;
+        pending: number;
+        in_progress: number;
+        on_hold: number;
+        completed: number;
+        overdue: number;
     };
     performance_summary: {
         status: "strong" | "good" | "needs_improvement";

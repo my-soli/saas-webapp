@@ -1,4 +1,4 @@
-export type QuoteStatus = "Draft" | "Sent to PT" | "Costed" | "Sent to Customer" | "Approved" | "Lost";
+export type QuoteStatus = "Draft" | "Sent to PT" | "Costed" | "Sent to Customer" | "Approved" | "Lost" | "Rejected";
 
 export type QuoteProductionStatus =
     | "pending"
@@ -14,8 +14,10 @@ export interface QuoteLineItem {
     quote: number;
     product: number | null;
     product_name: string;
+    description?: string;
     quantity: number;
     unit_price: number | string | null;
+    line_total?: number | string | null;
     production_cost?: number | string | null;
     discount_amount?: number;
     discount_type?: "percent" | "fixed";
@@ -23,6 +25,8 @@ export interface QuoteLineItem {
     customization_level_snapshot?: string;
     base_price_snapshot?: number | null;
     order?: number;
+    pt_unit_cost?: number | null;
+    pt_notes?: string;
 }
 
 export interface QuoteCostPayload {
@@ -44,6 +48,7 @@ export interface Quote {
     production_status: QuoteProductionStatus | string;
     production_cost?: number | null;
     production_notes?: string;
+    pt_send_back_notes?: string;
     costed_by?: number | null;
     payment_terms: string;
     checkout_status: string;
@@ -61,6 +66,11 @@ export interface Quote {
     adjustment_reason?: string;
     customer_notes?: string;
     custom_terms?: string;
+    payment_options?: string;
+    project_name?: string;
+    notes?: string;
+    first_sent_at?: string | null;
+    approved_at?: string | null;
 }
 
 export interface QuoteHistoryItem {
@@ -84,6 +94,7 @@ export interface QuoteActionResponse {
     lpo_number?: string;
     job_id?: number;
     job_number?: string;
+    email_sent?: boolean;
 }
 
 export interface QuotesResponse {
@@ -148,7 +159,9 @@ export interface MultiProductQuote {
     adjustment_reason: string;
     payment_terms: PaymentTerms;
     reference_number: string;
+    project_name: string;
     notes: string;
+    customer_notes: string;
     terms: string;
     custom_terms: string;
     loss_reason: string;
@@ -156,8 +169,11 @@ export interface MultiProductQuote {
     production_status: string;
     production_cost: number | null;
     production_notes: string;
+    payment_options: string;
     created_at: string;
     updated_at: string;
+    first_sent_at: string | null;
+    approved_at: string | null;
 }
 
 export interface QuoteStatsResponse {
@@ -173,6 +189,7 @@ export interface QuoteStatsResponse {
 export interface CreateQuoteLineItemInput {
     product_id: number;
     product_name: string;
+    description?: string;
     quantity: number;
     unit_price: number;
     discount_amount?: number;
@@ -184,6 +201,7 @@ export interface CreateQuoteInput {
     client_id?: number;
     lead_id?: number;
     reference_number?: string;
+    project_name?: string;
     quote_date: string;
     valid_until: string;
     payment_terms: PaymentTerms;
@@ -194,5 +212,6 @@ export interface CreateQuoteInput {
     adjustment_reason?: string;
     notes?: string;
     custom_terms?: string;
+    payment_options?: string;
     line_items: CreateQuoteLineItemInput[];
 }

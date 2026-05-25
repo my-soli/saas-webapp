@@ -2,6 +2,17 @@ export type PreferredChannel = "Email" | "Phone" | "WhatsApp" | "In-Person";
 
 export type PortalRole = "owner" | "admin" | "user" | "viewer";
 
+export type PortalTier = "personal" | "subscriber";
+
+export interface SubscriptionSummary {
+    plan_name: string;
+    status: "trial" | "active" | "past_due" | "cancelled" | "expired";
+    billing_cycle: "monthly" | "annually";
+    end_date: string;
+    days_remaining: number;
+    is_active: boolean;
+}
+
 export interface ClientPortalProfile {
     first_name: string;
     last_name: string;
@@ -16,6 +27,8 @@ export interface ClientPortalProfile {
     delivery_instructions: string;
     role: PortalRole;
     client_id: string;
+    portal_tier: PortalTier;
+    subscription: SubscriptionSummary | null;
 }
 
 export interface UpdateClientPortalProfilePayload {

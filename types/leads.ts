@@ -10,6 +10,7 @@ export interface Lead {
     phone: string;
     source: LeadSource | "";
     product_interest: string;
+    products_of_interest_ids: Array<{ id: number; name: string }>;
     preferred_contact: "Email" | "Phone" | "WhatsApp";
     preferred_client_type: "B2B" | "B2C";
     follow_up_date: string | null;

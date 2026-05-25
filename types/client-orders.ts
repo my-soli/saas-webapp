@@ -80,6 +80,33 @@ export interface InvoicesListResponse {
     results: ClientInvoice[];
 }
 
+export type PaymentMethod = "credit_card" | "bank_transfer" | "check" | "mpesa" | "paypal";
+export type PaymentStatus = "pending" | "processing" | "completed" | "failed" | "refunded";
+
+export interface ClientPayment {
+    id: number;
+    payment_number: string;
+    client: number;
+    client_name: string;
+    invoice: number | null;
+    invoice_number: string | null;
+    amount: string;
+    payment_method: PaymentMethod;
+    status: PaymentStatus;
+    reference_number: string;
+    notes: string;
+    created_at: string;
+    updated_at: string;
+    processed_at: string | null;
+}
+
+export interface PaymentsListResponse {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: ClientPayment[];
+}
+
 export type NotificationType =
     | "order_confirmed"
     | "order_status_update"

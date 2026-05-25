@@ -9,4 +9,7 @@ export interface LineItem {
     discount_amount: number;
     discount_type: "percent" | "fixed";
     variable_amount: number;
+    vat_rate?: number;
+    description?: string;
+    is_custom?: boolean;
 }

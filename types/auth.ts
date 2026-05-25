@@ -8,7 +8,7 @@ export interface AuthTokens {
     refresh: string;
 }
 
-export type StaffGroup = "Admin" | "Account Manager" | "Production Team";
+export type StaffGroup = "Admin" | "Account Manager" | "Production Team" | "Business Admin";
 
 export type UserGroup = StaffGroup;
 
@@ -16,6 +16,7 @@ export type PortalRole =
     | "admin"
     | "account_manager"
     | "production_team"
+    | "business_admin"
     | "client"
     | "vendor";
 
@@ -34,7 +35,7 @@ export interface User {
 
 export interface UserProfile {
     user: User;
-    role: "admin" | "account_manager" | "production_team" | "client" | "vendor";
+    role: "admin" | "account_manager" | "production_team" | "business_admin" | "client" | "vendor";
     permissions: string[];
 }
 
