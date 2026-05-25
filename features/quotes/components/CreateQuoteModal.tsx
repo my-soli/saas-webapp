@@ -191,7 +191,7 @@ export default function CreateQuoteModal({
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
             <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full my-8">
-                <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
                     <h2 className="text-2xl font-semibold text-gray-900">New Quote</h2>
                     <button
                         onClick={handleClose}
@@ -202,7 +202,7 @@ export default function CreateQuoteModal({
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
+                <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6 max-h-[calc(90vh-200px)] overflow-y-auto">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -295,9 +295,9 @@ export default function CreateQuoteModal({
                                 {lineItems.map((item) => (
                                     <div
                                         key={item.tempId}
-                                        className="bg-gray-50 rounded-lg p-4 grid grid-cols-12 gap-3 items-start"
+                                        className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 sm:grid-cols-12 gap-3 items-start"
                                     >
-                                        <div className="col-span-4">
+                                        <div className="col-span-2 sm:col-span-4">
                                             <label className="block text-xs font-medium text-gray-600 mb-1">
                                                 Product
                                             </label>
@@ -318,7 +318,7 @@ export default function CreateQuoteModal({
                                             </select>
                                         </div>
 
-                                        <div className="col-span-2">
+                                        <div className="col-span-1 sm:col-span-2">
                                             <label className="block text-xs font-medium text-gray-600 mb-1">
                                                 Quantity
                                             </label>
@@ -334,7 +334,7 @@ export default function CreateQuoteModal({
                                             />
                                         </div>
 
-                                        <div className="col-span-2">
+                                        <div className="col-span-1 sm:col-span-2">
                                             <label className="block text-xs font-medium text-gray-600 mb-1">
                                                 Unit Price
                                             </label>
@@ -351,7 +351,7 @@ export default function CreateQuoteModal({
                                             />
                                         </div>
 
-                                        <div className="col-span-3">
+                                        <div className="col-span-1 sm:col-span-3">
                                             <label className="block text-xs font-medium text-gray-600 mb-1">
                                                 Discount
                                             </label>
@@ -383,7 +383,7 @@ export default function CreateQuoteModal({
                                             </div>
                                         </div>
 
-                                        <div className="col-span-1 flex items-end">
+                                        <div className="col-span-1 sm:col-span-1 flex items-end">
                                             <button
                                                 type="button"
                                                 onClick={() => removeLineItem(item.tempId)}
@@ -509,7 +509,7 @@ export default function CreateQuoteModal({
                     </div>
                 </form>
 
-                <div className="border-t border-gray-200 p-6 bg-gray-50 flex items-center justify-end gap-3">
+                <div className="border-t border-gray-200 p-4 sm:p-6 bg-gray-50 flex flex-wrap items-center justify-end gap-3">
                     <button
                         type="button"
                         onClick={handleClose}

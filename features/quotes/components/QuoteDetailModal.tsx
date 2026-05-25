@@ -1,11 +1,20 @@
-import { X } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
+import { X, Mail, MessageCircle, Send, Loader2, Pencil } from "lucide-react";
 import type { MultiProductQuote, QuoteLineItemDetailed } from "@/types/quotes";
+import type { SendEmailFields } from "@/services/quotes";
+import { getApprovalLink } from "@/services/quotes";
+import { getCurrentUser } from "@/services/users";
 
 interface QuoteDetailModalProps {
     quote: MultiProductQuote | null;
     onClose: () => void;
     onSendToPT: (quoteId: number) => void;
-    onSendToCustomer: (quoteId: number) => void;
+    onSendToCustomer: (quoteId: number, emailFields: SendEmailFields) => void;
+    isSendingToCustomer?: boolean;
     onMarkLost: (quoteId: number) => void;
     onConvertToJob: (quoteId: number) => void;
     onDownloadPdf: (quoteId: string) => void;
@@ -16,11 +25,69 @@ export default function QuoteDetailModal({
     onClose,
     onSendToPT,
     onSendToCustomer,
+    isSendingToCustomer,
     onMarkLost,
     onConvertToJob,
     onDownloadPdf,
 }: QuoteDetailModalProps) {
+    const router = useRouter();
+    const [showEmailDraft, setShowEmailDraft] = useState(false);
+    const [emailFrom, setEmailFrom] = useState("");
+    const [emailTo, setEmailTo] = useState("");
+    const [emailCc, setEmailCc] = useState("");
+    const [emailSubject, setEmailSubject] = useState("");
+    const [emailBody, setEmailBody] = useState("");
+
+    const { data: currentUser } = useQuery({
+        queryKey: ["current-user"],
+        queryFn: getCurrentUser,
+    });
+
     if (!quote) return null;
+
+    const isWithinEditWindow = (() => {
+        const ref = quote.first_sent_at || quote.approved_at;
+        if (!ref) return true; // no timestamp recorded — allow edit
+        return Date.now() - new Date(ref).getTime() < 30 * 24 * 60 * 60 * 1000;
+    })();
+
+    const openEmailDraft = () => {
+        const senderEmail = currentUser?.email || "info@printduka.co.ke";
+        setEmailFrom(senderEmail);
+        setEmailTo("");
+        setEmailCc("");
+        setEmailSubject(`Quote ${quote.quote_id} from Print Duka Ltd`);
+        setEmailBody(
+            `Dear ${quote.client_name || "Valued Customer"},\n\nI hope this message finds you well.\n\nPlease find attached your quotation ${quote.quote_id} from Print Duka Ltd. We have prepared this quote based on your requirements and look forward to your feedback.\n\nPlease review the attached quote and feel free to reach out if you have any questions or need any adjustments.\n\nBest regards,\nPrint Duka Ltd\nNairobi, Kenya\n${senderEmail} | +254 795 332 766`
+        );
+        setShowEmailDraft(true);
+    };
+
+    const handleSendEmail = () => {
+        onSendToCustomer(quote.id, {
+            email_from: emailFrom.trim() || undefined,
+            email_to: emailTo.trim() || undefined,
+            email_cc: emailCc.trim() || undefined,
+            email_subject: emailSubject.trim() || undefined,
+            email_body: emailBody.trim() || undefined,
+        });
+        setShowEmailDraft(false);
+    };
+
+    const handleWhatsApp = async (): Promise<void> => {
+        let approvalUrl = "";
+        try {
+            const result = await getApprovalLink(quote.id);
+            approvalUrl = result.approval_url;
+        } catch {
+            // proceed without link if fetch fails
+        }
+        const linkLine = approvalUrl
+            ? `\nKindly review and approve your quote here:\n${approvalUrl}\n`
+            : "";
+        const msg = `Hello ${quote.client_name || ""},\n\nPlease find your quote *${quote.quote_id}* from Print Duka Ltd.\n\n*Total: KES ${quote.total_value.toLocaleString()}*\nValid Until: ${quote.valid_until}\n${linkLine}\nThank you!`;
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
+    };
 
     const formatCurrency = (value: number) => {
         return new Intl.NumberFormat("en-KE", {
@@ -52,8 +119,8 @@ export default function QuoteDetailModal({
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4" onClick={onClose}>
+            <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e): void => e.stopPropagation()}>
                 {/* Header */}
                 <div className="border-b border-gray-200 p-4">
                     <div className="flex items-start justify-between">
@@ -80,7 +147,7 @@ export default function QuoteDetailModal({
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {/* Quick Info */}
-                    <div className="grid grid-cols-4 gap-3 pb-4 border-b border-gray-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pb-4 border-b border-gray-200">
                         <div>
                             <p className="text-xs text-gray-500">Items</p>
                             <p className="text-lg font-semibold text-gray-900">{quote.item_count}</p>
@@ -133,7 +200,7 @@ export default function QuoteDetailModal({
                                                 </td>
                                                 <td className="py-2 px-3 text-center">{item.quantity}</td>
                                                 <td className="py-2 px-3 text-right">
-                                                    {typeof item.unit_price === "number"
+                                                    {item.unit_price != null && item.unit_price !== "" && !isNaN(Number(item.unit_price))
                                                         ? formatCurrency(Number(item.unit_price))
                                                         : "—"}
                                                 </td>
@@ -209,7 +276,7 @@ export default function QuoteDetailModal({
                     </div>
 
                     {/* Notes & Terms */}
-                    {(quote.notes || quote.custom_terms) && (
+                    {(quote.notes || quote.terms || quote.custom_terms) && (
                         <div className="space-y-3">
                             {quote.notes && (
                                 <div className="bg-blue-50 border border-blue-200 rounded p-3">
@@ -217,10 +284,10 @@ export default function QuoteDetailModal({
                                     <p className="text-sm text-gray-700 whitespace-pre-wrap">{quote.notes}</p>
                                 </div>
                             )}
-                            {quote.custom_terms && (
+                            {(quote.custom_terms || quote.terms) && (
                                 <div className="bg-purple-50 border border-purple-200 rounded p-3">
-                                    <h3 className="text-xs font-semibold text-brand-purple mb-1">Terms</h3>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{quote.custom_terms}</p>
+                                    <h3 className="text-xs font-semibold text-brand-purple mb-1">Terms & Conditions</h3>
+                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{quote.custom_terms || quote.terms}</p>
                                 </div>
                             )}
                         </div>
@@ -237,7 +304,7 @@ export default function QuoteDetailModal({
 
                 {/* Footer */}
                 <div className="border-t border-gray-200 bg-gray-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                         <button
                             onClick={(): void => onDownloadPdf(quote.quote_id)}
                             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 transition-colors"
@@ -246,7 +313,7 @@ export default function QuoteDetailModal({
                             Download PDF
                         </button>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             {quote.status === "Draft" && (
                                 <button
                                     onClick={(): void => onSendToPT(quote.id)}
@@ -257,17 +324,42 @@ export default function QuoteDetailModal({
                                 </button>
                             )}
 
-                            {quote.status === "Costed" && (
+                            {(quote.status === "Draft" || quote.status === "Costed") && (
                                 <button
-                                    onClick={(): void => onSendToCustomer(quote.id)}
-                                    className="px-4 py-2 text-sm font-medium bg-brand-purple text-white hover:bg-brand-purple/90 rounded transition-colors"
+                                    onClick={openEmailDraft}
+                                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-brand-purple text-white hover:bg-brand-purple/90 rounded transition-colors"
                                     type="button"
                                 >
+                                    <Mail className="w-4 h-4" />
                                     Send to Customer
                                 </button>
                             )}
 
-                            {quote.status === "Approved" && (
+                            {quote.status !== "Lost" && quote.status !== "Rejected" && (
+                                <button
+                                    onClick={handleWhatsApp}
+                                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-green-500 text-white hover:bg-green-600 rounded transition-colors"
+                                    type="button"
+                                    title="Share via WhatsApp"
+                                >
+                                    <MessageCircle className="w-4 h-4" />
+                                    WhatsApp
+                                </button>
+                            )}
+
+                            {(quote.status === "Sent to Customer" || (quote.status === "Approved" && isWithinEditWindow)) && (
+                                <button
+                                    onClick={(): void => router.push(`/account-manager/quotes/create?edit=${quote.id}`)}
+                                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-brand-blue text-white hover:bg-brand-blue/90 rounded transition-colors"
+                                    type="button"
+                                    title={quote.status === "Approved" ? "Edit and resend within 30-day window" : "Edit quote"}
+                                >
+                                    <Pencil className="w-4 h-4" />
+                                    {quote.status === "Approved" ? "Edit & Resend" : "Edit Quote"}
+                                </button>
+                            )}
+
+                            {(quote.status === "Sent to Customer" || quote.status === "Approved") && (
                                 <button
                                     onClick={(): void => onConvertToJob(quote.id)}
                                     className="px-4 py-2 text-sm font-medium bg-brand-green text-white hover:bg-brand-green/90 rounded transition-colors"
@@ -290,6 +382,98 @@ export default function QuoteDetailModal({
                     </div>
                 </div>
             </div>
+
+            {/* Email Composer */}
+            {showEmailDraft && (
+                <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-[70] p-0 sm:p-4" onClick={() => setShowEmailDraft(false)}>
+                    <div
+                        className="bg-white w-full sm:rounded-xl shadow-2xl sm:max-w-2xl flex flex-col max-h-[92vh]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Composer header */}
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 shrink-0">
+                            <span className="text-sm font-semibold text-gray-800">New Message</span>
+                            <button onClick={() => setShowEmailDraft(false)} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+
+                        {/* Fields */}
+                        <div className="shrink-0">
+                            <div className="flex items-center border-b border-gray-100 px-4 py-2 gap-3">
+                                <span className="text-xs font-medium text-gray-400 w-12 shrink-0">From</span>
+                                <input
+                                    type="email"
+                                    value={emailFrom}
+                                    onChange={(e) => setEmailFrom(e.target.value)}
+                                    className="flex-1 text-sm text-gray-800 bg-transparent outline-none placeholder-gray-300"
+                                    placeholder="your@email.com"
+                                />
+                            </div>
+                            <div className="flex items-center border-b border-gray-100 px-4 py-2 gap-3">
+                                <span className="text-xs font-medium text-gray-400 w-12 shrink-0">To</span>
+                                <input
+                                    type="email"
+                                    value={emailTo}
+                                    onChange={(e) => setEmailTo(e.target.value)}
+                                    placeholder="client@example.com"
+                                    className="flex-1 text-sm text-gray-800 bg-transparent outline-none placeholder-gray-300"
+                                />
+                            </div>
+                            <div className="flex items-center border-b border-gray-100 px-4 py-2 gap-3">
+                                <span className="text-xs font-medium text-gray-400 w-12 shrink-0">CC</span>
+                                <input
+                                    type="text"
+                                    value={emailCc}
+                                    onChange={(e) => setEmailCc(e.target.value)}
+                                    placeholder="cc@example.com, other@example.com"
+                                    className="flex-1 text-sm text-gray-800 bg-transparent outline-none placeholder-gray-300"
+                                />
+                            </div>
+                            <div className="flex items-center border-b border-gray-200 px-4 py-2 gap-3">
+                                <span className="text-xs font-medium text-gray-400 w-12 shrink-0">Subject</span>
+                                <input
+                                    type="text"
+                                    value={emailSubject}
+                                    onChange={(e) => setEmailSubject(e.target.value)}
+                                    className="flex-1 text-sm font-medium text-gray-800 bg-transparent outline-none"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto">
+                            <textarea
+                                value={emailBody}
+                                onChange={(e) => setEmailBody(e.target.value)}
+                                className="w-full h-full min-h-[260px] px-4 py-3 text-sm text-gray-800 bg-transparent outline-none resize-none leading-relaxed"
+                                placeholder="Write your message here..."
+                            />
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 shrink-0">
+                            <p className="text-xs text-gray-400">Quote PDF will be attached automatically</p>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setShowEmailDraft(false)}
+                                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                                >
+                                    Discard
+                                </button>
+                                <button
+                                    onClick={handleSendEmail}
+                                    disabled={isSendingToCustomer}
+                                    className="flex items-center gap-2 px-5 py-2 text-sm font-medium bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {isSendingToCustomer ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                    {isSendingToCustomer ? "Sending…" : "Send"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

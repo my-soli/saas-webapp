@@ -51,6 +51,7 @@ export default function QuotesTable({
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-gray-200">
@@ -143,6 +144,7 @@ export default function QuotesTable({
                     ))}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 }

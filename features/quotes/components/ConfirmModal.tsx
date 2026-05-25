@@ -5,6 +5,7 @@ interface ConfirmModalProps {
     message: string;
     confirmText?: string;
     confirmColor?: "yellow" | "green" | "purple" | "red" | "blue";
+    isLoading?: boolean;
     onClose: () => void;
     onConfirm: () => void;
 }
@@ -14,6 +15,7 @@ export default function ConfirmModal({
     message,
     confirmText = "Confirm",
     confirmColor = "blue",
+    isLoading = false,
     onClose,
     onConfirm,
 }: ConfirmModalProps) {
@@ -61,8 +63,13 @@ export default function ConfirmModal({
                     >
                         Cancel
                     </button>
-                    <button type="button" onClick={onConfirm} className={getConfirmButtonClass()}>
-                        {confirmText}
+                    <button
+                        type="button"
+                        onClick={onConfirm}
+                        disabled={isLoading}
+                        className={`${getConfirmButtonClass()} disabled:opacity-50`}
+                    >
+                        {isLoading ? "Sending…" : confirmText}
                     </button>
                 </div>
             </div>

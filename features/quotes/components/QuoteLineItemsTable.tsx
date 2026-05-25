@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ReactElement } from "react";
-import { Search, Plus, Trash2, FileText } from "lucide-react";
+import { Search, Plus, Trash2, FileText, PenLine } from "lucide-react";
 import type { Product } from "@/types/products";
 import type { LineItem } from "@/features/quotes/types";
 
@@ -10,8 +10,11 @@ interface QuoteLineItemsTableProps {
     lineItems: LineItem[];
     products: Product[];
     onAddProduct: (product: Product) => void;
+    onAddCustomLine: () => void;
     onRemoveItem: (tempId: string) => void;
     onUpdateItem: (tempId: string, field: keyof LineItem, value: string | number) => void;
+    includeVat?: boolean;
+    taxRate?: number;
 }
 
 const formatCurrency = (value: number): string =>
@@ -41,8 +44,11 @@ export default function QuoteLineItemsTable({
     lineItems,
     products,
     onAddProduct,
+    onAddCustomLine,
     onRemoveItem,
     onUpdateItem,
+    includeVat = false,
+    taxRate = 16,
 }: QuoteLineItemsTableProps): ReactElement {
     const [productSearch, setProductSearch] = useState("");
     const [showResults, setShowResults] = useState(false);
@@ -65,7 +71,8 @@ export default function QuoteLineItemsTable({
     const handleSelectProduct = (product: Product): void => {
         onAddProduct(product);
         setProductSearch("");
-        setShowResults(false);
+        // Keep dropdown open so multiple products can be added in one session
+        setTimeout(() => searchInputRef.current?.focus(), 0);
     };
 
     return (
@@ -89,6 +96,11 @@ export default function QuoteLineItemsTable({
                             <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-36">
                                 Discount
                             </th>
+                            {includeVat && (
+                                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-28">
+                                    VAT ({taxRate}%)
+                                </th>
+                            )}
                             <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-32">
                                 Amount
                             </th>
@@ -98,7 +110,7 @@ export default function QuoteLineItemsTable({
                     <tbody className="divide-y divide-gray-100">
                         {lineItems.length === 0 ? (
                             <tr>
-                                <td colSpan={7} className="px-4 py-12 text-center">
+                                <td colSpan={includeVat ? 8 : 7} className="px-4 py-12 text-center">
                                     <FileText className="w-10 h-10 mx-auto mb-2 text-gray-300" />
                                     <p className="text-sm text-gray-400">
                                         No items yet — search below to add products
@@ -108,18 +120,49 @@ export default function QuoteLineItemsTable({
                         ) : (
                             lineItems.map((item, index) => (
                                 <tr key={item.tempId} className="hover:bg-gray-50/50">
-                                    <td className="px-4 py-3 text-xs text-gray-400">{index + 1}</td>
+                                    <td className="px-4 py-3 text-xs text-gray-400 align-top pt-4">{index + 1}</td>
                                     <td className="px-4 py-3">
-                                        <p className="text-sm font-medium text-gray-900">
-                                            {item.product_name}
-                                        </p>
-                                        {item.product_sku && (
-                                            <p className="text-xs text-gray-400 mt-0.5">
-                                                {item.product_sku}
-                                            </p>
+                                        {item.is_custom ? (
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-1.5 mb-1">
+                                                    <PenLine className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                                    <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">
+                                                        Custom product
+                                                    </span>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={item.product_name}
+                                                    onChange={(e): void =>
+                                                        onUpdateItem(item.tempId, "product_name", e.target.value)
+                                                    }
+                                                    placeholder="Product name *"
+                                                    className="w-full px-2 py-1.5 text-sm border border-amber-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent placeholder:text-gray-400 font-medium"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900">
+                                                    {item.product_name}
+                                                </p>
+                                                {item.product_sku && (
+                                                    <p className="text-xs text-gray-400 mt-0.5">
+                                                        {item.product_sku}
+                                                    </p>
+                                                )}
+                                            </div>
                                         )}
+                                        <textarea
+                                            value={item.description || ""}
+                                            onChange={(e): void =>
+                                                onUpdateItem(item.tempId, "description", e.target.value)
+                                            }
+                                            placeholder="Add a description (specs, finish, size…)"
+                                            rows={2}
+                                            className="mt-1.5 w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder:text-gray-300 resize-none text-gray-600"
+                                        />
                                     </td>
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-4 py-3 text-right align-top pt-4">
                                         <input
                                             type="number"
                                             value={item.quantity}
@@ -130,7 +173,7 @@ export default function QuoteLineItemsTable({
                                             className={`${inputClass} w-20`}
                                         />
                                     </td>
-                                    <td className="px-4 py-3 text-right">
+                                    <td className="px-4 py-3 text-right align-top pt-4">
                                         <div className="flex flex-col items-end gap-0.5">
                                             <input
                                                 type="number"
@@ -149,7 +192,7 @@ export default function QuoteLineItemsTable({
                                             )}
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-4 py-3 align-top pt-4">
                                         <div className="flex items-center gap-1 justify-end">
                                             <input
                                                 type="number"
@@ -177,10 +220,33 @@ export default function QuoteLineItemsTable({
                                             </select>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 tabular-nums">
+                                    {includeVat && (
+                                        <td className="px-4 py-3 align-top pt-4">
+                                            <div className="flex flex-col items-end gap-0.5">
+                                                <div className="flex items-center gap-1">
+                                                    <input
+                                                        type="number"
+                                                        value={item.vat_rate ?? taxRate}
+                                                        onChange={(e): void =>
+                                                            onUpdateItem(item.tempId, "vat_rate", Number(e.target.value))
+                                                        }
+                                                        min="0"
+                                                        max="100"
+                                                        step="0.01"
+                                                        className="w-14 px-1.5 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue text-right"
+                                                    />
+                                                    <span className="text-xs text-gray-400">%</span>
+                                                </div>
+                                                <span className="text-xs text-gray-500 tabular-nums">
+                                                    {formatCurrency(calculateLineTotal(item) * ((item.vat_rate ?? taxRate) / 100))}
+                                                </span>
+                                            </div>
+                                        </td>
+                                    )}
+                                    <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 tabular-nums align-top pt-4">
                                         {formatCurrency(calculateLineTotal(item))}
                                     </td>
-                                    <td className="px-4 py-3">
+                                    <td className="px-4 py-3 align-top pt-4">
                                         <button
                                             type="button"
                                             onClick={(): void => onRemoveItem(item.tempId)}
@@ -196,7 +262,7 @@ export default function QuoteLineItemsTable({
                 </table>
             </div>
 
-            {/* Product search row */}
+            {/* Product search + add buttons */}
             <div className="border-t border-gray-100 bg-gray-50 px-4 py-3">
                 <div className="flex items-center gap-3">
                     <div className="relative flex-1">
@@ -220,6 +286,7 @@ export default function QuoteLineItemsTable({
                                     <button
                                         key={product.id}
                                         type="button"
+                                        onMouseDown={(e): void => e.preventDefault()}
                                         onClick={(): void => handleSelectProduct(product)}
                                         className="w-full text-left px-4 py-2.5 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
                                     >
@@ -245,7 +312,18 @@ export default function QuoteLineItemsTable({
                         <Plus className="w-4 h-4" />
                         Add line
                     </button>
+                    <button
+                        type="button"
+                        onClick={onAddCustomLine}
+                        className="flex items-center gap-1.5 text-sm font-medium text-amber-600 hover:text-amber-700 shrink-0"
+                    >
+                        <PenLine className="w-4 h-4" />
+                        Add custom
+                    </button>
                 </div>
+                <p className="mt-1.5 text-[11px] text-gray-400">
+                    Use <span className="font-medium">Add custom</span> for products not yet in the catalogue — admin will be notified to add them.
+                </p>
             </div>
         </div>
     );

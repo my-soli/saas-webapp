@@ -17,11 +17,14 @@ interface QuoteHeaderSectionProps {
     onCustomerChange: (type: "client" | "lead", id: number | null) => void;
     referenceNumber: string;
     onReferenceChange: (value: string) => void;
+    projectName: string;
+    onProjectNameChange: (value: string) => void;
     quoteDate: string;
     onQuoteDateChange: (value: string) => void;
     expiryDate: string;
     onExpiryDateChange: (value: string) => void;
     salesperson: string;
+    quoteId?: string;
 }
 
 const fieldClass =
@@ -42,11 +45,14 @@ export default function QuoteHeaderSection({
     onCustomerChange,
     referenceNumber,
     onReferenceChange,
+    projectName,
+    onProjectNameChange,
     quoteDate,
     onQuoteDateChange,
     expiryDate,
     onExpiryDateChange,
     salesperson,
+    quoteId,
 }: QuoteHeaderSectionProps): ReactElement {
     const selectValue =
         clientType === "client"
@@ -123,11 +129,34 @@ export default function QuoteHeaderSection({
                         className={fieldClass}
                     />
                 </div>
+
+                <div>
+                    <label className={labelClass}>
+                        Project Name
+                        <span className="ml-1.5 text-xs font-normal text-gray-400 normal-case tracking-normal">internal only — not sent to client</span>
+                    </label>
+                    <input
+                        type="text"
+                        value={projectName}
+                        onChange={(e): void => onProjectNameChange(e.target.value)}
+                        placeholder="e.g. Acme Q2 Branding Campaign"
+                        className={fieldClass}
+                    />
+                </div>
             </div>
 
-            {/* Right — Dates + Salesperson */}
+            {/* Right — Quote ID + Dates + Salesperson */}
             <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className={labelClass}>Quote ID</label>
+                    <input
+                        type="text"
+                        value={quoteId || "Auto-generated on save"}
+                        readOnly
+                        className={`${fieldClass} bg-gray-50 cursor-default font-mono text-xs tracking-wide`}
+                    />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label className={labelClass}>Quote Date</label>
                         <input
