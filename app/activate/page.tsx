@@ -6,7 +6,6 @@ import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface ValidationResult {
     valid: boolean;
@@ -51,7 +50,7 @@ function ActivatePageContent() {
 
     async function validateToken() {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/v1/users/validate_invite/`, {
+            const response = await fetch(`/api/proxy/api/v1/users/validate_invite/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -103,7 +102,7 @@ function ActivatePageContent() {
         setActivating(true);
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/v1/users/activate_invite/`, {
+            const response = await fetch(`/api/proxy/api/v1/users/activate_invite/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

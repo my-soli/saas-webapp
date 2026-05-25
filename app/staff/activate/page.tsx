@@ -28,12 +28,9 @@ function ActivateAccountContent() {
             }
 
             try {
-                const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-                const response = await fetch(`${API_BASE_URL}/api/v1/users/validate-invite/`, {
+                const response = await fetch(`/api/proxy/api/v1/users/validate-invite/`, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ token }),
                 });
 
@@ -70,12 +67,9 @@ function ActivateAccountContent() {
         setIsSubmitting(true);
 
         try {
-            const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-            const response = await fetch(`${API_BASE_URL}/api/v1/users/activate-invite/`, {
+            const response = await fetch(`/api/proxy/api/v1/users/activate-invite/`, {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token, password }),
             });
 

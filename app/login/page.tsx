@@ -10,6 +10,7 @@ const ROLE_DASHBOARD: Record<PortalRole, string> = {
     admin: '/admin/dashboard',
     account_manager: '/account-manager',
     production_team: '/production/dashboard',
+    business_admin: '/business/dashboard',
     vendor: '/vendors',
 };
 
@@ -52,9 +53,12 @@ export default function LoginPage() {
                     onError={handleLoginError}
                 />
 
-                <div className="mt-8 text-center">
-                    <p className="text-xs text-white/60">
-                        Need access? Contact your administrator
+                <div className="mt-8 text-center space-y-2">
+                    <p className="text-sm text-white/70">
+                        Don&apos;t have an account?{" "}
+                        <a href="/register" className="text-white font-medium hover:underline">
+                            Create one
+                        </a>
                     </p>
                 </div>
 
