@@ -2,10 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent, FormEvent, ReactElement } from "react";
-import { X } from "lucide-react";
+import { X, Check } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { leadFormSchema } from "@/lib/validations/lead";
 import type { Lead, LeadSource, LeadStatus } from "@/types/leads";
+
+const PROXY_BASE = typeof window !== "undefined" ? "" : (process.env.NEXTAUTH_URL || "http://localhost:3000");
 
 interface LeadFormDrawerProps {
     isOpen: boolean;
@@ -22,6 +25,7 @@ interface LeadFormState {
     phone: string;
     source: LeadSource | "";
     product_interest: string;
+    products_of_interest_ids: Array<{ id: number; name: string }>;
     preferred_contact: "Email" | "Phone" | "WhatsApp";
     preferred_client_type: "B2B" | "B2C";
     follow_up_date: string;
@@ -35,6 +39,7 @@ const initialFormState: LeadFormState = {
     phone: "",
     source: "",
     product_interest: "",
+    products_of_interest_ids: [],
     preferred_contact: "Email",
     preferred_client_type: "B2B",
     follow_up_date: "",
@@ -53,6 +58,41 @@ export default function LeadFormDrawer({
     const [formState, setFormState] = useState<LeadFormState>(initialFormState);
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
     const [isFormValid, setIsFormValid] = useState(false);
+    const [productSearch, setProductSearch] = useState("");
+
+    const { data: productsData } = useQuery({
+        queryKey: ["products-catalog-simple"],
+        queryFn: async () => {
+            const res = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-admin/?status=published&page_size=100`, {
+                credentials: "include",
+            });
+            return res.json() as Promise<{ results: Array<{ id: number; name: string }> }>;
+        },
+        enabled: isOpen,
+        staleTime: 5 * 60 * 1000,
+    });
+
+    const filteredProducts = useMemo(() => {
+        const all = productsData?.results ?? [];
+        if (!productSearch.trim()) return all;
+        const q = productSearch.toLowerCase();
+        return all.filter(p => p.name.toLowerCase().includes(q));
+    }, [productsData, productSearch]);
+
+    const toggleProduct = (product: { id: number; name: string }) => {
+        setFormState(s => {
+            const already = s.products_of_interest_ids.some(p => p.id === product.id);
+            return {
+                ...s,
+                products_of_interest_ids: already
+                    ? s.products_of_interest_ids.filter(p => p.id !== product.id)
+                    : [...s.products_of_interest_ids, product],
+                product_interest: already
+                    ? s.products_of_interest_ids.filter(p => p.id !== product.id).map(p => p.name).join(", ")
+                    : [...s.products_of_interest_ids, product].map(p => p.name).join(", "),
+            };
+        });
+    };
 
     useEffect((): void => {
         if (!isOpen) {
@@ -66,6 +106,7 @@ export default function LeadFormDrawer({
                 phone: lead.phone,
                 source: lead.source,
                 product_interest: lead.product_interest || "",
+                products_of_interest_ids: lead.products_of_interest_ids || [],
                 preferred_contact: lead.preferred_contact,
                 preferred_client_type: lead.preferred_client_type,
                 follow_up_date: lead.follow_up_date || "",
@@ -131,6 +172,7 @@ export default function LeadFormDrawer({
             phone: formState.phone.trim(),
             source: formState.source || undefined,
             product_interest: formState.product_interest.trim(),
+            products_of_interest_ids: formState.products_of_interest_ids,
             preferred_contact: formState.preferred_contact,
             preferred_client_type: formState.preferred_client_type,
             follow_up_date: formState.follow_up_date || null,
@@ -146,8 +188,8 @@ export default function LeadFormDrawer({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
-            <aside className="h-full w-full max-w-2xl bg-white shadow-2xl overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
+            <aside className="h-full w-full max-w-2xl bg-white shadow-2xl overflow-y-auto" onClick={(e): void => e.stopPropagation()}>
                 <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900">{title}</h2>
@@ -286,16 +328,46 @@ export default function LeadFormDrawer({
                                 )}
                             </div>
 
-                            <div>
-                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Product Interest</label>
-                                <p className="text-xs text-gray-500 mt-0.5">What products they're interested in</p>
+                            <div className="md:col-span-2">
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Products of Interest</label>
+                                <p className="text-xs text-gray-500 mt-0.5">Select one or more products from the catalog</p>
+                                {formState.products_of_interest_ids.length > 0 && (
+                                    <div className="flex flex-wrap gap-1 mt-2 mb-2">
+                                        {formState.products_of_interest_ids.map(p => (
+                                            <span key={p.id} className="inline-flex items-center gap-1 bg-brand-blue/10 text-brand-blue text-xs font-medium px-2 py-0.5 rounded-full">
+                                                {p.name}
+                                                <button type="button" onClick={() => toggleProduct(p)} className="hover:text-red-500">
+                                                    <X className="w-3 h-3" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                                 <input
                                     type="text"
-                                    value={formState.product_interest}
-                                    onChange={handleInputChange("product_interest")}
-                                    placeholder="e.g., Business Cards, Banners"
+                                    value={productSearch}
+                                    onChange={e => setProductSearch(e.target.value)}
+                                    placeholder="Search products..."
                                     className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                                 />
+                                {filteredProducts.length > 0 && (
+                                    <div className="mt-1 border border-gray-200 rounded-md max-h-40 overflow-y-auto">
+                                        {filteredProducts.map(p => {
+                                            const selected = formState.products_of_interest_ids.some(s => s.id === p.id);
+                                            return (
+                                                <button
+                                                    key={p.id}
+                                                    type="button"
+                                                    onClick={() => toggleProduct(p)}
+                                                    className={`flex items-center justify-between w-full px-3 py-2 text-sm text-left hover:bg-gray-50 ${selected ? "bg-brand-blue/5 text-brand-blue font-medium" : "text-gray-700"}`}
+                                                >
+                                                    {p.name}
+                                                    {selected && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
 
                             <div>

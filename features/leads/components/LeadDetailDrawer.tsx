@@ -148,8 +148,8 @@ export default function LeadDetailDrawer({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/40">
-            <aside className="h-full w-full max-w-2xl bg-white shadow-2xl overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={onClose}>
+            <aside className="h-full w-full max-w-2xl bg-white shadow-2xl overflow-y-auto" onClick={(e): void => e.stopPropagation()}>
                 <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900">Lead Detail</h2>

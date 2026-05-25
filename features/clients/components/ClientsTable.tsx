@@ -37,16 +37,17 @@ export default function ClientsTable({
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-gray-200">
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client ID</th>
+                        <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client ID</th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
+                        <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Phone</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Type</th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Created</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Created</th>
                         <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
                     </tr>
                 </thead>
@@ -56,17 +57,17 @@ export default function ClientsTable({
 
                         return (
                             <tr key={client.id} className="border-b border-gray-100 last:border-0">
-                                <td className="py-3 px-4 text-sm text-gray-700 font-semibold">{client.client_id}</td>
+                                <td className="hidden md:table-cell py-3 px-4 text-sm text-gray-700 font-semibold">{client.client_id}</td>
                                 <td className="py-3 px-4 text-sm text-gray-700">{client.name}</td>
-                                <td className="py-3 px-4 text-sm text-gray-700">{client.email || "—"}</td>
-                                <td className="py-3 px-4 text-sm text-gray-700">{client.phone || "—"}</td>
-                                <td className="py-3 px-4 text-sm text-gray-700">{client.client_type}</td>
+                                <td className="hidden md:table-cell py-3 px-4 text-sm text-gray-700">{client.email || "—"}</td>
+                                <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-700">{client.phone || "—"}</td>
+                                <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-700">{client.client_type}</td>
                                 <td className="py-3 px-4 text-sm">
                                     <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${getStatusClass(client.status)}`}>
                                         {client.status}
                                     </span>
                                 </td>
-                                <td className="py-3 px-4 text-sm text-gray-500">{formatDate(client.created_at)}</td>
+                                <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-500">{formatDate(client.created_at)}</td>
                                 <td className="py-3 px-4 text-right">
                                     <div className="flex items-center justify-end gap-3">
                                         <button
@@ -100,6 +101,7 @@ export default function ClientsTable({
                     })}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 }
