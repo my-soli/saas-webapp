@@ -66,7 +66,7 @@ export default function VendorPerformancePage(): ReactElement {
     return (
         <VendorLayout>
             <header className="bg-white shadow">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-brand-black">Performance Scorecard</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         Track your performance metrics and VPS rating

@@ -116,7 +116,7 @@ export default function VendorIssuesPage(): ReactElement {
     return (
         <VendorLayout>
             <header className="bg-white shadow">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-brand-black">Issues & Requests</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         Report issues and request material substitutions for your purchase orders
@@ -449,7 +449,7 @@ function SubstitutionsTab({
                         </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Original Material
@@ -479,7 +479,7 @@ function SubstitutionsTab({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Original Cost (KES)
@@ -586,7 +586,7 @@ function SubstitutionsTab({
                                 </div>
 
                                 <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                                    <div className="grid grid-cols-2 gap-4 mb-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
                                         <div>
                                             <p className="text-xs text-gray-500 mb-1">Original Material</p>
                                             <p className="font-medium text-gray-900">{sub.original_material}</p>

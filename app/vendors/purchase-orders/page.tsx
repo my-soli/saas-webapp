@@ -152,7 +152,7 @@ export default function VendorPurchaseOrdersPage(): ReactElement {
                 />
             )}
             <header className="bg-white shadow">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-brand-black">Purchase Orders</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         Manage your assigned purchase orders and track progress
@@ -430,7 +430,7 @@ function PODetailModal({ po, onClose, formatCurrency, formatDate, getStatusBadge
                     {/* Order Info */}
                     <section>
                         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Order Information</h3>
-                        <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-3 text-sm">
                             <div>
                                 <p className="text-gray-500">Job Number</p>
                                 <p className="font-medium text-gray-900">{po.job_number}</p>
@@ -481,7 +481,7 @@ function PODetailModal({ po, onClose, formatCurrency, formatDate, getStatusBadge
                     {/* Milestones & Flags */}
                     <section>
                         <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Progress</h3>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                             <div className="flex items-center gap-2">
                                 {po.vendor_accepted
                                     ? <CheckCircle2 className="w-4 h-4 text-green-500" />
@@ -525,7 +525,7 @@ function PODetailModal({ po, onClose, formatCurrency, formatDate, getStatusBadge
                     {(po.shipping_method || po.tracking_number) && (
                         <section>
                             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Shipping</h3>
-                            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-3 text-sm">
                                 {po.shipping_method && (
                                     <div>
                                         <p className="text-gray-500">Shipping Method</p>

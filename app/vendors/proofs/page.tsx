@@ -116,7 +116,7 @@ export default function VendorProofsPage(): ReactElement {
     return (
         <VendorLayout>
             <header className="bg-white shadow">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-brand-black">Proofs & Samples</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         Submit proofs for review and track approval status

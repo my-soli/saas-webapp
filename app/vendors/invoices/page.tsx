@@ -139,7 +139,7 @@ export default function VendorInvoicesPage(): ReactElement {
     return (
         <VendorLayout>
             <header className="bg-white shadow">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-brand-black">Invoices</h1>
                     <p className="text-sm text-gray-600 mt-1">
                         Submit payment requests for completed work
@@ -479,7 +479,7 @@ function InvoiceDetailModal({ invoice, onClose, getStatusBadge, formatCurrency, 
                     )}
 
                     {/* Details Grid */}
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
                         <div>
                             <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Purchase Order</p>
                             <p className="text-sm font-semibold text-gray-900">{invoice.po_number}</p>

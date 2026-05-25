@@ -87,7 +87,7 @@ export default function VendorSettingsPage(): ReactElement {
         return (
             <VendorLayout>
                 <header className="bg-white shadow">
-                    <div className="px-4 sm:px-8 py-4">
+                    <div className="px-4 sm:px-4 lg:px-8 py-4">
                         <h1 className="text-2xl font-bold text-brand-black">Settings</h1>
                     </div>
                 </header>
@@ -111,7 +111,7 @@ export default function VendorSettingsPage(): ReactElement {
     return (
         <VendorLayout>
             <header className="bg-white shadow">
-                <div className="px-4 sm:px-8 py-4">
+                <div className="px-4 sm:px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-brand-black">Settings</h1>
                     <p className="text-sm text-gray-600 mt-1">Manage your company profile and availability</p>
                 </div>
