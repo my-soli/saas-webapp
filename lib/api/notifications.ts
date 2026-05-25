@@ -1,6 +1,6 @@
 import type { NotificationsQuery, NotificationsResponse, UserNotification } from "@/types/notifications";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 class NotificationsApiError extends Error {
     constructor(
@@ -68,7 +68,7 @@ function normalizeNotifications(payload: unknown): NotificationsResponse {
 
 export async function fetchNotifications(query: NotificationsQuery = {}): Promise<NotificationsResponse> {
     const queryString = buildQueryString(query);
-    const url = `${API_BASE_URL}/api/v1/notifications/${queryString ? `?${queryString}` : ""}`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/notifications/${queryString ? `?${queryString}` : ""}`;
 
     try {
         const response = await fetch(url, {
@@ -95,7 +95,7 @@ export async function fetchNotifications(query: NotificationsQuery = {}): Promis
 
 export async function markNotificationRead(notificationId: number): Promise<void> {
     const csrfToken = getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/notifications/${notificationId}/mark_read/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/notifications/${notificationId}/mark_read/`, {
         method: "POST",
         credentials: "include",
         headers: {
@@ -109,6 +109,17 @@ export async function markNotificationRead(notificationId: number): Promise<void
     }
 }
 
-export async function markAllNotificationsRead(notificationIds: number[]): Promise<void> {
-    await Promise.all(notificationIds.map((notificationId: number): Promise<void> => markNotificationRead(notificationId)));
+export async function markAllNotificationsRead(_notificationIds: number[]): Promise<void> {
+    const csrfToken = getCsrfToken();
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/notifications/mark-all-read/`, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+            "Content-Type": "application/json",
+            ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
+        },
+    });
+    if (!response.ok) {
+        throw new NotificationsApiError("Failed to mark all notifications as read", response.status);
+    }
 }

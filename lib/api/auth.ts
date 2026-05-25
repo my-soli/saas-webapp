@@ -1,7 +1,5 @@
 import type { LoginCredentials, RegisterData, ChangePasswordData, User } from '@/types/auth';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 interface ApiError {
     error?: string;
     detail?: string;
@@ -56,12 +54,21 @@ export async function loginUserSession(credentials: LoginCredentials): Promise<{
 }
 
 export async function logoutUserSession(): Promise<{ success: boolean }> {
-    const response = await fetch(`${PROXY_BASE}/api/auth/session/logout`, {
-        method: 'POST',
-        credentials: 'include',
-    });
-
-    return handleResponse(response);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    try {
+        const response = await fetch(`${PROXY_BASE}/api/auth/session/logout`, {
+            method: 'POST',
+            credentials: 'include',
+            signal: controller.signal,
+        });
+        return handleResponse(response);
+    } catch {
+        // Timeout or network error — treat as success so redirect still fires
+        return { success: true };
+    } finally {
+        clearTimeout(timeoutId);
+    }
 }
 
 export async function checkSession(): Promise<{ authenticated: boolean; user?: User }> {
@@ -93,15 +100,9 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 export async function changePassword(data: ChangePasswordData): Promise<{ detail: string }> {
-    const csrfToken = await getCsrfToken();
-
-    const response = await fetch(`${API_BASE_URL}/api/auth/change-password/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/auth/change-password/`, {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': csrfToken,
-        },
-        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     });
 

@@ -5,7 +5,7 @@ import {
     type ProductionSettingsPreferences,
 } from "@/types/production-settings";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 const PRODUCTION_SETTINGS_STORAGE_KEY = "pd-production-settings-v1";
 
 interface ApiError {
@@ -71,7 +71,7 @@ export const updateStaffProfile = async (
 ): Promise<User> => {
     const csrfToken = await getCsrfToken();
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/users/me/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/users/me/`, {
         method: "PATCH",
         credentials: "include",
         headers: {

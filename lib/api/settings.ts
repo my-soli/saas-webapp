@@ -1,6 +1,6 @@
 import { SystemSettings, UpdateSettingsPayload } from "@/types/settings";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 class SettingsApiError extends Error {
     constructor(
@@ -25,7 +25,7 @@ function getCsrfToken(): string | null {
 }
 
 export async function fetchSettings(): Promise<SystemSettings> {
-    const url = `${API_BASE_URL}/api/v1/settings/`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/settings/`;
 
     try {
         const response = await fetch(url, {
@@ -57,7 +57,7 @@ export async function fetchSettings(): Promise<SystemSettings> {
 }
 
 export async function updateSettings(updates: UpdateSettingsPayload): Promise<SystemSettings> {
-    const url = `${API_BASE_URL}/api/v1/settings/bulk_update/`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/settings/bulk_update/`;
     const csrfToken = getCsrfToken();
 
     try {

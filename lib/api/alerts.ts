@@ -1,6 +1,6 @@
 import { AlertsResponse, AlertFilters, SystemAlert } from "@/types/alerts";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 class AlertsApiError extends Error {
     constructor(
@@ -51,7 +51,7 @@ function buildQueryString(filters: AlertFilters): string {
 
 export async function fetchAlerts(filters: AlertFilters = {}): Promise<AlertsResponse> {
     const queryString = buildQueryString(filters);
-    const url = `${API_BASE_URL}/api/v1/system-alerts/${queryString ? `?${queryString}` : ""}`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/system-alerts/${queryString ? `?${queryString}` : ""}`;
 
     try {
         const response = await fetch(url, {
@@ -83,7 +83,7 @@ export async function fetchAlerts(filters: AlertFilters = {}): Promise<AlertsRes
 }
 
 export async function dismissAlert(alertId: number): Promise<SystemAlert> {
-    const url = `${API_BASE_URL}/api/v1/system-alerts/${alertId}/`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/system-alerts/${alertId}/`;
     const csrfToken = getCsrfToken();
 
     try {

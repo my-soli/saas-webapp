@@ -1,6 +1,6 @@
 import { AuditLogResponse, AuditLogFilters } from "@/types/audit-logs";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 class AuditLogsApiError extends Error {
     constructor(
@@ -36,7 +36,7 @@ function buildQueryString(filters: AuditLogFilters): string {
 
 export async function fetchAuditLogs(filters: AuditLogFilters = {}): Promise<AuditLogResponse> {
     const queryString = buildQueryString(filters);
-    const url = `${API_BASE_URL}/api/v1/audit-logs/${queryString ? `?${queryString}` : ""}`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/audit-logs/${queryString ? `?${queryString}` : ""}`;
 
     try {
         const response = await fetch(url, {

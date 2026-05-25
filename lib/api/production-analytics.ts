@@ -5,7 +5,7 @@ import type {
     TeamPerformanceItem,
 } from "@/types/production-analytics";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 interface ApiError {
     error?: string;
@@ -91,7 +91,7 @@ const normalizeAnalyticsPayload = (value: unknown): ProductionAnalyticsData => {
 };
 
 export const fetchProductionAnalyticsData = async (): Promise<ProductionAnalyticsData> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/production-analytics/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/production-analytics/`, {
         method: "GET",
         credentials: "include",
         headers: {
@@ -133,7 +133,7 @@ export const fetchRecentProductionJobs = async (limit: number): Promise<Job[]> =
         page_size: String(limit),
     });
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/jobs/?${query.toString()}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/?${query.toString()}`, {
         method: "GET",
         credentials: "include",
         headers: {

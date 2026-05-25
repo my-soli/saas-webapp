@@ -1,6 +1,7 @@
 import { User, UsersListResponse, UsersQueryParams, UpdateUserPayload, Group, Permission } from "@/types/user";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Works on both client (relative) and server (absolute)
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 class UsersApiError extends Error {
     constructor(
@@ -10,18 +11,6 @@ class UsersApiError extends Error {
         super(message);
         this.name = "UsersApiError";
     }
-}
-
-function getCsrfToken(): string | null {
-    const name = "csrftoken";
-    const cookies = document.cookie.split(";");
-    for (let cookie of cookies) {
-        const trimmed = cookie.trim();
-        if (trimmed.startsWith(name + "=")) {
-            return decodeURIComponent(trimmed.substring(name.length + 1));
-        }
-    }
-    return null;
 }
 
 export async function fetchUsers(
@@ -42,12 +31,11 @@ export async function fetchUsers(
         searchParams.append("is_superuser", params.is_superuser.toString());
     }
 
-    const url = `${API_BASE_URL}/api/v1/users/?${searchParams.toString()}`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/users/?${searchParams.toString()}`;
 
     try {
         const response = await fetch(url, {
             method: "GET",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
             },
@@ -74,12 +62,11 @@ export async function fetchUsers(
 }
 
 export async function fetchUserById(userId: number): Promise<User> {
-    const url = `${API_BASE_URL}/api/v1/users/${userId}/`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/users/${userId}/`;
 
     try {
         const response = await fetch(url, {
             method: "GET",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
             },
@@ -109,16 +96,13 @@ export async function fetchUserById(userId: number): Promise<User> {
 }
 
 export async function updateUser(userId: number, updates: UpdateUserPayload): Promise<User> {
-    const url = `${API_BASE_URL}/api/v1/users/${userId}/`;
-    const csrfToken = getCsrfToken();
+    const url = `${PROXY_BASE}/api/proxy/api/v1/users/${userId}/`;
 
     try {
         const response = await fetch(url, {
             method: "PATCH",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
-                ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
             },
             body: JSON.stringify(updates),
         });
@@ -147,12 +131,11 @@ export async function updateUser(userId: number, updates: UpdateUserPayload): Pr
 }
 
 export async function fetchGroups(): Promise<Group[]> {
-    const url = `${API_BASE_URL}/api/v1/groups/`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/groups/`;
 
     try {
         const response = await fetch(url, {
             method: "GET",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
             },
@@ -173,16 +156,13 @@ export async function fetchGroups(): Promise<Group[]> {
 }
 
 export async function createGroup(name: string): Promise<Group> {
-    const url = `${API_BASE_URL}/api/v1/groups/`;
-    const csrfToken = getCsrfToken();
+    const url = `${PROXY_BASE}/api/proxy/api/v1/groups/`;
 
     try {
         const response = await fetch(url, {
             method: "POST",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
-                ...(csrfToken && { "X-CSRFToken": csrfToken }),
             },
             body: JSON.stringify({ name }),
         });
@@ -203,16 +183,13 @@ export async function createGroup(name: string): Promise<Group> {
 }
 
 export async function updateGroup(groupId: number, name: string): Promise<Group> {
-    const url = `${API_BASE_URL}/api/v1/groups/${groupId}/`;
-    const csrfToken = getCsrfToken();
+    const url = `${PROXY_BASE}/api/proxy/api/v1/groups/${groupId}/`;
 
     try {
         const response = await fetch(url, {
             method: "PATCH",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
-                ...(csrfToken && { "X-CSRFToken": csrfToken }),
             },
             body: JSON.stringify({ name }),
         });
@@ -233,16 +210,13 @@ export async function updateGroup(groupId: number, name: string): Promise<Group>
 }
 
 export async function deleteUser(userId: number): Promise<void> {
-    const url = `${API_BASE_URL}/api/v1/users/${userId}/`;
-    const csrfToken = getCsrfToken();
+    const url = `${PROXY_BASE}/api/proxy/api/v1/users/${userId}/`;
 
     try {
         const response = await fetch(url, {
             method: "DELETE",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
-                ...(csrfToken && { "X-CSRFToken": csrfToken }),
             },
         });
 
@@ -256,7 +230,12 @@ export async function deleteUser(userId: number): Promise<void> {
             if (response.status === 404) {
                 throw new UsersApiError("User not found", 404);
             }
-            throw new UsersApiError("Failed to delete user");
+            if (response.status === 409) {
+                const data = await response.json().catch(() => ({})) as { detail?: string };
+                throw new UsersApiError(data.detail || "Cannot delete user — they have associated records.", 409);
+            }
+            const data = await response.json().catch(() => ({})) as { detail?: string };
+            throw new UsersApiError(data.detail || `Failed to delete user (${response.status})`, response.status);
         }
     } catch (error) {
         if (error instanceof UsersApiError) {
@@ -267,16 +246,13 @@ export async function deleteUser(userId: number): Promise<void> {
 }
 
 export async function deleteGroup(groupId: number): Promise<void> {
-    const url = `${API_BASE_URL}/api/v1/groups/${groupId}/`;
-    const csrfToken = getCsrfToken();
+    const url = `${PROXY_BASE}/api/proxy/api/v1/groups/${groupId}/`;
 
     try {
         const response = await fetch(url, {
             method: "DELETE",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
-                ...(csrfToken && { "X-CSRFToken": csrfToken }),
             },
         });
 
@@ -293,12 +269,11 @@ export async function deleteGroup(groupId: number): Promise<void> {
 }
 
 export async function fetchGroupById(groupId: number): Promise<Group> {
-    const url = `${API_BASE_URL}/api/v1/groups/${groupId}/`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/groups/${groupId}/`;
 
     try {
         const response = await fetch(url, {
             method: "GET",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
             },
@@ -322,12 +297,11 @@ export async function fetchGroupById(groupId: number): Promise<Group> {
 }
 
 export async function fetchPermissions(): Promise<Permission[]> {
-    const url = `${API_BASE_URL}/api/v1/permissions/`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/permissions/`;
 
     try {
         const response = await fetch(url, {
             method: "GET",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
             },
@@ -348,16 +322,13 @@ export async function fetchPermissions(): Promise<Permission[]> {
 }
 
 export async function updateGroupPermissions(groupId: number, permissionIds: number[]): Promise<Group> {
-    const url = `${API_BASE_URL}/api/v1/groups/${groupId}/`;
-    const csrfToken = getCsrfToken();
+    const url = `${PROXY_BASE}/api/proxy/api/v1/groups/${groupId}/`;
 
     try {
         const response = await fetch(url, {
             method: "PATCH",
-            credentials: "include",
             headers: {
                 "Content-Type": "application/json",
-                ...(csrfToken && { "X-CSRFToken": csrfToken }),
             },
             body: JSON.stringify({ permission_ids: permissionIds }),
         });

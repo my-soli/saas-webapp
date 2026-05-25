@@ -40,6 +40,7 @@ const baseClientSchema = z.object({
 
 const b2bClientSchema = baseClientSchema.extend({
     client_type: z.literal("B2B"),
+    email: z.string().min(1, "Email is required for B2B clients").email("Invalid email address"),
     company: z.string().min(1, "Company name is required for B2B clients"),
     industry: z.string().optional(),
     vat_tax_id: z.string().optional(),
