@@ -69,7 +69,7 @@ export default function UsersTab({
                         />
                     </>
                 ) : (
-                    <div className="px-8">
+                    <div className="px-4 lg:px-8">
                         <EmptyState message="Try adjusting your search or filter criteria" />
                     </div>
                 )}

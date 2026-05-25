@@ -31,17 +31,18 @@ export default function DeliveriesTable({ deliveries, onView }: DeliveriesTableP
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-gray-200">
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Delivery</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Job</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Method</th>
+                        <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Job</th>
+                        <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Method</th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Staging</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Scheduled</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Handoff</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Staging</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Scheduled</th>
+                        <th className="hidden xl:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Handoff</th>
                         <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</th>
                     </tr>
                 </thead>
@@ -51,25 +52,25 @@ export default function DeliveriesTable({ deliveries, onView }: DeliveriesTableP
                             <td className="py-3 px-4 text-sm font-medium text-gray-900">
                                 {delivery.delivery_number}
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden md:table-cell py-3 px-4 text-sm text-gray-700">
                                 {delivery.job_number || "—"}
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden md:table-cell py-3 px-4 text-sm text-gray-700">
                                 {delivery.client_name || "—"}
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-700">
                                 {delivery.delivery_method ? methodLabels[delivery.delivery_method] : "—"}
                             </td>
                             <td className="py-3 px-4 text-sm text-gray-700">
                                 <DeliveryStatusBadge status={delivery.status} />
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-700">
                                 {locationLabels[delivery.staging_location] || "—"}
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-700">
                                 {formatDate(delivery.scheduled_delivery_date)}
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden xl:table-cell py-3 px-4 text-sm text-gray-700">
                                 {delivery.handoff_confirmed ? "Confirmed" : "Pending"}
                             </td>
                             <td className="py-3 px-4 text-right">
@@ -85,6 +86,7 @@ export default function DeliveriesTable({ deliveries, onView }: DeliveriesTableP
                     ))}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 }

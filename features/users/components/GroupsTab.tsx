@@ -21,7 +21,7 @@ export default function GroupsTab({ groups, isLoading, onEditGroup, onDeleteGrou
                     onDeleteGroup={onDeleteGroup}
                 />
             ) : (
-                <div className="px-8">
+                <div className="px-4 lg:px-8">
                     <EmptyState message="No groups created yet. Click 'Create Group' to add one." />
                 </div>
             )}

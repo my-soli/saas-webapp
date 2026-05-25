@@ -20,16 +20,17 @@ export default function LpoTable({ lpos, onView }: LpoTableProps) {
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-gray-200">
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">LPO Number</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Quote</th>
+                        <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
+                        <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Quote</th>
                         <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Amount</th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">QuickBooks</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Created</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">QuickBooks</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Created</th>
                         <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Action</th>
                     </tr>
                 </thead>
@@ -39,10 +40,10 @@ export default function LpoTable({ lpos, onView }: LpoTableProps) {
                             <td className="py-3 px-4 text-sm font-medium text-gray-900">
                                 {lpo.lpo_number}
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden md:table-cell py-3 px-4 text-sm text-gray-700">
                                 {lpo.client_name || "—"}
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden md:table-cell py-3 px-4 text-sm text-gray-700">
                                 {lpo.quote_id || "—"}
                             </td>
                             <td className="py-3 px-4 text-sm text-right font-semibold text-gray-900">
@@ -51,7 +52,7 @@ export default function LpoTable({ lpos, onView }: LpoTableProps) {
                             <td className="py-3 px-4 text-sm text-gray-700">
                                 <LpoStatusBadge status={lpo.status} />
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-700">
                                 {lpo.synced_to_quickbooks ? (
                                     <span className="inline-flex rounded-full bg-brand-green/10 px-2 py-0.5 text-xs font-semibold text-brand-green">
                                         Synced
@@ -62,7 +63,7 @@ export default function LpoTable({ lpos, onView }: LpoTableProps) {
                                     </span>
                                 )}
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-700">
                                 {formatDate(lpo.created_at)}
                             </td>
                             <td className="py-3 px-4 text-right">
@@ -78,6 +79,7 @@ export default function LpoTable({ lpos, onView }: LpoTableProps) {
                     ))}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 }
