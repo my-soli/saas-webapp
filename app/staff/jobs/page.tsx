@@ -190,7 +190,7 @@ export default function JobsPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <a href="/staff" className="hover:text-brand-blue">
                             Staff Portal
@@ -207,7 +207,7 @@ export default function JobsPage(): ReactElement {
                 </div>
             </header>
             <main className="bg-gray-50 min-h-screen">
-                <div className="px-8 py-6 space-y-6">
+                <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-6">
                     {isLoading && <JobsSkeleton />}
 
                     {!isLoading && (error || !data) && (

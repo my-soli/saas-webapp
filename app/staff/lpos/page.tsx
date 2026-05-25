@@ -124,7 +124,7 @@ export default function LPOsPage() {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <a href="/staff" className="hover:text-brand-blue">
                             Staff Portal
@@ -139,7 +139,7 @@ export default function LPOsPage() {
                 </div>
             </header>
             <main className="bg-gray-50 min-h-screen">
-                <div className="max-w-7xl mx-auto px-8 py-6 space-y-6">
+                <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6 space-y-6">
                     {isLoading && <LpoSkeleton />}
 
                     {!isLoading && (error || !data) && (

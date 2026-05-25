@@ -74,7 +74,7 @@ export default function SettingsPage() {
         return (
             <AdminLayout>
                 <header className="border-b border-gray-200 bg-white">
-                    <div className="px-8 py-6">
+                    <div className="px-4 lg:px-8 py-4 lg:py-6">
                         <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-3"></div>
                         <div className="h-4 w-96 bg-gray-200 rounded animate-pulse"></div>
                     </div>
@@ -112,7 +112,7 @@ export default function SettingsPage() {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="flex items-center justify-between px-8 py-6">
+                <div className="flex items-center justify-between px-4 lg:px-8 py-4 lg:py-6">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">System Settings</h1>
                         <p className="mt-2 text-sm text-gray-600">
@@ -178,7 +178,7 @@ export default function SettingsPage() {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
                                             Support Email

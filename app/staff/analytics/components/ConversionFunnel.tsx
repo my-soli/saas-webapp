@@ -66,7 +66,7 @@ export default function ConversionFunnel({ data }: ConversionFunnelProps) {
                     </Bar>
                 </BarChart>
             </ResponsiveContainer>
-            <div className="mt-4 grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
                 <div>
                     <div className="text-xs text-gray-600">Quote Conversion</div>
                     <div className="text-lg font-semibold text-gray-900">{quoteToOrder.toFixed(1)}%</div>

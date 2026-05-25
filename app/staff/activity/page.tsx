@@ -117,7 +117,7 @@ export default function ActivityPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
                         <Link href="/staff" className="hover:text-brand-blue">
                             Staff Portal

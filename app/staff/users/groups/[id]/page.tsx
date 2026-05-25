@@ -160,7 +160,7 @@ export default function GroupDetailPage() {
         return (
             <AdminLayout>
                 <header className="border-b border-gray-200 bg-white">
-                    <div className="px-8 py-4">
+                    <div className="px-4 lg:px-8 py-4">
                         <div className="flex items-start justify-between mb-3">
                             <div>
                                 <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
@@ -227,7 +227,7 @@ export default function GroupDetailPage() {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="flex items-start justify-between mb-3">
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">{group.name}</h1>

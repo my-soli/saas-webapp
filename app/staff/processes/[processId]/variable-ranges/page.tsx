@@ -178,7 +178,7 @@ export default function ProcessVariableRangesPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <a href="/staff" className="hover:text-brand-blue">
                             Staff Portal
@@ -209,7 +209,7 @@ export default function ProcessVariableRangesPage(): ReactElement {
                 </div>
             </header>
             <main className="bg-gray-50 min-h-screen">
-                <div className="max-w-5xl px-8 py-6 space-y-6">
+                <div className="max-w-5xl px-4 lg:px-8 py-4 lg:py-6 space-y-6">
                     {!hasValidId && (
                         <div className="bg-brand-red/10 border border-brand-red/20 rounded-lg p-6">
                             <div className="flex items-center gap-3">

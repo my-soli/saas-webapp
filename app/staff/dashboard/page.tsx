@@ -63,7 +63,7 @@ export default function DashboardPage(): ReactElement {
     return (
         <AdminLayout>
             <header className="bg-white shadow">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-brand-black">Dashboard</h1>
                 </div>
             </header>

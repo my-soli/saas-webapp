@@ -1,9 +1,9 @@
 import { AnalyticsData } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 export async function fetchAnalyticsData(): Promise<AnalyticsData> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/analytics/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/analytics/`, {
         headers: {
             "Content-Type": "application/json",
         },

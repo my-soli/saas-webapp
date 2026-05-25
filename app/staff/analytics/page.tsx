@@ -29,7 +29,7 @@ export default function AnalyticsPage() {
         return (
             <AdminLayout>
                 <header className="border-b border-gray-200 bg-white">
-                    <div className="px-8 py-4">
+                    <div className="px-4 lg:px-8 py-4">
                         <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                             <a href="/staff" className="hover:text-brand-blue">
                                 Staff Portal
@@ -43,7 +43,7 @@ export default function AnalyticsPage() {
                         </p>
                     </div>
                     <div className="border-t border-gray-200">
-                        <nav className="flex px-8 gap-6">
+                        <nav className="flex px-4 lg:px-8 gap-4 overflow-x-auto">
                             <div className="py-3 text-sm font-medium border-b-2 border-brand-blue text-brand-blue">
                                 Overview
                             </div>
@@ -60,7 +60,7 @@ export default function AnalyticsPage() {
                     </div>
                 </header>
                 <main className="bg-gray-50 min-h-screen">
-                    <div className="max-w-7xl mx-auto px-8 py-6">
+                    <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6">
                         <AnalyticsSkeleton />
                     </div>
                 </main>
@@ -72,7 +72,7 @@ export default function AnalyticsPage() {
         return (
             <AdminLayout>
                 <header className="border-b border-gray-200 bg-white">
-                    <div className="px-8 py-4">
+                    <div className="px-4 lg:px-8 py-4">
                         <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                             <a href="/staff" className="hover:text-brand-blue">
                                 Staff Portal
@@ -86,7 +86,7 @@ export default function AnalyticsPage() {
                         </p>
                     </div>
                     <div className="border-t border-gray-200">
-                        <nav className="flex px-8 gap-6">
+                        <nav className="flex px-4 lg:px-8 gap-4 overflow-x-auto">
                             <div className="py-3 text-sm font-medium border-b-2 border-brand-blue text-brand-blue">
                                 Overview
                             </div>
@@ -103,7 +103,7 @@ export default function AnalyticsPage() {
                     </div>
                 </header>
                 <main className="bg-gray-50 min-h-screen">
-                    <div className="max-w-7xl mx-auto px-8 py-6">
+                    <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6">
                         <div className="bg-brand-red/10 border border-brand-red/20 rounded-lg p-6">
                             <div className="flex items-center gap-3">
                                 <AlertCircleIcon className="h-6 w-6 text-brand-red" />
@@ -133,7 +133,7 @@ export default function AnalyticsPage() {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
                         <a href="/staff" className="hover:text-brand-blue">
                             Staff Portal
@@ -147,7 +147,7 @@ export default function AnalyticsPage() {
                     </p>
                 </div>
                 <div className="border-t border-gray-200">
-                    <nav className="flex px-8 gap-6">
+                    <nav className="flex px-4 lg:px-8 gap-4 overflow-x-auto">
                         {tabs.map((tab) => (
                             <button
                                 key={tab.id}
@@ -164,7 +164,7 @@ export default function AnalyticsPage() {
                 </div>
             </header>
             <main className="bg-gray-50 min-h-screen">
-                <div className="max-w-7xl mx-auto px-8 py-6 space-y-6">
+                <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6 space-y-6">
                     {activeTab === "overview" && (
                         <>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

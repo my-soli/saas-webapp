@@ -187,7 +187,7 @@ function UsersPageContent() {
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="flex items-center justify-between px-8 py-6">
+                <div className="flex items-center justify-between px-4 lg:px-8 py-4 lg:py-6">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
                         <p className="mt-2 text-sm text-gray-600">

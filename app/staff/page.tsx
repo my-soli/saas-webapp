@@ -41,7 +41,7 @@ export default function StaffPage() {
     return (
         <AdminLayout>
             <header className="bg-white shadow">
-                <div className="px-8 py-4 flex justify-between items-center">
+                <div className="px-4 lg:px-8 py-4 flex justify-between items-center">
                     <div>
                         <h1 className="text-3xl font-bold text-brand-black">
                             Staff Portal
