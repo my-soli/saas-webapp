@@ -10,7 +10,6 @@ import {
     Users,
     FileText,
     Package,
-    Briefcase,
     Building2,
     Settings,
     Truck,
@@ -21,6 +20,11 @@ import {
     ShieldCheck,
     AlertTriangle,
     Layers,
+    BadgeDollarSign,
+    Zap,
+    PackageCheck,
+    Scale,
+    ClipboardCheck,
 } from "lucide-react";
 import { logoutUserSession } from "@/lib/api/auth";
 
@@ -47,8 +51,16 @@ const menuSections: MenuSection[] = [
             { label: "Clients", href: "/admin/clients", icon: UserCircle },
             { label: "Leads", href: "/admin/leads", icon: Users },
             { label: "Quotes", href: "/admin/quotes", icon: FileText },
-            { label: "Jobs", href: "/admin/jobs", icon: Briefcase },
             { label: "Payments", href: "/admin/payments", icon: CreditCard },
+        ],
+    },
+    {
+        title: "ORCHESTRATION",
+        items: [
+            { label: "Control Tower", href: "/admin/orchestration", icon: Zap },
+            { label: "Dispatch", href: "/admin/dispatch", icon: PackageCheck },
+            { label: "Reconciliation", href: "/admin/reconciliation", icon: Scale },
+            { label: "QC Templates", href: "/admin/qc-templates", icon: ClipboardCheck },
         ],
     },
     {
@@ -66,6 +78,7 @@ const menuSections: MenuSection[] = [
         title: "ADMINISTRATION",
         items: [
             { label: "Users", href: "/admin/users", icon: Users },
+            { label: "Subscription Plans", href: "/admin/subscription-plans", icon: BadgeDollarSign },
             { label: "Audit Logs", href: "/admin/audit-logs", icon: ShieldCheck },
             { label: "Alerts", href: "/admin/alerts", icon: AlertTriangle },
             { label: "Settings", href: "/admin/settings", icon: Settings },
@@ -83,22 +96,29 @@ export default function AdminSidebar({ isDrawerOpen, onClose }: AdminSidebarProp
     const router = useRouter();
     const [loggingOut, setLoggingOut] = useState(false);
 
-    const isActiveLink = (href: string): boolean =>
-        pathname === href || (href !== "/admin/dashboard" && pathname.startsWith(href));
+    const isActiveLink = (href: string): boolean => {
+        if (pathname === href) return true;
+        if (href === "/admin/dashboard") return false;
+        if (pathname.startsWith(href)) return true;
+        // Job detail sub-pages belong to Control Tower
+        if (href === "/admin/orchestration" && pathname.startsWith("/admin/jobs/")) return true;
+        return false;
+    };
 
     async function handleLogout(): Promise<void> {
         setLoggingOut(true);
         try {
             await logoutUserSession();
-        } finally {
-            router.push("/login");
+        } catch {
+            // ignore — still redirect
         }
+        window.location.href = "/login";
     }
 
     return (
         <aside
             className={`
-                fixed left-0 top-0 z-30 h-screen w-64 bg-brand-blue text-white
+                fixed left-0 top-0 z-50 h-screen w-[85vw] lg:w-64 bg-brand-blue text-white
                 flex flex-col overflow-y-auto
                 transition-transform duration-200 ease-in-out
                 ${isDrawerOpen

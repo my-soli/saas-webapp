@@ -74,15 +74,16 @@ export default function VendorSidebar({ isDrawerOpen, onClose }: VendorSidebarPr
         setLoggingOut(true);
         try {
             await logoutUserSession();
-        } finally {
-            router.push("/login");
+        } catch {
+            // ignore — still redirect
         }
+        window.location.href = "/login";
     }
 
     return (
         <aside
             className={`
-                fixed left-0 top-0 z-30 h-screen w-64 bg-brand-blue text-white
+                fixed left-0 top-0 z-50 h-screen w-[85vw] lg:w-64 bg-brand-blue text-white
                 flex flex-col overflow-y-auto
                 transition-transform duration-200 ease-in-out
                 ${isDrawerOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}

@@ -17,7 +17,7 @@ export default function ProductionLayout({ children }: ProductionLayoutProps) {
 
             {drawerOpen && (
                 <div
-                    className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+                    className="fixed inset-0 z-40 bg-black/40 lg:hidden"
                     onClick={() => setDrawerOpen(false)}
                 />
             )}

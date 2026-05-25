@@ -4,7 +4,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactElement } from "react";
-import { type LucideIcon, LayoutDashboard, Package, Settings, LogOut, X, Loader2 } from "lucide-react";
+import {
+    type LucideIcon,
+    LayoutDashboard, Package, Settings, LogOut, X, Loader2,
+    FileText, MessageSquare, BadgeDollarSign,
+    ShoppingCart, ImageIcon, TrendingUp, BarChart2,
+} from "lucide-react";
 import { logoutUserSession } from "@/lib/api/auth";
 
 interface MenuItem {
@@ -23,9 +28,32 @@ const menuSections: MenuSection[] = [
     {
         title: "MAIN",
         items: [
-            { label: "Dashboard", href: "/portal", icon: LayoutDashboard, exact: true },
-            { label: "Orders", href: "/portal/orders", icon: Package },
-            { label: "Settings", href: "/portal/settings", icon: Settings },
+            { label: "Dashboard",  href: "/portal",              icon: LayoutDashboard, exact: true },
+            { label: "Orders",     href: "/portal/orders",       icon: Package },
+            { label: "Quotes",     href: "/portal/quotes",       icon: FileText },
+            { label: "Cart",       href: "/portal/cart",         icon: ShoppingCart },
+        ],
+    },
+    {
+        title: "FINANCE",
+        items: [
+            { label: "Financials", href: "/portal/financials",   icon: TrendingUp },
+            { label: "Analytics",  href: "/portal/analytics",    icon: BarChart2 },
+            { label: "Invoices",   href: "/portal/invoices",     icon: FileText },
+        ],
+    },
+    {
+        title: "ASSETS",
+        items: [
+            { label: "Designs & Documents", href: "/portal/designs",  icon: ImageIcon },
+            { label: "Help & Tickets",       href: "/portal/support", icon: MessageSquare },
+        ],
+    },
+    {
+        title: "ACCOUNT",
+        items: [
+            { label: "Subscription", href: "/portal/subscription", icon: BadgeDollarSign },
+            { label: "Settings",     href: "/portal/settings",     icon: Settings },
         ],
     },
 ];
@@ -48,15 +76,16 @@ export default function ClientSidebar({ isDrawerOpen, onClose }: ClientSidebarPr
         setLoggingOut(true);
         try {
             await logoutUserSession();
-        } finally {
-            router.push("/login");
+        } catch {
+            // ignore — still redirect
         }
+        window.location.href = "/login";
     }
 
     return (
         <aside
             className={`
-                fixed left-0 top-0 z-30 h-screen w-64 bg-brand-blue text-white
+                fixed left-0 top-0 z-50 h-screen w-[85vw] lg:w-64 bg-brand-blue text-white
                 flex flex-col overflow-y-auto
                 transition-transform duration-200 ease-in-out
                 ${isDrawerOpen

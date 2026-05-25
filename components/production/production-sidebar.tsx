@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, type ReactElement } from "react";
 import {
     type LucideIcon,
@@ -10,6 +10,7 @@ import {
     BookOpen,
     FileText,
     Package,
+    Layers,
     Briefcase,
     Building2,
     Settings,
@@ -19,9 +20,14 @@ import {
     LogOut,
     Loader2,
     X,
+    Zap,
+    PackageCheck,
+    Scale,
+    ClipboardCheck,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { logoutUserSession } from "@/lib/api/auth";
+import { fetchNotifications } from "@/lib/api/notifications";
 
 interface MenuItem {
     label: string;
@@ -51,9 +57,19 @@ const menuSections: MenuSection[] = [
         title: "PRODUCTION",
         items: [
             { label: "Product Catalog", href: "/production-team/products", icon: Package },
-            { label: "Costing", href: "/production-team/processes", icon: BookOpen },
+            { label: "Catalog Setup", href: "/production-team/catalog-setup", icon: Layers },
+            
             { label: "Vendors", href: "/production-team/vendors", icon: Building2 },
             { label: "Deliveries", href: "/production-team/deliveries", icon: Truck },
+        ],
+    },
+    {
+        title: "ORCHESTRATION",
+        items: [
+            { label: "Control Tower", href: "/production-team/orchestration", icon: Zap },
+            { label: "Dispatch", href: "/production-team/dispatch", icon: PackageCheck },
+            { label: "Reconciliation", href: "/production-team/reconciliation", icon: Scale },
+            { label: "QC Templates", href: "/production-team/qc-templates", icon: ClipboardCheck },
         ],
     },
     {
@@ -76,23 +92,38 @@ export default function ProductionSidebar({ isDrawerOpen, onClose }: ProductionS
     const router = useRouter();
     const [loggingOut, setLoggingOut] = useState(false);
 
-    const isActiveLink = (href: string): boolean =>
-        pathname === href ||
-        (href !== "/production-team/dashboard" && pathname.startsWith(href));
+    const { data: unreadData } = useQuery({
+        queryKey: ["pt-unread-notifications-count"],
+        queryFn: () => fetchNotifications({ unreadOnly: true }),
+        refetchInterval: 30_000,
+        staleTime: 0,
+    });
+    const unreadCount = unreadData?.count ?? 0;
+
+    const isActiveLink = (href: string): boolean => {
+        if (pathname === href) return true;
+        if (href === "/production-team/dashboard") return false;
+        if (pathname.startsWith(href)) return true;
+        // /production-team/X pages redirect to /staff/production/X — match both
+        const staffAlias = href.replace("/production-team/", "/staff/production/");
+        if (staffAlias !== href && (pathname === staffAlias || pathname.startsWith(staffAlias + "/"))) return true;
+        return false;
+    };
 
     async function handleLogout(): Promise<void> {
         setLoggingOut(true);
         try {
             await logoutUserSession();
-        } finally {
-            router.push("/login");
+        } catch {
+            // ignore — still redirect
         }
+        window.location.href = "/login";
     }
 
     return (
         <aside
             className={`
-                fixed left-0 top-0 z-30 h-screen w-64 bg-brand-blue text-white
+                fixed left-0 top-0 z-50 h-screen w-[85vw] lg:w-64 bg-brand-blue text-white
                 flex flex-col overflow-y-auto
                 transition-transform duration-200 ease-in-out
                 ${isDrawerOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
@@ -128,6 +159,9 @@ export default function ProductionSidebar({ isDrawerOpen, onClose }: ProductionS
                             {section.items.map((item) => {
                                 const isActive = isActiveLink(item.href);
                                 const Icon = item.icon;
+                                const showBadge =
+                                    (item.href === "/production-team/notifications" && unreadCount > 0) ||
+                                    (item.href === "/production-team/orchestration" && false); /* orchestration alerts wired later */
                                 return (
                                     <li key={item.href}>
                                         <Link
@@ -138,8 +172,13 @@ export default function ProductionSidebar({ isDrawerOpen, onClose }: ProductionS
                                                     : "text-white hover:bg-white/10"
                                                 }`}
                                         >
-                                            <Icon className="w-5 h-5" />
-                                            <span>{item.label}</span>
+                                            <Icon className="w-5 h-5 shrink-0" />
+                                            <span className="flex-1">{item.label}</span>
+                                            {showBadge && (
+                                                <span className="flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold px-1">
+                                                    {unreadCount > 99 ? "99+" : unreadCount}
+                                                </span>
+                                            )}
                                         </Link>
                                     </li>
                                 );
