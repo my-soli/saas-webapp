@@ -1,4 +1,4 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 interface ContactFormData {
     first_name: string;
@@ -13,7 +13,7 @@ interface ContactFormResponse {
 }
 
 export async function submitContactForm(data: ContactFormData): Promise<ContactFormResponse> {
-    const response = await fetch(`${API_URL}/api/v1/contact/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/contact/`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

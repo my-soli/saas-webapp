@@ -1,7 +1,7 @@
 import { LPO, LPOQueryParams, LPOResponse, LPOUpdatePayload } from "@/types/lpos";
 import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 const buildWriteHeaders = async (): Promise<HeadersInit> => {
     const csrfToken = await getCsrfToken();
@@ -41,7 +41,7 @@ const buildQueryString = (params: LPOQueryParams): string => {
 
 export async function fetchLpos(params: LPOQueryParams): Promise<LPOResponse> {
     const queryString = buildQueryString(params);
-    const response = await fetch(`${API_BASE_URL}/api/v1/lpos/?${queryString}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/lpos/?${queryString}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -58,7 +58,7 @@ export async function fetchLpos(params: LPOQueryParams): Promise<LPOResponse> {
 }
 
 export async function updateLpo(lpoId: number, payload: LPOUpdatePayload): Promise<LPO> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/lpos/${lpoId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/lpos/${lpoId}/`, {
         method: "PATCH",
         headers: await buildWriteHeaders(),
         credentials: "include",

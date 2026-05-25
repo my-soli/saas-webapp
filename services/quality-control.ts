@@ -5,7 +5,7 @@ import {
     UpdateQCInspectionPayload,
 } from "@/types/quality-control";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 const buildQueryString = (params: QCInspectionsQueryParams): string => {
     const searchParams = new URLSearchParams();
@@ -47,7 +47,7 @@ export async function fetchQCInspections(
     params: QCInspectionsQueryParams
 ): Promise<QCInspectionsResponse> {
     const queryString = buildQueryString(params);
-    const response = await fetch(`${API_BASE_URL}/api/v1/qc-inspections/?${queryString}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/qc-inspections/?${queryString}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -67,7 +67,7 @@ export async function updateQCInspection(
     inspectionId: number,
     payload: UpdateQCInspectionPayload
 ): Promise<QCInspection> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/qc-inspections/${inspectionId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/qc-inspections/${inspectionId}/`, {
         method: "PATCH",
         headers: {
             "Content-Type": "application/json",

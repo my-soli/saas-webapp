@@ -8,10 +8,10 @@ import type {
     ClientStatsResponse,
     ComplianceDocument,
 } from "@/types/clients";
+import type { MultiProductQuote } from "@/types/quotes";
 
-import { getCsrfToken } from "@/lib/api/auth";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Works on both client (relative) and server (absolute)
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 interface PaginatedResponse<T> {
     count: number;
@@ -42,25 +42,28 @@ const buildQueryString = (params: ClientsQueryParams): string => {
     return searchParams.toString();
 };
 
-const buildWriteHeaders = async (): Promise<HeadersInit> => {
-    const csrfToken = await getCsrfToken();
-    return {
-        "Content-Type": "application/json",
-        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
-    };
-};
-
 const extractErrorDetail = async (response: Response): Promise<string> => {
     try {
-        const payload = (await response.json()) as { detail?: string };
-        if (typeof payload.detail === "string" && payload.detail.trim().length > 0) {
-            return payload.detail;
+        const text = await response.text();
+        try {
+            const payload = JSON.parse(text) as Record<string, unknown>;
+            if (typeof payload.detail === "string" && payload.detail.trim().length > 0) {
+                return payload.detail;
+            }
+            // DRF field-level validation errors: {"field": ["msg"]} or {"field": "msg"}
+            const fieldErrors = Object.entries(payload)
+                .map(([field, msgs]) => {
+                    const msg = Array.isArray(msgs) ? msgs[0] : msgs;
+                    return `${field}: ${msg}`;
+                })
+                .join("; ");
+            return fieldErrors || text || "Unknown error";
+        } catch {
+            return text || "Unknown error";
         }
-    } catch (_error: unknown) {
+    } catch {
+        return "Unknown error";
     }
-
-    const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
-    return errorText;
 };
 
 const normalizeClientPayload = (payload: ClientFormPayload): ClientFormPayload => {
@@ -68,16 +71,19 @@ const normalizeClientPayload = (payload: ClientFormPayload): ClientFormPayload =
         return payload;
     }
 
+    // B2C: strip all B2B-only fields so the backend's field-presence check doesn't reject them
     return {
-        ...payload,
-        company: "",
-        vat_tax_id: "",
-        kra_pin: "",
-        industry: "",
-        credit_limit: 0,
-        default_markup: 0,
-        risk_rating: "Low",
-        is_reseller: false,
+        client_type: payload.client_type,
+        name: payload.name,
+        phone: payload.phone,
+        email: payload.email,
+        status: payload.status,
+        preferred_channel: payload.preferred_channel,
+        lead_source: payload.lead_source,
+        address: payload.address,
+        delivery_address: payload.delivery_address,
+        delivery_instructions: payload.delivery_instructions,
+        payment_terms: payload.payment_terms,
     };
 };
 
@@ -96,11 +102,8 @@ const parseCollectionResponse = <T>(payload: unknown): T[] => {
 
 export async function fetchClients(params: ClientsQueryParams): Promise<ClientsResponse> {
     const queryString = buildQueryString(params);
-    const response = await fetch(`${API_BASE_URL}/api/v1/clients/?${queryString}`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/?${queryString}`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -113,11 +116,8 @@ export async function fetchClients(params: ClientsQueryParams): Promise<ClientsR
 }
 
 export async function fetchClient(clientId: number): Promise<Client> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/clients/${clientId}/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/${clientId}/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -130,10 +130,9 @@ export async function fetchClient(clientId: number): Promise<Client> {
 }
 
 export async function createClient(payload: ClientFormPayload): Promise<Client> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/clients/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/`, {
         method: "POST",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(normalizeClientPayload(payload)),
     });
 
@@ -146,10 +145,9 @@ export async function createClient(payload: ClientFormPayload): Promise<Client> 
 }
 
 export async function updateClient(clientId: number, payload: ClientFormPayload): Promise<Client> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/clients/${clientId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/${clientId}/`, {
         method: "PATCH",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(normalizeClientPayload(payload)),
     });
 
@@ -162,10 +160,9 @@ export async function updateClient(clientId: number, payload: ClientFormPayload)
 }
 
 export async function deleteClient(clientId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/clients/${clientId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/${clientId}/`, {
         method: "DELETE",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {
@@ -175,11 +172,8 @@ export async function deleteClient(clientId: number): Promise<void> {
 }
 
 export async function fetchClientContacts(clientId: number): Promise<ClientContact[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/client-contacts/?client=${clientId}`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/client-contacts/?client=${clientId}`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -193,11 +187,8 @@ export async function fetchClientContacts(clientId: number): Promise<ClientConta
 }
 
 export async function fetchClientBrandAssets(clientId: number): Promise<BrandAsset[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/brand-assets/?client=${clientId}`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/brand-assets/?client=${clientId}`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -211,11 +202,8 @@ export async function fetchClientBrandAssets(clientId: number): Promise<BrandAss
 }
 
 export async function fetchClientComplianceDocuments(clientId: number): Promise<ComplianceDocument[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/compliance-documents/?client=${clientId}`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/compliance-documents/?client=${clientId}`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -228,12 +216,24 @@ export async function fetchClientComplianceDocuments(clientId: number): Promise<
     return parseCollectionResponse<ComplianceDocument>(payload);
 }
 
+export async function fetchClientQuotes(clientId: number): Promise<MultiProductQuote[]> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/?client=${clientId}&ordering=-created_at&page_size=20`, {
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to fetch client quotes: ${response.status} ${errorText}`);
+    }
+
+    const payload = (await response.json()) as unknown;
+    return parseCollectionResponse<MultiProductQuote>(payload);
+}
+
 export async function fetchClientStats(): Promise<ClientStatsResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/clients/?page_size=1000`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/?page_size=1000`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 

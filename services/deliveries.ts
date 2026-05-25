@@ -1,6 +1,6 @@
 import { DeliveriesQueryParams, DeliveriesResponse } from "@/types/deliveries";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 const buildQueryString = (params: DeliveriesQueryParams): string => {
     const searchParams = new URLSearchParams();
@@ -48,7 +48,7 @@ const buildQueryString = (params: DeliveriesQueryParams): string => {
 
 export async function fetchDeliveries(params: DeliveriesQueryParams): Promise<DeliveriesResponse> {
     const queryString = buildQueryString(params);
-    const response = await fetch(`${API_BASE_URL}/api/v1/deliveries/?${queryString}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/deliveries/?${queryString}`, {
         headers: {
             "Content-Type": "application/json",
         },

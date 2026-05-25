@@ -7,11 +7,11 @@ import type {
 } from "@/types/products";
 import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 export async function fetchPrintCategories(): Promise<PrintCategory[]> {
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/print-categories/?page_size=200`,
+        `${PROXY_BASE}/api/proxy/api/v1/print-categories/?page_size=200`,
         { credentials: "include", cache: "no-store" },
     );
     if (!response.ok) throw new Error("Failed to fetch print categories");
@@ -21,7 +21,7 @@ export async function fetchPrintCategories(): Promise<PrintCategory[]> {
 
 export async function fetchProductCategories(): Promise<ProductCategory[]> {
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/product-categories/?page_size=200`,
+        `${PROXY_BASE}/api/proxy/api/v1/product-categories/?page_size=200`,
         { credentials: "include", cache: "no-store" },
     );
     if (!response.ok) throw new Error("Failed to fetch product categories");
@@ -34,7 +34,7 @@ export async function fetchProductSubCategories(
 ): Promise<ProductSubCategory[]> {
     const qs = categoryId ? `?category=${categoryId}&page_size=200` : "?page_size=200";
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/product-subcategories/${qs}`,
+        `${PROXY_BASE}/api/proxy/api/v1/product-subcategories/${qs}`,
         { credentials: "include", cache: "no-store" },
     );
     if (!response.ok) throw new Error("Failed to fetch subcategories");
@@ -45,7 +45,7 @@ export async function fetchProductSubCategories(
 
 export async function fetchProductFamilies(): Promise<ProductFamily[]> {
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/product-families/?page_size=200`,
+        `${PROXY_BASE}/api/proxy/api/v1/product-families/?page_size=200`,
         { credentials: "include", cache: "no-store" },
     );
     if (!response.ok) throw new Error("Failed to fetch product families");
@@ -55,7 +55,7 @@ export async function fetchProductFamilies(): Promise<ProductFamily[]> {
 
 export async function fetchProductTags(): Promise<ProductTag[]> {
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/product-tags/?page_size=200`,
+        `${PROXY_BASE}/api/proxy/api/v1/product-tags/?page_size=200`,
         { credentials: "include", cache: "no-store" },
     );
     if (!response.ok) throw new Error("Failed to fetch product tags");
@@ -71,7 +71,7 @@ export async function createProductCategory(data: { name: string; description: s
     formData.append("name", data.name);
     formData.append("description", data.description);
     if (data.image) formData.append("image", data.image);
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-categories/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-categories/`, {
         method: "POST",
         headers: { "X-CSRFToken": csrf },
         credentials: "include",
@@ -87,7 +87,7 @@ export async function updateProductCategory(id: number, data: { name: string; de
     formData.append("name", data.name);
     formData.append("description", data.description);
     if (data.image) formData.append("image", data.image);
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-categories/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-categories/${id}/`, {
         method: "PATCH",
         headers: { "X-CSRFToken": csrf },
         credentials: "include",
@@ -99,7 +99,7 @@ export async function updateProductCategory(id: number, data: { name: string; de
 
 export async function deleteProductCategory(id: number): Promise<void> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-categories/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-categories/${id}/`, {
         method: "DELETE",
         headers: { "X-CSRFToken": csrf },
         credentials: "include",
@@ -111,7 +111,7 @@ export async function deleteProductCategory(id: number): Promise<void> {
 
 export async function createProductSubCategory(data: { name: string; description: string; category: number }): Promise<ProductSubCategory> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-subcategories/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-subcategories/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         credentials: "include",
@@ -123,7 +123,7 @@ export async function createProductSubCategory(data: { name: string; description
 
 export async function updateProductSubCategory(id: number, data: { name: string; description: string; category: number }): Promise<ProductSubCategory> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-subcategories/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-subcategories/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         credentials: "include",
@@ -135,7 +135,7 @@ export async function updateProductSubCategory(id: number, data: { name: string;
 
 export async function deleteProductSubCategory(id: number): Promise<void> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-subcategories/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-subcategories/${id}/`, {
         method: "DELETE",
         headers: { "X-CSRFToken": csrf },
         credentials: "include",
@@ -147,7 +147,7 @@ export async function deleteProductSubCategory(id: number): Promise<void> {
 
 export async function createProductFamily(data: { name: string; description: string }): Promise<ProductFamily> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-families/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-families/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         credentials: "include",
@@ -159,7 +159,7 @@ export async function createProductFamily(data: { name: string; description: str
 
 export async function updateProductFamily(id: number, data: { name: string; description: string }): Promise<ProductFamily> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-families/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-families/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         credentials: "include",
@@ -171,7 +171,7 @@ export async function updateProductFamily(id: number, data: { name: string; desc
 
 export async function deleteProductFamily(id: number): Promise<void> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-families/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-families/${id}/`, {
         method: "DELETE",
         headers: { "X-CSRFToken": csrf },
         credentials: "include",
@@ -183,7 +183,7 @@ export async function deleteProductFamily(id: number): Promise<void> {
 
 export async function createPrintCategory(data: { name: string; description: string }): Promise<PrintCategory> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/print-categories/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/print-categories/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         credentials: "include",
@@ -195,7 +195,7 @@ export async function createPrintCategory(data: { name: string; description: str
 
 export async function updatePrintCategory(id: number, data: { name: string; description: string }): Promise<PrintCategory> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/print-categories/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/print-categories/${id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         credentials: "include",
@@ -207,7 +207,7 @@ export async function updatePrintCategory(id: number, data: { name: string; desc
 
 export async function deletePrintCategory(id: number): Promise<void> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/print-categories/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/print-categories/${id}/`, {
         method: "DELETE",
         headers: { "X-CSRFToken": csrf },
         credentials: "include",
@@ -218,7 +218,7 @@ export async function deletePrintCategory(id: number): Promise<void> {
 export async function fetchSpecGroupLibraries(groupType?: string): Promise<import("@/types/products").SpecGroupLibrary[]> {
     const qs = groupType ? `?group_type=${groupType}&status=active&page_size=200` : "?status=active&page_size=200";
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/spec-group-library/${qs}`,
+        `${PROXY_BASE}/api/proxy/api/v1/spec-group-library/${qs}`,
         { credentials: "include", cache: "no-store" },
     );
     if (!response.ok) throw new Error("Failed to fetch spec group libraries");

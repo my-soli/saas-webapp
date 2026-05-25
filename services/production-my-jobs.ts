@@ -8,7 +8,7 @@ import type {
 } from "@/types/production-my-jobs";
 import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 const parseText = async (response: Response): Promise<string> => {
     const text = await response.text().catch((_error: unknown): string => "Unknown error");
@@ -60,7 +60,7 @@ export async function fetchPurchaseOrders(status: string): Promise<PurchaseOrder
     }
     query.set("page_size", "200");
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/purchase-orders/?${query.toString()}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/purchase-orders/?${query.toString()}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -83,7 +83,7 @@ export async function fetchPurchaseOrderProofs(status: string): Promise<Purchase
     }
     query.set("page_size", "200");
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/purchase-order-proofs/?${query.toString()}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/purchase-order-proofs/?${query.toString()}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -106,7 +106,7 @@ export async function fetchVendorInvoices(status: string): Promise<VendorInvoice
     }
     query.set("page_size", "200");
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-invoices/?${query.toString()}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-invoices/?${query.toString()}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -123,7 +123,7 @@ export async function fetchVendorInvoices(status: string): Promise<VendorInvoice
 }
 
 export async function sendJobToVendor(jobId: number, payload: SendJobToVendorPayload): Promise<SendJobToVendorResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/send_to_vendor/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/${jobId}/send_to_vendor/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -145,7 +145,7 @@ export async function uploadJobAttachments(jobId: number, files: File[]): Promis
         formData.append("files", file);
     });
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/upload_attachments/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/${jobId}/upload_attachments/`, {
         method: "POST",
         headers: {
             ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
@@ -163,7 +163,7 @@ export async function uploadJobAttachments(jobId: number, files: File[]): Promis
 }
 
 export async function approveProof(proofId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/purchase-order-proofs/${proofId}/approve/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/purchase-order-proofs/${proofId}/approve/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -177,7 +177,7 @@ export async function approveProof(proofId: number): Promise<void> {
 }
 
 export async function rejectProof(proofId: number, reason: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/purchase-order-proofs/${proofId}/reject/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/purchase-order-proofs/${proofId}/reject/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -191,7 +191,7 @@ export async function rejectProof(proofId: number, reason: string): Promise<void
 }
 
 export async function approveInvoice(invoiceId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-invoices/${invoiceId}/approve/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-invoices/${invoiceId}/approve/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -205,7 +205,7 @@ export async function approveInvoice(invoiceId: number): Promise<void> {
 }
 
 export async function rejectInvoice(invoiceId: number, reason: string): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-invoices/${invoiceId}/reject/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-invoices/${invoiceId}/reject/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",

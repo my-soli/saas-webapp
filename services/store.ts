@@ -1,6 +1,6 @@
 import type { Product, ProductPricingMode, ProductSpecGroup } from "@/types/products";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 export interface CatalogProduct {
     id: number;
@@ -63,14 +63,14 @@ export async function fetchCatalogProducts(params?: {
     if (params?.search) qs.set("search", params.search);
     qs.set("page_size", String(params?.page_size ?? 48));
 
-    const url = `${API_BASE_URL}/api/v1/product-catalog/?${qs.toString()}`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/product-catalog/?${qs.toString()}`;
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) throw new Error(`Failed to fetch catalog: ${response.status}`);
     return response.json() as Promise<{ count: number; results: CatalogProduct[] }>;
 }
 
 export async function fetchCatalogProduct(productId: number): Promise<CatalogProduct> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-catalog/${productId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-catalog/${productId}/`, {
         cache: "no-store",
     });
     if (!response.ok) throw new Error(`Product not found: ${response.status}`);
@@ -86,7 +86,7 @@ export async function calculatePrice(
         stringKeyedSelections[key] = value;
     }
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/product-catalog/${productId}/calculate-price/`,
+        `${PROXY_BASE}/api/proxy/api/v1/product-catalog/${productId}/calculate-price/`,
         {
             method: "POST",
             headers: { "Content-Type": "application/json" },

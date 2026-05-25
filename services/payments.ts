@@ -1,6 +1,12 @@
-import { PaymentsQueryParams, PaymentsResponse } from "@/types/payments";
+import { Payment, PaymentsQueryParams, PaymentsResponse } from "@/types/payments";
+import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const buildWriteHeaders = async (): Promise<HeadersInit> => {
+    const csrfToken = await getCsrfToken();
+    return { "Content-Type": "application/json", ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}) };
+};
+
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 const buildQueryString = (params: PaymentsQueryParams): string => {
     const searchParams = new URLSearchParams();
@@ -36,7 +42,7 @@ const buildQueryString = (params: PaymentsQueryParams): string => {
 
 export async function fetchPayments(params: PaymentsQueryParams): Promise<PaymentsResponse> {
     const queryString = buildQueryString(params);
-    const response = await fetch(`${API_BASE_URL}/api/v1/payments/?${queryString}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/payments/?${queryString}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -50,4 +56,44 @@ export async function fetchPayments(params: PaymentsQueryParams): Promise<Paymen
     }
 
     return response.json();
+}
+
+export async function createPayment(payload: Partial<Payment>): Promise<Payment> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/payments/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        throw new Error(`Failed to create payment: ${response.status} ${errorText}`);
+    }
+    return response.json();
+}
+
+export async function updatePayment(paymentId: number, payload: Partial<Payment>): Promise<Payment> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/payments/${paymentId}/`, {
+        method: "PATCH",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        throw new Error(`Failed to update payment: ${response.status} ${errorText}`);
+    }
+    return response.json();
+}
+
+export async function deletePayment(paymentId: number): Promise<void> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/payments/${paymentId}/`, {
+        method: "DELETE",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+    });
+    if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        throw new Error(`Failed to delete payment: ${response.status} ${errorText}`);
+    }
 }

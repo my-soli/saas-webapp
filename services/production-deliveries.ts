@@ -6,7 +6,7 @@ import type {
     SubmitProductionQCForJobResponse,
 } from "@/types/production-deliveries";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 import { getCsrfToken } from "@/lib/api/auth";
 
 const buildWriteHeaders = async (): Promise<HeadersInit> => {
@@ -43,7 +43,7 @@ export async function fetchProductionHandoffQueue(search: string): Promise<Produ
 
     const queryString = params.toString();
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/deliveries/handoff-queue/${queryString ? `?${queryString}` : ""}`,
+        `${PROXY_BASE}/api/proxy/api/v1/deliveries/handoff-queue/${queryString ? `?${queryString}` : ""}`,
         {
             headers: {
                 "Content-Type": "application/json",
@@ -64,7 +64,7 @@ export async function fetchProductionHandoffQueue(search: string): Promise<Produ
 export async function completeProductionHandoff(
     payload: CompleteProductionHandoffPayload
 ): Promise<CompleteProductionHandoffResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/deliveries/complete-handoff/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/deliveries/complete-handoff/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -82,7 +82,7 @@ export async function completeProductionHandoff(
 export async function submitProductionQCForJob(
     payload: SubmitProductionQCForJobPayload
 ): Promise<SubmitProductionQCForJobResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/qc-inspections/submit-for-job/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/qc-inspections/submit-for-job/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",

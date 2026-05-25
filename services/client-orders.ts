@@ -1,11 +1,13 @@
 import type {
     ClientOrder,
     ClientInvoice,
+    ClientPayment,
     InvoicesListResponse,
     OrdersListResponse,
+    PaymentsListResponse,
 } from "@/types/client-orders";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 export interface OrdersQueryParams {
     page?: number;
@@ -22,7 +24,7 @@ export async function fetchClientOrders(
     if (params.search?.trim()) qs.set("search", params.search.trim());
 
     const response = await fetch(
-        `${API_BASE}/api/v1/client-orders/?${qs.toString()}`,
+        `${PROXY_BASE}/api/proxy/api/v1/client-orders/?${qs.toString()}`,
         { credentials: "include", cache: "no-store" }
     );
     if (!response.ok) {
@@ -32,7 +34,7 @@ export async function fetchClientOrders(
 }
 
 export async function fetchClientOrder(id: number): Promise<ClientOrder> {
-    const response = await fetch(`${API_BASE}/api/v1/client-orders/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/client-orders/${id}/`, {
         credentials: "include",
         cache: "no-store",
     });
@@ -46,7 +48,7 @@ export async function fetchInvoicesForOrder(
     orderId: number
 ): Promise<ClientInvoice[]> {
     const response = await fetch(
-        `${API_BASE}/api/v1/client-invoices/?order=${orderId}`,
+        `${PROXY_BASE}/api/proxy/api/v1/client-invoices/?order=${orderId}`,
         { credentials: "include", cache: "no-store" }
     );
     if (!response.ok) {
@@ -58,7 +60,7 @@ export async function fetchInvoicesForOrder(
 
 export async function submitClientOrder(id: number): Promise<ClientOrder> {
     const response = await fetch(
-        `${API_BASE}/api/v1/client-orders/${id}/submit/`,
+        `${PROXY_BASE}/api/proxy/api/v1/client-orders/${id}/submit/`,
         {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -77,7 +79,7 @@ export async function submitClientOrder(id: number): Promise<ClientOrder> {
 
 export async function cancelClientOrder(id: number): Promise<ClientOrder> {
     const response = await fetch(
-        `${API_BASE}/api/v1/client-orders/${id}/cancel/`,
+        `${PROXY_BASE}/api/proxy/api/v1/client-orders/${id}/cancel/`,
         {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -107,11 +109,30 @@ export async function fetchClientInvoices(
     if (params.status) qs.set("status", params.status);
 
     const response = await fetch(
-        `${API_BASE}/api/v1/client-invoices/?${qs.toString()}`,
+        `${PROXY_BASE}/api/proxy/api/v1/client-invoices/?${qs.toString()}`,
         { credentials: "include", cache: "no-store" }
     );
     if (!response.ok) {
         throw new Error("Failed to fetch invoices");
     }
     return response.json() as Promise<InvoicesListResponse>;
+}
+
+export interface PaymentsQueryParams {
+    page?: number;
+    status?: string;
+}
+
+export async function fetchClientPayments(
+    params: PaymentsQueryParams = {}
+): Promise<PaymentsListResponse> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.set("page", String(params.page));
+    if (params.status && params.status !== "all") qs.set("status", params.status);
+    const response = await fetch(
+        `${PROXY_BASE}/api/proxy/api/v1/client-payments/?${qs.toString()}`,
+        { credentials: "include", cache: "no-store" }
+    );
+    if (!response.ok) throw new Error("Failed to fetch payments");
+    return response.json() as Promise<PaymentsListResponse>;
 }

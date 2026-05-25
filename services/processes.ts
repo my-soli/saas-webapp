@@ -20,7 +20,7 @@ import {
 } from "@/types/processes";
 import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 const buildQueryString = (params: ProcessesQueryParams): string => {
     const searchParams = new URLSearchParams();
@@ -81,7 +81,7 @@ const buildWriteHeaders = async (): Promise<HeadersInit> => {
 
 export async function fetchProcesses(params: ProcessesQueryParams): Promise<ProcessesResponse> {
     const queryString = buildQueryString(params);
-    const response = await fetch(`${API_BASE_URL}/api/v1/processes/?${queryString}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/processes/?${queryString}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -98,7 +98,7 @@ export async function fetchProcesses(params: ProcessesQueryParams): Promise<Proc
 }
 
 export async function fetchProcess(processId: number): Promise<Process> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/processes/${processId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/processes/${processId}/`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -115,7 +115,7 @@ export async function fetchProcess(processId: number): Promise<Process> {
 }
 
 export async function fetchProcessTiers(processId: number): Promise<ProcessTier[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-tiers/?process=${processId}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-tiers/?process=${processId}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -132,7 +132,7 @@ export async function fetchProcessTiers(processId: number): Promise<ProcessTier[
 }
 
 export async function fetchProcessVariables(processId: number): Promise<ProcessVariable[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-variables/?process=${processId}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-variables/?process=${processId}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -149,7 +149,7 @@ export async function fetchProcessVariables(processId: number): Promise<ProcessV
 }
 
 export async function fetchProcessVendors(processId: number): Promise<ProcessVendor[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-vendors/?process=${processId}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-vendors/?process=${processId}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -182,7 +182,7 @@ export async function fetchProcessDetailBundle(processId: number): Promise<Proce
 }
 
 export async function createProcess(payload: CreateProcessPayload): Promise<Process> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/processes/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/processes/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -198,7 +198,7 @@ export async function createProcess(payload: CreateProcessPayload): Promise<Proc
 }
 
 export async function updateProcess(processId: number, payload: UpdateProcessPayload): Promise<Process> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/processes/${processId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/processes/${processId}/`, {
         method: "PATCH",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -214,7 +214,7 @@ export async function updateProcess(processId: number, payload: UpdateProcessPay
 }
 
 export async function deleteProcess(processId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/processes/${processId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/processes/${processId}/`, {
         method: "DELETE",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -227,7 +227,7 @@ export async function deleteProcess(processId: number): Promise<void> {
 }
 
 export async function createProcessTier(payload: CreateProcessTierPayload): Promise<ProcessTier> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-tiers/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-tiers/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -243,7 +243,7 @@ export async function createProcessTier(payload: CreateProcessTierPayload): Prom
 }
 
 export async function updateProcessTier(tierId: number, payload: UpdateProcessTierPayload): Promise<ProcessTier> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-tiers/${tierId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-tiers/${tierId}/`, {
         method: "PATCH",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -259,7 +259,7 @@ export async function updateProcessTier(tierId: number, payload: UpdateProcessTi
 }
 
 export async function deleteProcessTier(tierId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-tiers/${tierId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-tiers/${tierId}/`, {
         method: "DELETE",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -272,7 +272,7 @@ export async function deleteProcessTier(tierId: number): Promise<void> {
 }
 
 export async function createProcessVariable(payload: CreateProcessVariablePayload): Promise<ProcessVariable> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-variables/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-variables/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -291,7 +291,7 @@ export async function updateProcessVariable(
     variableId: number,
     payload: UpdateProcessVariablePayload
 ): Promise<ProcessVariable> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-variables/${variableId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-variables/${variableId}/`, {
         method: "PATCH",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -307,7 +307,7 @@ export async function updateProcessVariable(
 }
 
 export async function deleteProcessVariable(variableId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-variables/${variableId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-variables/${variableId}/`, {
         method: "DELETE",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -320,7 +320,7 @@ export async function deleteProcessVariable(variableId: number): Promise<void> {
 }
 
 export async function createProcessVendor(payload: CreateProcessVendorPayload): Promise<ProcessVendor> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-vendors/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-vendors/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -339,7 +339,7 @@ export async function updateProcessVendor(
     vendorId: number,
     payload: UpdateProcessVendorPayload
 ): Promise<ProcessVendor> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-vendors/${vendorId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-vendors/${vendorId}/`, {
         method: "PATCH",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -355,7 +355,7 @@ export async function updateProcessVendor(
 }
 
 export async function deleteProcessVendor(vendorId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-vendors/${vendorId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-vendors/${vendorId}/`, {
         method: "DELETE",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -368,7 +368,7 @@ export async function deleteProcessVendor(vendorId: number): Promise<void> {
 }
 
 export async function fetchProcessVariableRanges(variableId: number): Promise<ProcessVariableRange[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-variable-ranges/?variable=${variableId}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-variable-ranges/?variable=${variableId}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -387,7 +387,7 @@ export async function fetchProcessVariableRanges(variableId: number): Promise<Pr
 export async function createProcessVariableRange(
     payload: CreateProcessVariableRangePayload
 ): Promise<ProcessVariableRange> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-variable-ranges/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-variable-ranges/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -406,7 +406,7 @@ export async function updateProcessVariableRange(
     rangeId: number,
     payload: UpdateProcessVariableRangePayload
 ): Promise<ProcessVariableRange> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-variable-ranges/${rangeId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-variable-ranges/${rangeId}/`, {
         method: "PATCH",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -422,7 +422,7 @@ export async function updateProcessVariableRange(
 }
 
 export async function deleteProcessVariableRange(rangeId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/process-variable-ranges/${rangeId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/process-variable-ranges/${rangeId}/`, {
         method: "DELETE",
         headers: await buildWriteHeaders(),
         credentials: "include",

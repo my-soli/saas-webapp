@@ -11,7 +11,7 @@ import type {
 } from "@/types/quotes";
 import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 const buildQueryString = (params: QuotesQueryParams): string => {
     const searchParams = new URLSearchParams();
@@ -84,7 +84,7 @@ const normalizeQuote = (quote: ApiQuote): Quote => {
 
 export async function fetchQuotes(params: QuotesQueryParams): Promise<QuotesResponse> {
     const queryString = buildQueryString(params);
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/?${queryString}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/?${queryString}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -104,8 +104,25 @@ export async function fetchQuotes(params: QuotesQueryParams): Promise<QuotesResp
     };
 }
 
+export async function patchQuote(quoteId: number, payload: Partial<Pick<Quote, "status" | "quote_date" | "valid_until" | "payment_terms" | "customer_notes" | "custom_terms" | "reference_number">>): Promise<Quote> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/`, {
+        method: "PATCH",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to update quote"));
+    }
+
+    const apiQuote = (await response.json()) as ApiQuote;
+    return normalizeQuote(apiQuote);
+}
+
 export async function deleteQuote(quoteId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/`, {
         method: "DELETE",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -118,7 +135,7 @@ export async function deleteQuote(quoteId: number): Promise<void> {
 }
 
 export async function fetchQuote(quoteId: number): Promise<Quote> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -157,6 +174,7 @@ export async function updateQuote(quoteId: number, data: CreateQuoteInput): Prom
         client: data.client_id || null,
         lead: data.lead_id || null,
         reference_number: data.reference_number || "",
+        project_name: data.project_name || "",
         quote_date: data.quote_date,
         valid_until: data.valid_until,
         product_name: productName,
@@ -170,21 +188,23 @@ export async function updateQuote(quoteId: number, data: CreateQuoteInput): Prom
         adjustment_reason: data.adjustment_reason || "",
         customer_notes: data.notes || "",
         custom_terms: data.custom_terms || "",
+        payment_options: data.payment_options || "",
         line_items: data.line_items.map((item, index) => ({
-            product: item.product_id,
+            product: item.product_id || null,
             product_name: item.product_name,
+            description: item.description || "",
             quantity: item.quantity,
             unit_price: item.unit_price,
             discount_amount: item.discount_amount || 0,
             discount_type: item.discount_type || "percent",
             variable_amount: item.variable_amount || 0,
-            customization_level_snapshot: "",
+            customization_level_snapshot: item.product_id ? "" : "fully_customizable",
             base_price_snapshot: item.unit_price,
             order: index,
         })),
     };
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/`, {
         method: "PATCH",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -201,7 +221,7 @@ export async function updateQuote(quoteId: number, data: CreateQuoteInput): Prom
 }
 
 export async function fetchQuoteHistory(quoteId: number): Promise<QuoteHistoryResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/history/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/history/`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -218,7 +238,7 @@ export async function fetchQuoteHistory(quoteId: number): Promise<QuoteHistoryRe
 }
 
 const postQuoteAction = async (quoteId: number, actionPath: string): Promise<QuoteActionResponse> => {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/${actionPath}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/${actionPath}/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -233,7 +253,7 @@ const postQuoteAction = async (quoteId: number, actionPath: string): Promise<Quo
 };
 
 export async function sendQuoteToPT(quoteId: number, assignedTo?: number): Promise<QuoteActionResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/send_to_pt_for_review/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/send_to_pt_for_review/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -248,8 +268,44 @@ export async function sendQuoteToPT(quoteId: number, assignedTo?: number): Promi
     return response.json();
 }
 
-export async function sendQuoteToCustomer(quoteId: number): Promise<QuoteActionResponse> {
-    return postQuoteAction(quoteId, "send_to_customer");
+export interface SendEmailFields {
+    email_from?: string;
+    email_to?: string;
+    email_cc?: string;
+    email_subject?: string;
+    email_body?: string;
+}
+
+export async function sendQuoteToCustomer(quoteId: number, emailFields?: SendEmailFields): Promise<QuoteActionResponse> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/send_to_customer/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify(emailFields ?? {}),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to send quote to customer"));
+    }
+
+    return response.json();
+}
+
+export async function getApprovalLink(quoteId: number): Promise<{ approval_url: string; token: string; quote_id: string }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/get_approval_link/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to get approval link"));
+    }
+
+    return response.json();
 }
 
 export async function approveQuote(quoteId: number): Promise<QuoteActionResponse> {
@@ -261,7 +317,7 @@ export async function cloneQuote(quoteId: number): Promise<QuoteActionResponse> 
 }
 
 export async function costQuote(quoteId: number, payload: QuoteCostPayload): Promise<QuoteActionResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/cost/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/cost/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -291,7 +347,7 @@ export async function fetchMultiProductQuotes(
     params.set("ordering", "-created_at");
 
     const queryString = params.toString();
-    const url = `${API_BASE_URL}/api/v1/quotes/?${queryString}`;
+    const url = `${PROXY_BASE}/api/proxy/api/v1/quotes/?${queryString}`;
 
     const response = await fetch(url, {
         headers: {
@@ -311,7 +367,7 @@ export async function fetchMultiProductQuotes(
 }
 
 export async function fetchQuoteStats(): Promise<QuoteStatsResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/?page_size=1000`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/?page_size=1000`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -325,25 +381,21 @@ export async function fetchQuoteStats(): Promise<QuoteStatsResponse> {
     }
 
     const data = await response.json();
-    const quotes = data.results || [];
+    const quotes: MultiProductQuote[] = data.results || [];
 
     const totalQuotes = quotes.length;
-    const draftCount = quotes.filter((q: Quote) => q.status === "Draft").length;
-    const pendingCosting = quotes.filter((q: Quote) => q.status === "Sent to PT").length;
-    const approvedCount = quotes.filter((q: Quote) => q.status === "Approved").length;
-    const lostCount = quotes.filter((q: Quote) => q.status === "Lost").length;
+    const draftCount = quotes.filter((q) => q.status === "Draft").length;
+    const pendingCosting = quotes.filter((q) => q.status === "Sent to PT").length;
+    const approvedCount = quotes.filter((q) => q.status === "Approved").length;
+    const lostCount = quotes.filter((q) => q.status === "Lost").length;
     const totalValue = quotes
-        .filter((q: Quote) => q.status !== "Lost")
-        .reduce((sum: number, q: Quote) => sum + (parseMoney(q.total_amount) || 0), 0);
+        .filter((q) => q.status !== "Lost")
+        .reduce((sum, q) => sum + (Number(q.total_value) || 0), 0);
 
-    const approvedQuotes = quotes.filter((q: Quote) => q.status === "Approved");
-    const avgMargin = approvedQuotes.length > 0
-        ? approvedQuotes.reduce((sum: number, q: Quote) => {
-            const total = parseMoney(q.total_amount) || 0;
-            const cost = parseMoney(q.production_cost ?? null) || 0;
-            const margin = total > 0 ? ((total - cost) / total) * 100 : 0;
-            return sum + margin;
-        }, 0) / approvedQuotes.length
+    const activeQuotes = quotes.filter((q) => q.status !== "Lost" && q.status !== "Draft");
+    const quotesWithMargin = activeQuotes.filter((q) => q.margin > 0);
+    const avgMargin = quotesWithMargin.length > 0
+        ? quotesWithMargin.reduce((sum, q) => sum + q.margin, 0) / quotesWithMargin.length
         : 0;
 
     return {
@@ -358,7 +410,7 @@ export async function fetchQuoteStats(): Promise<QuoteStatsResponse> {
 }
 
 export async function fetchMultiProductQuoteDetail(quoteId: string): Promise<MultiProductQuote> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -396,6 +448,7 @@ export async function createMultiProductQuote(data: CreateQuoteInput): Promise<M
         client: data.client_id || null,
         lead: data.lead_id || null,
         reference_number: data.reference_number || "",
+        project_name: data.project_name || "",
         quote_date: data.quote_date,
         valid_until: data.valid_until,
         product_name: productName,
@@ -409,23 +462,25 @@ export async function createMultiProductQuote(data: CreateQuoteInput): Promise<M
         adjustment_reason: data.adjustment_reason || "",
         customer_notes: data.notes || "",
         custom_terms: data.custom_terms || "",
+        payment_options: data.payment_options || "",
         status: "Draft",
         channel: "portal",
         line_items: data.line_items.map((item, index) => ({
-            product: item.product_id,
+            product: item.product_id || null,
             product_name: item.product_name,
+            description: item.description || "",
             quantity: item.quantity,
             unit_price: item.unit_price,
             discount_amount: item.discount_amount || 0,
             discount_type: item.discount_type || "percent",
             variable_amount: item.variable_amount || 0,
-            customization_level_snapshot: "",
+            customization_level_snapshot: item.product_id ? "" : "fully_customizable",
             base_price_snapshot: item.unit_price,
             order: index,
         })),
     };
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -440,8 +495,30 @@ export async function createMultiProductQuote(data: CreateQuoteInput): Promise<M
     return response.json();
 }
 
+export async function uploadQuoteAttachments(quoteId: number, files: File[]): Promise<void> {
+    if (files.length === 0) return;
+    const csrfToken = await getCsrfToken();
+    for (const file of files) {
+        const form = new FormData();
+        form.append("quote", String(quoteId));
+        form.append("file", file);
+        form.append("filename", file.name);
+        form.append("file_size", String(file.size));
+        const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quote-attachments/`, {
+            method: "POST",
+            headers: csrfToken ? { "X-CSRFToken": csrfToken } : {},
+            credentials: "include",
+            body: form,
+        });
+        if (!response.ok) {
+            const errorText = await response.text().catch((): string => "Unknown error");
+            throw new Error(`Failed to upload ${file.name}: ${parseErrorMessage(errorText, "Upload error")}`);
+        }
+    }
+}
+
 export async function markQuoteLost(quoteId: number, reason: string): Promise<QuoteActionResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/mark-lost/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/mark-lost/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -456,12 +533,39 @@ export async function markQuoteLost(quoteId: number, reason: string): Promise<Qu
     return response.json();
 }
 
-export async function convertQuoteToJob(quoteId: number): Promise<QuoteActionResponse> {
-    return postQuoteAction(quoteId, "approve");
+export interface LineItemAssignment {
+    line_item_id: number;
+    user_id: number | null;
+}
+
+export async function convertQuoteToJob(
+    quoteId: number,
+    ownerUserId?: number | null,
+    lineItemAssignments?: LineItemAssignment[]
+): Promise<QuoteActionResponse> {
+    const body: Record<string, unknown> = {};
+    if (ownerUserId) body.user_id = ownerUserId;
+    if (lineItemAssignments && lineItemAssignments.length > 0) {
+        body.line_item_assignments = lineItemAssignments.filter((a) => a.user_id !== null);
+    }
+
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/approve/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to convert quote to job"));
+    }
+
+    return response.json();
 }
 
 export async function downloadQuotePdf(quoteId: string): Promise<Blob> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/${quoteId}/download-pdf/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/download-pdf/`, {
         credentials: "include",
         cache: "no-store",
     });
@@ -475,7 +579,7 @@ export async function downloadQuotePdf(quoteId: string): Promise<Blob> {
 }
 
 export async function fetchQuoteByToken(token: string): Promise<Quote> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/public/${token}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/public/${token}/`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -492,7 +596,7 @@ export async function fetchQuoteByToken(token: string): Promise<Quote> {
 }
 
 export async function acceptQuoteByToken(token: string): Promise<QuoteActionResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/public/${token}/accept/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/public/${token}/accept/`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -509,7 +613,7 @@ export async function acceptQuoteByToken(token: string): Promise<QuoteActionResp
 }
 
 export async function rejectQuoteByToken(token: string, reason?: string): Promise<QuoteActionResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/quotes/public/${token}/reject/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/public/${token}/reject/`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -521,6 +625,43 @@ export async function rejectQuoteByToken(token: string, reason?: string): Promis
     if (!response.ok) {
         const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
         throw new Error(parseErrorMessage(errorText, "Failed to reject quote"));
+    }
+
+    return response.json();
+}
+
+/** PT sends costed quote back to AM with optional notes. */
+export async function sendQuoteBackToAM(quoteId: number, notes?: string): Promise<QuoteActionResponse> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/send_back_to_am/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ notes: notes ?? "" }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to send quote back to AM"));
+    }
+
+    return response.json();
+}
+
+/** PT updates pt_unit_cost / pt_notes on a single line item. */
+export async function updateLineItemPTCost(
+    lineItemId: number,
+    payload: { pt_unit_cost: number | null; pt_notes?: string }
+): Promise<unknown> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quote-line-items/${lineItemId}/`, {
+        method: "PATCH",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to update line item cost"));
     }
 
     return response.json();

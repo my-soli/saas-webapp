@@ -21,9 +21,9 @@ import {
     UpdateMilestonePayload,
     POStats,
 } from "@/types/vendors";
-import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Works on both client (relative) and server (absolute)
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 const buildQueryString = (params: VendorsQueryParams): string => {
     const searchParams = new URLSearchParams();
@@ -43,11 +43,8 @@ const buildQueryString = (params: VendorsQueryParams): string => {
 
 export async function fetchVendors(params: VendorsQueryParams): Promise<VendorsResponse> {
     const queryString = buildQueryString(params);
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendors/?${queryString}`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendors/?${queryString}`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -59,20 +56,24 @@ export async function fetchVendors(params: VendorsQueryParams): Promise<VendorsR
     return response.json();
 }
 
-const buildWriteHeaders = async (): Promise<HeadersInit> => {
-    const csrfToken = await getCsrfToken();
-    return {
-        "Content-Type": "application/json",
-        ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
-    };
-};
+export async function fetchAllVendors(): Promise<Vendor[]> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendors/?page_size=500&active=true`, {
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(`Failed to fetch vendors: ${response.status} ${errorText}`);
+    }
+
+    const data: VendorsResponse = await response.json();
+    return data.results;
+}
 
 export async function fetchVendor(vendorId: number): Promise<Vendor> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendors/${vendorId}/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendors/${vendorId}/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -85,10 +86,9 @@ export async function fetchVendor(vendorId: number): Promise<Vendor> {
 }
 
 export async function createVendor(payload: CreateVendorPayload): Promise<Vendor> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendors/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendors/`, {
         method: "POST",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
 
@@ -101,10 +101,9 @@ export async function createVendor(payload: CreateVendorPayload): Promise<Vendor
 }
 
 export async function updateVendor(vendorId: number, payload: UpdateVendorPayload): Promise<Vendor> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendors/${vendorId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendors/${vendorId}/`, {
         method: "PATCH",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
 
@@ -117,10 +116,9 @@ export async function updateVendor(vendorId: number, payload: UpdateVendorPayloa
 }
 
 export async function deleteVendor(vendorId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendors/${vendorId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendors/${vendorId}/`, {
         method: "DELETE",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {
@@ -130,10 +128,9 @@ export async function deleteVendor(vendorId: number): Promise<void> {
 }
 
 export async function inviteVendor(vendorId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendors/${vendorId}/invite/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendors/${vendorId}/invite/`, {
         method: "POST",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {
@@ -143,10 +140,9 @@ export async function inviteVendor(vendorId: number): Promise<void> {
 }
 
 export async function updateVendorSelf(payload: UpdateVendorPayload): Promise<Vendor> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-self-info/update_me/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-self-info/update_me/`, {
         method: "PATCH",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
 
@@ -160,11 +156,8 @@ export async function updateVendorSelf(payload: UpdateVendorPayload): Promise<Ve
 }
 
 export async function fetchCurrentVendor(): Promise<Vendor> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-self-info/me/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-self-info/me/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -177,11 +170,8 @@ export async function fetchCurrentVendor(): Promise<Vendor> {
 }
 
 export async function fetchVendorPerformanceScorecard(vendorId: number): Promise<VendorPerformanceScorecard> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-performance/scorecard/?vendor_id=${vendorId}`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-performance/scorecard/?vendor_id=${vendorId}`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -193,11 +183,8 @@ export async function fetchVendorPerformanceScorecard(vendorId: number): Promise
 }
 
 export async function fetchVendorActivePurchaseOrders(): Promise<PurchaseOrderBasic[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-active-pos/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-active-pos/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -209,11 +196,8 @@ export async function fetchVendorActivePurchaseOrders(): Promise<PurchaseOrderBa
 }
 
 export async function fetchVendorIssues(): Promise<VendorIssue[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-issues/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-issues/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -226,10 +210,9 @@ export async function fetchVendorIssues(): Promise<VendorIssue[]> {
 }
 
 export async function createVendorIssue(payload: CreateIssuePayload): Promise<VendorIssue> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-issues/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-issues/`, {
         method: "POST",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
 
@@ -241,11 +224,8 @@ export async function createVendorIssue(payload: CreateIssuePayload): Promise<Ve
 }
 
 export async function fetchMaterialSubstitutions(): Promise<MaterialSubstitution[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-material-substitutions/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-material-substitutions/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -258,10 +238,9 @@ export async function fetchMaterialSubstitutions(): Promise<MaterialSubstitution
 }
 
 export async function createMaterialSubstitution(payload: CreateSubstitutionPayload): Promise<MaterialSubstitution> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-material-substitutions/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-material-substitutions/`, {
         method: "POST",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
 
@@ -273,11 +252,8 @@ export async function createMaterialSubstitution(payload: CreateSubstitutionPayl
 }
 
 export async function fetchVendorInvoices(): Promise<VendorInvoice[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-invoices/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-invoices/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -290,11 +266,8 @@ export async function fetchVendorInvoices(): Promise<VendorInvoice[]> {
 }
 
 export async function fetchVendorInvoiceStats(): Promise<InvoiceStats> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-invoices/stats/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-invoices/stats/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -306,7 +279,6 @@ export async function fetchVendorInvoiceStats(): Promise<InvoiceStats> {
 }
 
 export async function createVendorInvoice(payload: CreateInvoicePayload): Promise<VendorInvoice> {
-    const csrfToken = await getCsrfToken();
     const formData = new FormData();
     formData.append("purchase_order_id", String(payload.purchase_order_id));
     formData.append("invoice_date", payload.invoice_date);
@@ -316,10 +288,9 @@ export async function createVendorInvoice(payload: CreateInvoicePayload): Promis
     formData.append("tax_rate", String(payload.tax_rate));
     if (payload.invoice_file) formData.append("invoice_file", payload.invoice_file);
 
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-invoices/`, {
+    // Proxy handles CSRF for multipart/form-data automatically
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-invoices/`, {
         method: "POST",
-        headers: csrfToken ? { "X-CSRFToken": csrfToken } : {},
-        credentials: "include",
         body: formData,
     });
 
@@ -331,10 +302,9 @@ export async function createVendorInvoice(payload: CreateInvoicePayload): Promis
 }
 
 export async function updateVendorInvoice(invoiceId: number, payload: UpdateInvoicePayload): Promise<VendorInvoice> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-invoices/${invoiceId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-invoices/${invoiceId}/`, {
         method: "PATCH",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
 
@@ -346,10 +316,9 @@ export async function updateVendorInvoice(invoiceId: number, payload: UpdateInvo
 }
 
 export async function submitVendorInvoice(invoiceId: number): Promise<VendorInvoice> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-invoices/${invoiceId}/submit/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-invoices/${invoiceId}/submit/`, {
         method: "POST",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {
@@ -360,10 +329,9 @@ export async function submitVendorInvoice(invoiceId: number): Promise<VendorInvo
 }
 
 export async function deleteVendorInvoice(invoiceId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-invoices/${invoiceId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-invoices/${invoiceId}/`, {
         method: "DELETE",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {
@@ -372,11 +340,8 @@ export async function deleteVendorInvoice(invoiceId: number): Promise<void> {
 }
 
 export async function fetchVendorProofs(): Promise<VendorProof[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-proofs/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-proofs/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -389,11 +354,8 @@ export async function fetchVendorProofs(): Promise<VendorProof[]> {
 }
 
 export async function fetchVendorProofStats(): Promise<ProofStats> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-proofs/stats/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-proofs/stats/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -412,13 +374,9 @@ export async function createVendorProof(payload: CreateProofPayload): Promise<Ve
         formData.append("description", payload.description);
     }
 
-    const csrfToken = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-proofs/`, {
+    // Proxy handles CSRF for multipart/form-data automatically
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-proofs/`, {
         method: "POST",
-        credentials: "include",
-        headers: {
-            ...(csrfToken ? { "X-CSRFToken": csrfToken } : {}),
-        },
         body: formData,
     });
 
@@ -430,10 +388,9 @@ export async function createVendorProof(payload: CreateProofPayload): Promise<Ve
 }
 
 export async function deleteVendorProof(proofId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-proofs/${proofId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-proofs/${proofId}/`, {
         method: "DELETE",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {
@@ -442,11 +399,8 @@ export async function deleteVendorProof(proofId: number): Promise<void> {
 }
 
 export async function fetchVendorPurchaseOrders(): Promise<PurchaseOrder[]> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-pos/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-pos/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -459,11 +413,8 @@ export async function fetchVendorPurchaseOrders(): Promise<PurchaseOrder[]> {
 }
 
 export async function fetchVendorPOStats(): Promise<POStats> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-pos/stats/`, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        credentials: "include",
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-pos/stats/`, {
+        headers: { "Content-Type": "application/json" },
         cache: "no-store",
     });
 
@@ -475,10 +426,9 @@ export async function fetchVendorPOStats(): Promise<POStats> {
 }
 
 export async function acceptPurchaseOrder(poId: number): Promise<PurchaseOrder> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-pos/${poId}/accept/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-pos/${poId}/accept/`, {
         method: "POST",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {
@@ -489,10 +439,9 @@ export async function acceptPurchaseOrder(poId: number): Promise<PurchaseOrder> 
 }
 
 export async function updatePOMilestone(poId: number, payload: UpdateMilestonePayload): Promise<PurchaseOrder> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-pos/${poId}/update_milestone/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-pos/${poId}/update_milestone/`, {
         method: "POST",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
     });
 
@@ -504,10 +453,9 @@ export async function updatePOMilestone(poId: number, payload: UpdateMilestonePa
 }
 
 export async function acknowledgePOAssets(poId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/vendor-portal-pos/${poId}/acknowledge_assets/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/vendor-portal-pos/${poId}/acknowledge_assets/`, {
         method: "POST",
-        headers: await buildWriteHeaders(),
-        credentials: "include",
+        headers: { "Content-Type": "application/json" },
     });
 
     if (!response.ok) {

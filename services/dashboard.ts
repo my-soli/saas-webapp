@@ -6,7 +6,7 @@ import type {
     AccountManagerDashboard,
 } from "@/types/dashboard";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 const extractErrorDetail = async (response: Response): Promise<string> => {
     try {
@@ -22,7 +22,7 @@ const extractErrorDetail = async (response: Response): Promise<string> => {
 };
 
 export async function fetchDashboardOverview(): Promise<DashboardOverview> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/dashboard/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/dashboard/`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -39,7 +39,7 @@ export async function fetchDashboardOverview(): Promise<DashboardOverview> {
 }
 
 export async function fetchDashboardAnalytics(): Promise<DashboardAnalytics> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/analytics/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/analytics/`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -56,7 +56,7 @@ export async function fetchDashboardAnalytics(): Promise<DashboardAnalytics> {
 }
 
 export async function fetchDashboardAlerts(): Promise<DashboardAlertsResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/system-alerts/?is_active=true&is_dismissed=false&page_size=5`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/system-alerts/?is_active=true&is_dismissed=false&page_size=5`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -73,7 +73,7 @@ export async function fetchDashboardAlerts(): Promise<DashboardAlertsResponse> {
 }
 
 export async function fetchDashboardActivity(): Promise<DashboardActivityResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/activity-log/?ordering=-created_at&page_size=10`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/activity-log/?ordering=-created_at&page_size=10`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -90,7 +90,7 @@ export async function fetchDashboardActivity(): Promise<DashboardActivityRespons
 }
 
 export async function fetchAccountManagerDashboard(): Promise<AccountManagerDashboard> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/dashboard/account-manager/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/dashboard/account-manager/`, {
         headers: {
             "Content-Type": "application/json",
         },

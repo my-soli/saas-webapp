@@ -3,11 +3,11 @@ import type {
     NotificationsListResponse,
 } from "@/types/client-orders";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 export async function fetchUnreadNotifications(): Promise<NotificationsListResponse> {
     const response = await fetch(
-        `${API_BASE}/api/v1/client-notifications/?is_read=false`,
+        `${PROXY_BASE}/api/proxy/api/v1/client-notifications/?is_read=false`,
         { credentials: "include", cache: "no-store" }
     );
     if (!response.ok) {
@@ -20,7 +20,7 @@ export async function markNotificationRead(
     id: number
 ): Promise<ClientPortalNotification> {
     const response = await fetch(
-        `${API_BASE}/api/v1/client-notifications/${id}/mark_read/`,
+        `${PROXY_BASE}/api/proxy/api/v1/client-notifications/${id}/mark_read/`,
         {
             method: "POST",
             headers: { "Content-Type": "application/json" },

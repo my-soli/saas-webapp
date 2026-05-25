@@ -1,7 +1,7 @@
 import type { Lead, LeadConvertPayload, LeadConvertResponse, LeadQualifyResponse, LeadsQueryParams, LeadsResponse } from "@/types/leads";
 import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 class BusinessValidationError extends Error {
     constructor(message: string) {
@@ -55,7 +55,7 @@ const extractErrorDetail = async (response: Response): Promise<string> => {
 
 export async function fetchLeads(params: LeadsQueryParams): Promise<LeadsResponse> {
     const queryString = buildQueryString(params);
-    const response = await fetch(`${API_BASE_URL}/api/v1/leads/?${queryString}`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/leads/?${queryString}`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -72,7 +72,7 @@ export async function fetchLeads(params: LeadsQueryParams): Promise<LeadsRespons
 }
 
 export async function deleteLead(leadId: number): Promise<void> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/leads/${leadId}/`, {
         method: "DELETE",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -88,7 +88,7 @@ export async function deleteLead(leadId: number): Promise<void> {
 }
 
 export async function fetchLead(leadId: number): Promise<Lead> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/leads/${leadId}/`, {
         headers: {
             "Content-Type": "application/json",
         },
@@ -105,7 +105,7 @@ export async function fetchLead(leadId: number): Promise<Lead> {
 }
 
 export async function markLeadContacted(leadId: number): Promise<LeadQualifyResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/mark-contacted/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/leads/${leadId}/mark-contacted/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -123,7 +123,7 @@ export async function markLeadContacted(leadId: number): Promise<LeadQualifyResp
 }
 
 export async function qualifyLead(leadId: number): Promise<LeadQualifyResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/qualify/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/leads/${leadId}/qualify/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -141,7 +141,7 @@ export async function qualifyLead(leadId: number): Promise<LeadQualifyResponse> 
 }
 
 export async function convertLead(leadId: number, payload: LeadConvertPayload): Promise<LeadConvertResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/convert/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/leads/${leadId}/convert/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -160,7 +160,7 @@ export async function convertLead(leadId: number, payload: LeadConvertPayload): 
 }
 
 export async function markLeadLost(leadId: number): Promise<LeadQualifyResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/mark-lost/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/leads/${leadId}/mark-lost/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -178,7 +178,7 @@ export async function markLeadLost(leadId: number): Promise<LeadQualifyResponse>
 }
 
 export async function createLead(payload: Partial<Lead>): Promise<Lead> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/leads/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/leads/`, {
         method: "POST",
         headers: await buildWriteHeaders(),
         credentials: "include",
@@ -197,7 +197,7 @@ export async function createLead(payload: Partial<Lead>): Promise<Lead> {
 }
 
 export async function updateLead(leadId: number, payload: Partial<Lead>): Promise<Lead> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/leads/${leadId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/leads/${leadId}/`, {
         method: "PATCH",
         headers: await buildWriteHeaders(),
         credentials: "include",

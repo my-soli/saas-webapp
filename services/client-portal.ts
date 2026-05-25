@@ -5,10 +5,10 @@ import type {
 } from "@/types/client-portal";
 import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 export async function fetchClientPortalProfile(): Promise<ClientPortalProfile> {
-    const response = await fetch(`${API_BASE_URL}/api/v1/portal/me/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/portal/me/`, {
         credentials: "include",
         cache: "no-store",
     });
@@ -23,7 +23,7 @@ export async function updateClientPortalProfile(
     payload: UpdateClientPortalProfilePayload
 ): Promise<ClientPortalProfile> {
     const csrfToken = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/portal/me/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/portal/me/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
         credentials: "include",
@@ -40,7 +40,7 @@ export async function changeClientPortalPassword(
     payload: ChangePasswordPayload
 ): Promise<void> {
     const csrfToken = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/auth/change-password/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/auth/change-password/`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
         credentials: "include",
