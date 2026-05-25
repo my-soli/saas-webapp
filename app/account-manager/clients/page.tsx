@@ -10,7 +10,7 @@ import ClientsTable from "@/features/clients/components/ClientsTable";
 import ClientFormDrawer from "@/features/clients/components/ClientFormDrawer";
 import ClientDetailDrawer from "@/features/clients/components/ClientDetailDrawer";
 import type { Client, ClientStatus, ClientType, ClientFormPayload } from "@/types/clients";
-import { fetchClients, fetchClientStats, deleteClient, createClient, updateClient, fetchClientContacts, fetchClientBrandAssets, fetchClientComplianceDocuments } from "@/services/clients";
+import { fetchClients, fetchClientStats, deleteClient, createClient, updateClient, fetchClientContacts, fetchClientBrandAssets, fetchClientComplianceDocuments, fetchClientQuotes } from "@/services/clients";
 
 export default function ClientListPage() {
     const [statusFilter, setStatusFilter] = useState<ClientStatus | "all">("all");
@@ -58,6 +58,12 @@ export default function ClientListPage() {
     const { data: clientComplianceDocs, isLoading: complianceDocsLoading } = useQuery({
         queryKey: ["client-compliance-docs", viewingClient?.id],
         queryFn: () => fetchClientComplianceDocuments(viewingClient!.id),
+        enabled: viewingClient !== null,
+    });
+
+    const { data: clientQuotes, isLoading: quotesLoading } = useQuery({
+        queryKey: ["client-quotes", viewingClient?.id],
+        queryFn: () => fetchClientQuotes(viewingClient!.id),
         enabled: viewingClient !== null,
     });
 
@@ -176,8 +182,8 @@ export default function ClientListPage() {
     return (
         <AccountManagerLayout>
             <div className="bg-gray-50 min-h-screen">
-                <div className="max-w-7xl mx-auto px-8 py-6">
-                    <div className="flex items-center justify-between mb-6">
+                <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                         <div>
                             <h1 className="text-2xl font-semibold text-gray-900 mb-1">
                                 Clients
@@ -327,8 +333,9 @@ export default function ClientListPage() {
                 contacts={clientContacts ?? []}
                 brandAssets={clientBrandAssets ?? []}
                 complianceDocuments={clientComplianceDocs ?? []}
+                quotes={clientQuotes ?? []}
                 isLoading={false}
-                isLoadingRelations={contactsLoading || brandAssetsLoading || complianceDocsLoading}
+                isLoadingRelations={contactsLoading || brandAssetsLoading || complianceDocsLoading || quotesLoading}
                 onClose={() => setViewingClient(null)}
                 onEdit={(client) => {
                     setViewingClient(null);

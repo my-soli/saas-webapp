@@ -12,6 +12,7 @@ import QuoteDetailModal from "@/features/quotes/components/QuoteDetailModal";
 import SelectProductionMemberModal from "@/features/quotes/components/SelectProductionMemberModal";
 import MarkLostModal from "@/features/quotes/components/MarkLostModal";
 import ConfirmModal from "@/features/quotes/components/ConfirmModal";
+import ConvertToJobModal from "@/features/quotes/components/ConvertToJobModal";
 import type { MultiProductQuote, QuoteStatus } from "@/types/quotes";
 import {
     fetchMultiProductQuotes,
@@ -22,7 +23,10 @@ import {
     sendQuoteToCustomer,
     markQuoteLost,
     convertQuoteToJob,
+    deleteQuote,
+    fetchMultiProductQuoteDetail,
 } from "@/services/quotes";
+import type { LineItemAssignment, SendEmailFields } from "@/services/quotes";
 
 export default function MultiProductQuotesPage() {
     const router = useRouter();
@@ -32,8 +36,8 @@ export default function MultiProductQuotesPage() {
     const [selectPTModalQuoteId, setSelectPTModalQuoteId] = useState<number | null>(null);
     const [markLostModalQuoteId, setMarkLostModalQuoteId] = useState<number | null>(null);
     const [cloneConfirmQuoteId, setCloneConfirmQuoteId] = useState<number | null>(null);
-    const [sendToCustomerConfirmQuoteId, setSendToCustomerConfirmQuoteId] = useState<number | null>(null);
-    const [convertToJobConfirmQuoteId, setConvertToJobConfirmQuoteId] = useState<number | null>(null);
+    const [convertToJobQuote, setConvertToJobQuote] = useState<MultiProductQuote | null>(null);
+    const [deleteConfirmQuoteId, setDeleteConfirmQuoteId] = useState<number | null>(null);
     const queryClient = useQueryClient();
 
     const { data: stats, isLoading: statsLoading } = useQuery({
@@ -69,13 +73,20 @@ export default function MultiProductQuotesPage() {
     });
 
     const sendToCustomerMutation = useMutation({
-        mutationFn: sendQuoteToCustomer,
-        onSuccess: () => {
-            toast.success("Quote sent to customer via email successfully!");
+        mutationFn: ({ quoteId, emailFields }: { quoteId: number; emailFields: SendEmailFields }) =>
+            sendQuoteToCustomer(quoteId, emailFields),
+        onSuccess: (data) => {
+            if (data.email_sent === false) {
+                toast.warning("Quote status updated, but the email could not be delivered. Check your email configuration.");
+            } else {
+                toast.success("Quote sent to customer via email successfully!");
+            }
             queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
             queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
             setSelectedQuote(null);
-            setSendToCustomerConfirmQuoteId(null);
+        },
+        onError: () => {
+            toast.error("Failed to send quote to customer. Please try again.");
         },
     });
 
@@ -92,13 +103,27 @@ export default function MultiProductQuotesPage() {
     });
 
     const convertToJobMutation = useMutation({
-        mutationFn: convertQuoteToJob,
+        mutationFn: ({ quoteId, ownerUserId, assignments }: { quoteId: number; ownerUserId: number | null; assignments: LineItemAssignment[] }) =>
+            convertQuoteToJob(quoteId, ownerUserId, assignments),
         onSuccess: () => {
             toast.success("Quote converted to job successfully!");
             queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
             queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
             setSelectedQuote(null);
-            setConvertToJobConfirmQuoteId(null);
+            setConvertToJobQuote(null);
+        },
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: deleteQuote,
+        onSuccess: () => {
+            toast.success("Quote deleted.");
+            queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
+            setDeleteConfirmQuoteId(null);
+        },
+        onError: () => {
+            toast.error("Failed to delete quote. Please try again.");
         },
     });
 
@@ -154,18 +179,8 @@ export default function MultiProductQuotesPage() {
         }
     };
 
-    const handleSendToCustomer = (quoteId: number) => {
-        setSendToCustomerConfirmQuoteId(quoteId);
-    };
-
-    const handleConfirmSendToCustomer = async () => {
-        if (sendToCustomerConfirmQuoteId) {
-            try {
-                await sendToCustomerMutation.mutateAsync(sendToCustomerConfirmQuoteId);
-            } catch (error) {
-                toast.error("Failed to send quote to customer. Please try again.");
-            }
-        }
+    const handleSendToCustomer = (quoteId: number, emailFields: SendEmailFields) => {
+        sendToCustomerMutation.mutate({ quoteId, emailFields });
     };
 
     const handleMarkLost = (quoteId: number) => {
@@ -182,17 +197,35 @@ export default function MultiProductQuotesPage() {
         }
     };
 
-    const handleConvertToJob = (quoteId: number) => {
-        setConvertToJobConfirmQuoteId(quoteId);
+    const handleConvertToJob = async (quoteId: number) => {
+        const found = quotes.find((q) => q.id === quoteId);
+        if (!found) return;
+        // Fetch full detail so we have line_items
+        try {
+            const detail = await fetchMultiProductQuoteDetail(found.quote_id);
+            setConvertToJobQuote(detail);
+        } catch {
+            setConvertToJobQuote(found);
+        }
     };
 
-    const handleConfirmConvertToJob = async () => {
-        if (convertToJobConfirmQuoteId) {
+    const handleConfirmConvertToJob = async (ownerUserId: number | null, assignments: LineItemAssignment[]) => {
+        if (convertToJobQuote) {
             try {
-                await convertToJobMutation.mutateAsync(convertToJobConfirmQuoteId);
+                await convertToJobMutation.mutateAsync({ quoteId: convertToJobQuote.id, ownerUserId, assignments });
             } catch (error) {
                 toast.error("Failed to convert quote to job. Please try again.");
             }
+        }
+    };
+
+    const handleDelete = (quoteId: number) => {
+        setDeleteConfirmQuoteId(quoteId);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (deleteConfirmQuoteId) {
+            await deleteMutation.mutateAsync(deleteConfirmQuoteId);
         }
     };
 
@@ -203,8 +236,8 @@ export default function MultiProductQuotesPage() {
     return (
         <AccountManagerLayout>
             <div className="bg-gray-50 min-h-screen">
-                <div className="max-w-7xl mx-auto px-8 py-6">
-                    <div className="flex items-center justify-between mb-6">
+                <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                         <div>
                             <h1 className="text-2xl font-semibold text-gray-900 mb-1">
                                 Multi-Product Quotes
@@ -292,6 +325,7 @@ export default function MultiProductQuotesPage() {
                             onDownloadPdf={handleDownloadPdf}
                             onClone={handleClone}
                             onEdit={handleEdit}
+                            onDelete={handleDelete}
                         />
                     )}
                 </div>
@@ -302,6 +336,7 @@ export default function MultiProductQuotesPage() {
                 onClose={() => setSelectedQuote(null)}
                 onSendToPT={handleSendToPT}
                 onSendToCustomer={handleSendToCustomer}
+                isSendingToCustomer={sendToCustomerMutation.isPending}
                 onMarkLost={handleMarkLost}
                 onConvertToJob={handleConvertToJob}
                 onDownloadPdf={handleDownloadPdf}
@@ -334,25 +369,23 @@ export default function MultiProductQuotesPage() {
                 />
             )}
 
-            {sendToCustomerConfirmQuoteId && (
-                <ConfirmModal
-                    title="Send to Customer"
-                    message="Are you sure you want to send this quote to the customer via email?"
-                    confirmText="Send to Customer"
-                    confirmColor="purple"
-                    onClose={() => setSendToCustomerConfirmQuoteId(null)}
-                    onConfirm={handleConfirmSendToCustomer}
+            {convertToJobQuote && (
+                <ConvertToJobModal
+                    quote={convertToJobQuote}
+                    onClose={() => setConvertToJobQuote(null)}
+                    onConfirm={handleConfirmConvertToJob}
+                    isLoading={convertToJobMutation.isPending}
                 />
             )}
 
-            {convertToJobConfirmQuoteId && (
+            {deleteConfirmQuoteId && (
                 <ConfirmModal
-                    title="Convert to Job"
-                    message="Are you sure you want to convert this approved quote to a job? This action will create a new job in the system."
-                    confirmText="Convert to Job"
-                    confirmColor="green"
-                    onClose={() => setConvertToJobConfirmQuoteId(null)}
-                    onConfirm={handleConfirmConvertToJob}
+                    title="Delete Quote"
+                    message="Are you sure you want to delete this quote? This action cannot be undone."
+                    confirmText="Delete Quote"
+                    confirmColor="red"
+                    onClose={() => setDeleteConfirmQuoteId(null)}
+                    onConfirm={handleConfirmDelete}
                 />
             )}
         </AccountManagerLayout>

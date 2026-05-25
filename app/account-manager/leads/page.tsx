@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, useMemo, type ReactElement } from "react";
@@ -299,7 +299,7 @@ export default function LeadIntakePage(): ReactElement {
     return (
         <AccountManagerLayout>
             <header className="bg-white shadow">
-                <div className="px-8 py-4 flex items-center justify-between">
+                <div className="px-4 lg:px-8 py-4 flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-brand-black">Lead Intake</h1>
                         <p className="text-sm text-gray-600 mt-1">
@@ -316,7 +316,7 @@ export default function LeadIntakePage(): ReactElement {
                 </div>
             </header>
 
-            <main className="p-8 space-y-6">
+            <main className="p-4 lg:p-8 space-y-6">
                 <LeadsStatsCards stats={stats} />
 
                 <LeadsFilters

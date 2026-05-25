@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ChangeEvent, ReactElement } from "react";
 import { useEffect, useMemo, useState } from "react";
@@ -71,23 +71,38 @@ export default function AccountManagerNotificationsPage(): ReactElement {
 
     const markReadMutation = useMutation({
         mutationFn: (notificationId: number) => markNotificationRead(notificationId),
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ["unread-notifications-count"] });
+            queryClient.setQueryData(["unread-notifications-count"], (old: { count: number; results: unknown[] } | undefined) => {
+                if (!old) return old;
+                return { ...old, count: Math.max(0, (old.count ?? 0) - 1) };
+            });
+        },
         onSuccess: () => {
             toast.success("Notification marked as read.");
             queryClient.invalidateQueries({ queryKey: ["account-manager-notifications"] });
+            queryClient.invalidateQueries({ queryKey: ["unread-notifications-count"] });
         },
         onError: () => {
             toast.error("Unable to update notification.");
+            queryClient.invalidateQueries({ queryKey: ["unread-notifications-count"] });
         },
     });
 
     const markAllReadMutation = useMutation({
         mutationFn: (notificationIds: number[]) => markAllNotificationsRead(notificationIds),
+        onMutate: async () => {
+            await queryClient.cancelQueries({ queryKey: ["unread-notifications-count"] });
+            queryClient.setQueryData(["unread-notifications-count"], { results: [], count: 0 });
+        },
         onSuccess: () => {
             toast.success("All notifications marked as read.");
             queryClient.invalidateQueries({ queryKey: ["account-manager-notifications"] });
+            queryClient.invalidateQueries({ queryKey: ["unread-notifications-count"] });
         },
         onError: () => {
             toast.error("Unable to mark all notifications as read.");
+            queryClient.invalidateQueries({ queryKey: ["unread-notifications-count"] });
         },
     });
 
@@ -121,7 +136,7 @@ export default function AccountManagerNotificationsPage(): ReactElement {
     return (
         <AccountManagerLayout>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <h1 className="text-2xl font-bold text-gray-900">Account Manager Notifications</h1>
                     <p className="mt-2 text-sm text-gray-600">
                         Notifications scoped to account manager activities.
@@ -129,7 +144,7 @@ export default function AccountManagerNotificationsPage(): ReactElement {
                 </div>
             </header>
 
-            <main className="p-8">
+            <main className="p-4 lg:p-8">
                 <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
                     <div className="border-b border-gray-200 p-4">
                         <div className="flex flex-col gap-3 lg:flex-row">
@@ -184,7 +199,7 @@ export default function AccountManagerNotificationsPage(): ReactElement {
                         <div className="divide-y divide-gray-100 p-4">
                             {Array.from({ length: 5 }).map((_, index: number): ReactElement => (
                                 <article key={`skeleton-${index}`} className="py-4">
-                                    <div className="flex items-start justify-between gap-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
                                                 <div className="h-4 w-4 animate-pulse rounded-full bg-gray-200" />
@@ -220,7 +235,7 @@ export default function AccountManagerNotificationsPage(): ReactElement {
                             ) : (
                                 notifications.map((notification: UserNotification): ReactElement => (
                                     <article key={notification.id} className="p-4">
-                                        <div className="flex items-start justify-between gap-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2">
                                                     <AlertCircleIcon className="h-4 w-4 text-brand-blue" />
@@ -231,7 +246,17 @@ export default function AccountManagerNotificationsPage(): ReactElement {
                                                     {!notification.is_read ? <span className="text-xs font-medium text-brand-red">New</span> : null}
                                                 </div>
                                                 <p className="mt-2 text-sm text-gray-700">{notification.message}</p>
-                                                <p className="mt-2 text-xs text-gray-500">{formatDate(notification.created_at)}</p>
+                                                <div className="mt-2 flex items-center gap-3">
+                                                    <p className="text-xs text-gray-500">{formatDate(notification.created_at)}</p>
+                                                    {notification.action_url && notification.action_label && (
+                                                        <a
+                                                            href={notification.action_url}
+                                                            className="inline-flex items-center gap-1 rounded-md bg-brand-blue/10 px-2.5 py-1 text-xs font-semibold text-brand-blue hover:bg-brand-blue/20 transition-colors"
+                                                        >
+                                                            {notification.action_label} →
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {!notification.is_read ? (
