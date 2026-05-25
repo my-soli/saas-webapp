@@ -269,7 +269,7 @@ export default function VendorsWorkspace({
                 </div>
             ) : null}
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
                         <Link href={breadcrumbHref} className="hover:text-brand-blue">
                             {breadcrumbLabel}
@@ -294,7 +294,7 @@ export default function VendorsWorkspace({
             </header>
 
             <main className="min-h-screen bg-gray-50">
-                <div className="mx-auto max-w-7xl space-y-6 px-8 py-6">
+                <div className="mx-auto max-w-7xl space-y-6 px-4 lg:px-8 py-4 lg:py-6">
                     {isLoading ? <VendorsSkeleton /> : null}
 
                     {notice ? (

@@ -16,7 +16,7 @@ export default function PhysicalTab({ values, onValuesChange }: PhysicalTabProps
 
     return (
         <div className="max-w-2xl space-y-5">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Unit of Measure" hint="The base unit used when quoting and ordering this product">
                     <select className={selectCls} value={values.unit_of_measure} onChange={(e) => set("unit_of_measure", e.target.value as ProductFormValues["unit_of_measure"])}>
                         <option value="pieces">Pieces</option>
@@ -37,7 +37,7 @@ export default function PhysicalTab({ values, onValuesChange }: PhysicalTabProps
                 </FormField>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <FormField label="Weight" hint="Packed weight of one unit, used for shipping cost calculations">
                     <input type="number" className={inputCls} placeholder="0.00" min={0} step="0.01" value={values.weight} onChange={(e) => set("weight", e.target.value)} />
                 </FormField>
@@ -57,7 +57,7 @@ export default function PhysicalTab({ values, onValuesChange }: PhysicalTabProps
                 </FormField>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <FormField label="Length" hint="Longest external dimension of the packed product">
                     <input type="number" className={inputCls} placeholder="0.00" min={0} step="0.01" value={values.length} onChange={(e) => set("length", e.target.value)} />
                 </FormField>
@@ -69,7 +69,7 @@ export default function PhysicalTab({ values, onValuesChange }: PhysicalTabProps
                 </FormField>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Warranty" hint="Warranty policy shown on quotations, invoices, and the product detail page">
                     <select className={selectCls} value={values.warranty} onChange={(e) => set("warranty", e.target.value as ProductFormValues["warranty"])}>
                         <option value="satisfaction-guarantee">Satisfaction Guarantee</option>

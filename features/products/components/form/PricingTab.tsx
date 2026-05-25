@@ -43,7 +43,7 @@ export default function PricingTab({ values, onValuesChange, isNew = false }: Pr
                 required
                 hint="Auto Calculate: storefront computes price live from configured spec groups. Quote Only: Production Team prices each order manually."
             >
-                <div className="grid grid-cols-2 gap-3 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                     {PRICING_MODE_OPTIONS.map((option) => {
                         const selected = values.pricing_mode === option.value;
                         return (
@@ -62,7 +62,7 @@ export default function PricingTab({ values, onValuesChange, isNew = false }: Pr
                 </div>
             </FormField>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                     label="Status"
                     hint={isNew ? "New products are always saved as Draft — publish them after adding spec groups and pricing" : "Draft: only visible to admins. Published: live on the store. Archived: hidden and inactive."}
@@ -92,7 +92,7 @@ export default function PricingTab({ values, onValuesChange, isNew = false }: Pr
 
             <div>
                 <p className="text-sm font-medium text-gray-700 mb-3">Badges &amp; Flags</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {BADGE_FLAGS.map(({ key, label }) => (
                         <label key={key} className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-gray-200 px-3 py-2.5 hover:bg-gray-50">
                             <input

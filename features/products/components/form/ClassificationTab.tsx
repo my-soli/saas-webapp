@@ -69,7 +69,7 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
 
     return (
         <div className="max-w-2xl space-y-5">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Print Category" hint="Production category used for internal job routing and press assignment">
                     <select className={selectCls} value={values.print_category} onChange={(e) => set("print_category", e.target.value)}>
                         <option value="">Select print category</option>
@@ -87,7 +87,7 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
                 </FormField>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Category" hint="Primary storefront category that determines where this product appears in the catalog">
                     <select className={selectCls} value={values.primary_category} onChange={(e) => handleCategoryChange(e.target.value)}>
                         <option value="">Select category</option>

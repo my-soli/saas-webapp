@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PlusIcon, Trash2Icon, GripVerticalIcon, SaveIcon } from "lucide-react";
 import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 interface FAQItem {
     id: number;
@@ -23,7 +23,7 @@ interface DraftFAQ {
 
 async function fetchFAQs(productId: number): Promise<FAQItem[]> {
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/product-faqs/?product=${productId}`,
+        `${PROXY_BASE}/api/proxy/api/v1/product-faqs/?product=${productId}`,
         { credentials: "include" },
     );
     if (!response.ok) throw new Error("Failed to load FAQs");
@@ -33,7 +33,7 @@ async function fetchFAQs(productId: number): Promise<FAQItem[]> {
 
 async function createFAQ(productId: number, draft: DraftFAQ, order: number): Promise<FAQItem> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-faqs/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-faqs/`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
@@ -45,7 +45,7 @@ async function createFAQ(productId: number, draft: DraftFAQ, order: number): Pro
 
 async function updateFAQ(id: number, data: Partial<FAQItem>): Promise<FAQItem> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-faqs/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-faqs/${id}/`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
@@ -57,7 +57,7 @@ async function updateFAQ(id: number, data: Partial<FAQItem>): Promise<FAQItem> {
 
 async function deleteFAQ(id: number): Promise<void> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-faqs/${id}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-faqs/${id}/`, {
         method: "DELETE",
         credentials: "include",
         headers: { "X-CSRFToken": csrf },

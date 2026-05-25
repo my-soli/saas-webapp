@@ -44,15 +44,16 @@ export default function VendorsTable({ vendors, onEdit, onDelete, onInvite }: Ve
 
     return (
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-gray-200">
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">VPS</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Rating</th>
+                        <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Contact</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">VPS</th>
+                        <th className="hidden lg:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Rating</th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                        <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Created</th>
+                        <th className="hidden md:table-cell text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Created</th>
                         <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
                     </tr>
                 </thead>
@@ -63,16 +64,16 @@ export default function VendorsTable({ vendors, onEdit, onDelete, onInvite }: Ve
                                 <div className="text-sm font-semibold text-gray-900">{vendor.name}</div>
                                 <div className="text-xs text-gray-500">{vendor.contact_person || "—"}</div>
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden md:table-cell py-3 px-4 text-sm text-gray-700">
                                 <div>{vendor.email}</div>
                                 <div className="text-xs text-gray-500">{vendor.phone}</div>
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-700">
                                 <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
                                     VPS {vendor.vps_score_value || "N/A"} ({formatVpsValue(vendor.vps_score_value)})
                                 </span>
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-700">
+                            <td className="hidden lg:table-cell py-3 px-4 text-sm text-gray-700">
                                 {vendor.rating ? `${vendor.rating} ★` : "—"}
                             </td>
                             <td className="py-3 px-4 text-sm">
@@ -83,7 +84,7 @@ export default function VendorsTable({ vendors, onEdit, onDelete, onInvite }: Ve
                                     {vendor.active ? "Active" : "Inactive"}
                                 </span>
                             </td>
-                            <td className="py-3 px-4 text-sm text-gray-500">
+                            <td className="hidden md:table-cell py-3 px-4 text-sm text-gray-500">
                                 {formatDate(vendor.created_at)}
                             </td>
                             <td className="py-3 px-4 text-right">
@@ -117,6 +118,7 @@ export default function VendorsTable({ vendors, onEdit, onDelete, onInvite }: Ve
                     ))}
                 </tbody>
             </table>
+            </div>
         </div>
     );
 }

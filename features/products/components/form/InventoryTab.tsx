@@ -55,7 +55,7 @@ export default function InventoryTab({ values, onValuesChange }: InventoryTabPro
                 </select>
             </FormField>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Stock Quantity" hint="Current number of units available in stock">
                     <input type="number" className={inputCls} min={0} value={values.stock_quantity} onChange={(e) => set("stock_quantity", Number(e.target.value))} />
                 </FormField>

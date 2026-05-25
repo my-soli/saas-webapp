@@ -7,7 +7,7 @@ const FIELD_COUNTS = [1, 2, 3, 4, 5] as const;
 export default function EditProductSkeleton(): ReactElement {
     return (
         <AdminLayout>
-            <div className="border-b border-gray-200 bg-white px-8 py-4">
+            <div className="border-b border-gray-200 bg-white px-4 lg:px-8 py-4">
                 <div className="flex items-center gap-2 mb-3">
                     <div className="h-3 w-10 rounded bg-gray-200 animate-pulse" />
                     <div className="h-3 w-2 rounded bg-gray-200 animate-pulse" />

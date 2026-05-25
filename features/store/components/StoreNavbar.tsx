@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const MAX_NAV_CATS = 5;
 
 interface ProductCategory {
@@ -26,7 +25,7 @@ interface ProductCategory {
 }
 
 async function fetchCategories(): Promise<ProductCategory[]> {
-    const res = await fetch(`${API_BASE_URL}/api/v1/product-categories/?page_size=100`);
+    const res = await fetch(`/api/proxy/api/v1/product-categories/?page_size=100`);
     if (!res.ok) return [];
     const data = await res.json() as { results?: ProductCategory[] } | ProductCategory[];
     return Array.isArray(data) ? data : (data.results ?? []);

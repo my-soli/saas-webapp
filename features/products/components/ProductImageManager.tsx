@@ -7,7 +7,7 @@ import Image from "next/image";
 import { StarIcon, Trash2Icon, UploadCloudIcon, CheckCircleIcon } from "lucide-react";
 import { getCsrfToken } from "@/lib/api/auth";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
 interface ProductImage {
     id: number;
@@ -24,7 +24,7 @@ interface ProductImage {
 
 async function fetchImages(productId: number): Promise<ProductImage[]> {
     const response = await fetch(
-        `${API_BASE_URL}/api/v1/product-images/?product=${productId}&page_size=50`,
+        `${PROXY_BASE}/api/proxy/api/v1/product-images/?product=${productId}&page_size=50`,
         { credentials: "include" },
     );
     if (!response.ok) throw new Error("Failed to load images");
@@ -40,7 +40,7 @@ async function uploadImage(productId: number, file: File, isPrimary: boolean): P
     formData.append("alt_text", file.name.replace(/\.[^.]+$/, ""));
     formData.append("is_primary", isPrimary ? "true" : "false");
     formData.append("image_type", "product-photo");
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-images/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-images/`, {
         method: "POST",
         credentials: "include",
         headers: { "X-CSRFToken": csrf },
@@ -52,7 +52,7 @@ async function uploadImage(productId: number, file: File, isPrimary: boolean): P
 
 async function setPrimary(imageId: number): Promise<ProductImage> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-images/${imageId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-images/${imageId}/`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
@@ -64,7 +64,7 @@ async function setPrimary(imageId: number): Promise<ProductImage> {
 
 async function deleteImage(imageId: number): Promise<void> {
     const csrf = await getCsrfToken();
-    const response = await fetch(`${API_BASE_URL}/api/v1/product-images/${imageId}/`, {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-images/${imageId}/`, {
         method: "DELETE",
         credentials: "include",
         headers: { "X-CSRFToken": csrf },

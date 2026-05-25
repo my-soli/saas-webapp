@@ -263,7 +263,7 @@ export default function VendorFormWorkspace({
     return (
         <>
             <header className="border-b border-gray-200 bg-white">
-                <div className="px-8 py-4">
+                <div className="px-4 lg:px-8 py-4">
                     <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
                         <Link href={homeHref} className="hover:text-brand-blue">
                             {homeLabel}
@@ -281,7 +281,7 @@ export default function VendorFormWorkspace({
             </header>
 
             <main className="min-h-screen bg-gray-50">
-                <div className="max-w-5xl space-y-6 px-8 py-6">
+                <div className="max-w-5xl space-y-6 px-4 lg:px-8 py-4 lg:py-6">
                     {mode === "edit" && !hasValidId ? (
                         <div className="rounded-lg border border-brand-red/20 bg-brand-red/10 p-6">
                             <div className="flex items-center gap-3">
