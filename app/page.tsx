@@ -56,6 +56,7 @@ const PORTAL_ROLE_LABELS: Record<PortalRole, string> = {
   admin: "Admin Portal",
   account_manager: "Account Manager Portal",
   production_team: "Staff Portal",
+  business_admin: "Business Portal",
   client: "Client Portal",
   vendor: "Vendor Portal",
 };
@@ -65,6 +66,7 @@ const ROLE_DASHBOARD: Record<PortalRole, string> = {
   admin: "/admin/dashboard",
   account_manager: "/account-manager",
   production_team: "/production/dashboard",
+  business_admin: "/business/dashboard",
   vendor: "/vendors",
 };
 
