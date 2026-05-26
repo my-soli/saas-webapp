@@ -6,22 +6,19 @@ import Image from "next/image";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import {
-    User, Mail, Lock, Phone, Building2, ArrowRight, ArrowLeft,
-    CheckCircle, Loader2, Star, Users, Zap, Globe,
+    User, Mail, Phone, Building2, ArrowRight, ArrowLeft,
+    CheckCircle, Loader2, Star, Users, Zap, Globe, MailCheck,
 } from "lucide-react";
-import { registerAccount, fetchSubscriptionPlans, createSubscription } from "@/services/subscription";
-import { loginUserSession } from "@/lib/api/auth";
+import { fetchSubscriptionPlans } from "@/services/subscription";
 import type { SubscriptionPlan } from "@/types/subscription";
 
-type Step = "type" | "details" | "plan" | "done";
+type Step = "type" | "details" | "plan" | "check-email";
 type AccountType = "personal" | "subscriber";
 
 interface FormState {
     first_name: string;
     last_name: string;
     email: string;
-    password: string;
-    confirm_password: string;
     phone: string;
     company: string;
 }
@@ -30,8 +27,6 @@ const EMPTY_FORM: FormState = {
     first_name: "",
     last_name: "",
     email: "",
-    password: "",
-    confirm_password: "",
     phone: "",
     company: "",
 };
@@ -114,6 +109,7 @@ export default function RegisterPage(): ReactElement {
     const [billingCycle, setBillingCycle] = useState<"monthly" | "annually">("monthly");
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [submittedEmail, setSubmittedEmail] = useState("");
 
     const { data: plans = [] } = useQuery({
         queryKey: ["subscription-plans"],
@@ -130,58 +126,66 @@ export default function RegisterPage(): ReactElement {
         if (!form.last_name.trim()) return "Last name is required.";
         if (!form.email.trim()) return "Email is required.";
         if (!form.phone.trim()) return "Phone number is required.";
-        if (form.password.length < 8) return "Password must be at least 8 characters.";
-        if (form.password !== form.confirm_password) return "Passwords do not match.";
         if (accountType === "subscriber" && !form.company.trim()) return "Company name is required for subscriber accounts.";
         return null;
     }
 
-    async function handleSubmitPersonal() {
-        const err = validateDetails();
-        if (err) { setError(err); return; }
+    async function submitRegistration() {
         setError(null);
         setLoading(true);
         try {
-            await registerAccount({
-                first_name: form.first_name,
-                last_name: form.last_name,
-                email: form.email,
-                password: form.password,
-                phone: form.phone,
-                company: form.company,
-                portal_tier: "personal",
+            const payload: Record<string, string> = {
+                first_name: form.first_name.trim(),
+                last_name: form.last_name.trim(),
+                email: form.email.trim().toLowerCase(),
+                phone: form.phone.trim(),
+                company: form.company.trim(),
+                portal_tier: accountType === "subscriber" ? "subscriber" : "personal",
+            };
+
+            const res = await fetch("/api/proxy/api/v1/portal/register/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
             });
-            await loginUserSession({ username: form.email, password: form.password });
-            setStep("done");
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "Registration failed");
+
+            if (res.ok || res.status === 200) {
+                setSubmittedEmail(form.email.trim().toLowerCase());
+                setStep("check-email");
+            } else if (res.status === 429) {
+                setError("Too many registration attempts. Please wait a minute and try again.");
+            } else {
+                const body = await res.json().catch(() => ({})) as Record<string, string | string[]>;
+                const firstVal = Object.values(body)[0];
+                const msg = Array.isArray(firstVal) ? firstVal[0] : (firstVal as string) ?? "Registration failed. Please try again.";
+                setError(msg);
+            }
+        } catch {
+            setError("Unable to reach the server. Please check your connection.");
         } finally {
             setLoading(false);
         }
     }
 
-    async function handleSubmitSubscriber() {
+    function handleContinueToDetails() {
+        setStep("details");
+    }
+
+    function handleDetailsNext() {
+        const err = validateDetails();
+        if (err) { setError(err); return; }
+        setError(null);
+        if (accountType === "personal") {
+            submitRegistration();
+        } else {
+            setStep("plan");
+        }
+    }
+
+    function handleSubmitSubscriber() {
         if (!selectedPlanId) { setError("Please select a plan."); return; }
         setError(null);
-        setLoading(true);
-        try {
-            await registerAccount({
-                first_name: form.first_name,
-                last_name: form.last_name,
-                email: form.email,
-                password: form.password,
-                phone: form.phone,
-                company: form.company,
-                portal_tier: "subscriber",
-            });
-            await loginUserSession({ username: form.email, password: form.password });
-            await createSubscription({ plan: selectedPlanId, billing_cycle: billingCycle });
-            setStep("done");
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "Registration failed");
-        } finally {
-            setLoading(false);
-        }
+        submitRegistration();
     }
 
     return (
@@ -236,7 +240,7 @@ export default function RegisterPage(): ReactElement {
                                     </span>
                                     <Building2 className="w-8 h-8 text-brand-blue mb-3" />
                                     <p className="font-semibold text-gray-900">Business Subscriber</p>
-                                    <p className="text-sm text-gray-500 mt-1">Full access to print management, multi-user team, analytics, and priority support. Subscription required.</p>
+                                    <p className="text-sm text-gray-500 mt-1">Full access to print management, multi-user team, analytics, and priority support.</p>
                                     {accountType === "subscriber" && (
                                         <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand-blue">
                                             <CheckCircle className="w-3.5 h-3.5" /> Selected
@@ -247,7 +251,7 @@ export default function RegisterPage(): ReactElement {
                             <div className="flex justify-end pt-2">
                                 <button
                                     type="button"
-                                    onClick={() => setStep("details")}
+                                    onClick={handleContinueToDetails}
                                     className="flex items-center gap-2 px-6 py-2.5 bg-brand-blue text-white font-medium text-sm rounded-lg hover:opacity-90 transition-opacity"
                                 >
                                     Continue <ArrowRight className="w-4 h-4" />
@@ -263,7 +267,9 @@ export default function RegisterPage(): ReactElement {
                                 <h2 className="text-xl font-semibold text-gray-900 mb-1">
                                     {accountType === "subscriber" ? "Business details" : "Your details"}
                                 </h2>
-                                <p className="text-sm text-gray-500">Fill in your information to create your account</p>
+                                <p className="text-sm text-gray-500">
+                                    We&apos;ll send a verification link to your email to activate your account.
+                                </p>
                             </div>
 
                             {error && (
@@ -280,7 +286,8 @@ export default function RegisterPage(): ReactElement {
                                             value={form.first_name}
                                             onChange={(e) => setField("first_name", e.target.value)}
                                             placeholder="John"
-                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                            disabled={loading}
+                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:bg-gray-50"
                                         />
                                     </div>
                                 </div>
@@ -293,7 +300,8 @@ export default function RegisterPage(): ReactElement {
                                             value={form.last_name}
                                             onChange={(e) => setField("last_name", e.target.value)}
                                             placeholder="Doe"
-                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                            disabled={loading}
+                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:bg-gray-50"
                                         />
                                     </div>
                                 </div>
@@ -306,7 +314,8 @@ export default function RegisterPage(): ReactElement {
                                             value={form.email}
                                             onChange={(e) => setField("email", e.target.value)}
                                             placeholder="john@company.com"
-                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                            disabled={loading}
+                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:bg-gray-50"
                                         />
                                     </div>
                                 </div>
@@ -319,7 +328,8 @@ export default function RegisterPage(): ReactElement {
                                             value={form.phone}
                                             onChange={(e) => setField("phone", e.target.value)}
                                             placeholder="+254712345678"
-                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                            disabled={loading}
+                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:bg-gray-50"
                                         />
                                     </div>
                                 </div>
@@ -333,76 +343,32 @@ export default function RegisterPage(): ReactElement {
                                                 value={form.company}
                                                 onChange={(e) => setField("company", e.target.value)}
                                                 placeholder="Acme Ltd"
-                                                className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                                disabled={loading}
+                                                className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:bg-gray-50"
                                             />
                                         </div>
                                     </div>
                                 )}
-                                <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Password</label>
-                                    <div className="relative">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                        <input
-                                            type="password"
-                                            value={form.password}
-                                            onChange={(e) => setField("password", e.target.value)}
-                                            placeholder="Min. 8 characters"
-                                            autoComplete="new-password"
-                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-sm font-medium text-gray-700">Confirm Password</label>
-                                    <div className="relative">
-                                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                        <input
-                                            type="password"
-                                            value={form.confirm_password}
-                                            onChange={(e) => setField("confirm_password", e.target.value)}
-                                            placeholder="Re-enter password"
-                                            autoComplete="new-password"
-                                            className="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent"
-                                        />
-                                    </div>
-                                    {form.confirm_password.length > 0 && form.password !== form.confirm_password && (
-                                        <p className="text-xs text-red-500">Passwords do not match</p>
-                                    )}
-                                </div>
                             </div>
 
                             <div className="flex justify-between pt-2">
                                 <button
                                     type="button"
                                     onClick={() => { setStep("type"); setError(null); }}
-                                    className="flex items-center gap-2 px-4 py-2.5 text-gray-600 text-sm hover:text-gray-900 transition-colors"
+                                    disabled={loading}
+                                    className="flex items-center gap-2 px-4 py-2.5 text-gray-600 text-sm hover:text-gray-900 transition-colors disabled:opacity-50"
                                 >
                                     <ArrowLeft className="w-4 h-4" /> Back
                                 </button>
-                                {accountType === "personal" ? (
-                                    <button
-                                        type="button"
-                                        onClick={handleSubmitPersonal}
-                                        disabled={loading}
-                                        className="flex items-center gap-2 px-6 py-2.5 bg-brand-blue text-white font-medium text-sm rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60"
-                                    >
-                                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                                        Create Account
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const err = validateDetails();
-                                            if (err) { setError(err); return; }
-                                            setError(null);
-                                            setStep("plan");
-                                        }}
-                                        className="flex items-center gap-2 px-6 py-2.5 bg-brand-blue text-white font-medium text-sm rounded-lg hover:opacity-90 transition-opacity"
-                                    >
-                                        Choose Plan <ArrowRight className="w-4 h-4" />
-                                    </button>
-                                )}
+                                <button
+                                    type="button"
+                                    onClick={handleDetailsNext}
+                                    disabled={loading}
+                                    className="flex items-center gap-2 px-6 py-2.5 bg-brand-blue text-white font-medium text-sm rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60"
+                                >
+                                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    {accountType === "personal" ? "Create Account" : <>Choose Plan <ArrowRight className="w-4 h-4" /></>}
+                                </button>
                             </div>
                         </div>
                     )}
@@ -412,7 +378,7 @@ export default function RegisterPage(): ReactElement {
                         <div className="space-y-5">
                             <div>
                                 <h2 className="text-xl font-semibold text-gray-900 mb-1">Choose your plan</h2>
-                                <p className="text-sm text-gray-500">Start with a free 14-day trial — no payment required now</p>
+                                <p className="text-sm text-gray-500">You&apos;ll set up billing after verifying your email.</p>
                             </div>
 
                             {error && (
@@ -460,7 +426,8 @@ export default function RegisterPage(): ReactElement {
                                 <button
                                     type="button"
                                     onClick={() => { setStep("details"); setError(null); }}
-                                    className="flex items-center gap-2 px-4 py-2.5 text-gray-600 text-sm hover:text-gray-900 transition-colors"
+                                    disabled={loading}
+                                    className="flex items-center gap-2 px-4 py-2.5 text-gray-600 text-sm hover:text-gray-900 transition-colors disabled:opacity-50"
                                 >
                                     <ArrowLeft className="w-4 h-4" /> Back
                                 </button>
@@ -471,43 +438,56 @@ export default function RegisterPage(): ReactElement {
                                     className="flex items-center gap-2 px-6 py-2.5 bg-brand-blue text-white font-medium text-sm rounded-lg hover:opacity-90 transition-opacity disabled:opacity-60"
                                 >
                                     {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                                    Start Free Trial
+                                    Create Account
                                 </button>
                             </div>
                         </div>
                     )}
 
-                    {/* Step: Done */}
-                    {step === "done" && (
-                        <div className="py-8 text-center space-y-4">
+                    {/* Step: Check email */}
+                    {step === "check-email" && (
+                        <div className="py-6 text-center space-y-5">
                             <div className="flex justify-center">
-                                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-                                    <CheckCircle className="w-8 h-8 text-green-600" />
+                                <div className="w-20 h-20 rounded-full bg-brand-blue/10 flex items-center justify-center">
+                                    <MailCheck className="w-10 h-10 text-brand-blue" />
                                 </div>
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-900">Welcome to PrintDuka!</h2>
-                            <p className="text-gray-500 text-sm max-w-sm mx-auto">
-                                {accountType === "subscriber"
-                                    ? "Your business account and 14-day free trial have been set up. Explore your dashboard to get started."
-                                    : "Your personal account is ready. You can now track orders, review proofs, and pay invoices."}
-                            </p>
-                            <button
-                                type="button"
-                                onClick={() => router.push(accountType === "subscriber" ? "/business/dashboard" : "/portal")}
-                                className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-brand-blue text-white font-medium rounded-lg hover:opacity-90 transition-opacity"
-                            >
-                                Go to Dashboard <ArrowRight className="w-4 h-4" />
-                            </button>
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
+                                <p className="text-gray-500 text-sm max-w-sm mx-auto">
+                                    We&apos;ve sent a verification link to{" "}
+                                    <span className="font-semibold text-gray-700">{submittedEmail}</span>.
+                                    Click the link to set your password and activate your account.
+                                </p>
+                            </div>
+                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-left max-w-sm mx-auto">
+                                <p className="text-xs text-amber-700 font-medium mb-1">Didn&apos;t receive the email?</p>
+                                <ul className="text-xs text-amber-600 space-y-1 list-disc list-inside">
+                                    <li>Check your spam or junk folder</li>
+                                    <li>The link expires in 24 hours</li>
+                                    <li>Contact us if you need help</li>
+                                </ul>
+                            </div>
+                            <div className="pt-2">
+                                <Link
+                                    href="/login"
+                                    className="inline-flex items-center gap-2 px-6 py-3 bg-brand-blue text-white font-medium rounded-lg hover:opacity-90 transition-opacity text-sm"
+                                >
+                                    Back to Sign In <ArrowRight className="w-4 h-4" />
+                                </Link>
+                            </div>
                         </div>
                     )}
                 </div>
 
-                <div className="mt-6 text-center">
-                    <p className="text-sm text-white/70">
-                        Already have an account?{" "}
-                        <Link href="/login" className="text-white font-medium hover:underline">Sign in</Link>
-                    </p>
-                </div>
+                {step !== "check-email" && (
+                    <div className="mt-6 text-center">
+                        <p className="text-sm text-white/70">
+                            Already have an account?{" "}
+                            <Link href="/login" className="text-white font-medium hover:underline">Sign in</Link>
+                        </p>
+                    </div>
+                )}
             </div>
         </div>
     );

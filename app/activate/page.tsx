@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle, XCircle, Loader2, Eye, EyeOff } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Eye, EyeOff, MailCheck } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 
@@ -27,6 +27,7 @@ function ActivatePageContent() {
 
     const [validating, setValidating] = useState(true);
     const [isValid, setIsValid] = useState(false);
+    const [isExpired, setIsExpired] = useState(false);
     const [validationError, setValidationError] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -36,6 +37,9 @@ function ActivatePageContent() {
     const [activated, setActivated] = useState(false);
     const [error, setError] = useState("");
     const [username, setUsername] = useState("");
+    const [resendEmail, setResendEmail] = useState("");
+    const [resending, setResending] = useState(false);
+    const [resendSent, setResendSent] = useState(false);
 
     useEffect(() => {
         if (!token) {
@@ -69,6 +73,9 @@ function ActivatePageContent() {
                 setIsValid(false);
                 const errorMsg = errorData.detail || "Invalid or expired invitation link";
                 setValidationError(errorMsg);
+                if (errorMsg.toLowerCase().includes("expired")) {
+                    setIsExpired(true);
+                }
                 toast.error(errorMsg);
             }
         } catch (err) {
@@ -78,6 +85,22 @@ function ActivatePageContent() {
             toast.error(errorMsg);
         } finally {
             setValidating(false);
+        }
+    }
+
+    async function handleResend(e: React.FormEvent) {
+        e.preventDefault();
+        if (!resendEmail.trim()) return;
+        setResending(true);
+        try {
+            await fetch(`/api/proxy/api/auth/resend-activation/`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: resendEmail.trim() }),
+            });
+            setResendSent(true);
+        } finally {
+            setResending(false);
         }
     }
 
@@ -145,6 +168,78 @@ function ActivatePageContent() {
     }
 
     if (!isValid) {
+        if (isExpired && !resendSent) {
+            return (
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                    <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+                        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <XCircle className="w-10 h-10 text-amber-600" />
+                        </div>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Link Expired</h1>
+                        <p className="text-gray-600 mb-6">
+                            Your activation link has expired. Enter your email address and we&apos;ll send you a new one.
+                        </p>
+                        <form onSubmit={handleResend} className="space-y-4 text-left">
+                            <div>
+                                <label htmlFor="resend-email" className="block text-sm font-medium text-gray-700 mb-1">
+                                    Email address
+                                </label>
+                                <input
+                                    id="resend-email"
+                                    type="email"
+                                    required
+                                    value={resendEmail}
+                                    onChange={(e) => setResendEmail(e.target.value)}
+                                    disabled={resending}
+                                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent disabled:bg-gray-50"
+                                    placeholder="you@example.com"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={resending || !resendEmail.trim()}
+                                className="w-full px-6 py-2.5 bg-brand-blue text-white rounded-lg hover:bg-blue-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:ring-offset-2 transition-all duration-150 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            >
+                                {resending ? (
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>
+                                ) : (
+                                    "Request New Link"
+                                )}
+                            </button>
+                        </form>
+                        <button
+                            onClick={() => router.push("/login")}
+                            className="mt-4 text-sm text-gray-500 hover:text-gray-700 underline underline-offset-2"
+                        >
+                            Back to login
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        if (resendSent) {
+            return (
+                <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                    <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <MailCheck className="w-10 h-10 text-green-600" />
+                        </div>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Check Your Email</h1>
+                        <p className="text-gray-600 mb-6">
+                            If that email address is associated with a pending account, a new activation link has been sent. Please check your inbox.
+                        </p>
+                        <button
+                            onClick={() => router.push("/login")}
+                            className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:ring-offset-2 transition-all duration-150"
+                        >
+                            Back to Login
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
                 <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">

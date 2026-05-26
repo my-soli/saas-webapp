@@ -1,5 +1,20 @@
 import type { LoginCredentials, RegisterData, ChangePasswordData, User } from '@/types/auth';
 
+export type LoginResult =
+    | { success: true; user: User }
+    | { requires_2fa: true; totp_token: string };
+
+export interface TotpStatus {
+    enabled: boolean;
+    confirmed_at: string | null;
+}
+
+export interface TotpSetupData {
+    secret: string;
+    provisioning_uri: string;
+    qr_url: string;
+}
+
 interface ApiError {
     error?: string;
     detail?: string;
@@ -42,12 +57,71 @@ export async function getCsrfToken(): Promise<string> {
     return data.csrfToken;
 }
 
-export async function loginUserSession(credentials: LoginCredentials): Promise<{ success: boolean; user: User }> {
+export async function loginUserSession(credentials: LoginCredentials): Promise<LoginResult> {
     const response = await fetch(`${PROXY_BASE}/api/auth/session/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(credentials),
+    });
+
+    return handleResponse(response);
+}
+
+export async function verifyTotpSession(totp_token: string, code: string): Promise<{ success: true; user: User }> {
+    const response = await fetch(`${PROXY_BASE}/api/auth/session/totp-verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ totp_token, code }),
+    });
+
+    return handleResponse(response);
+}
+
+export async function verifyTotpJwt(totp_token: string, code: string): Promise<{ access: string; refresh: string }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/auth/token/totp-verify/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ totp_token, code }),
+    });
+
+    return handleResponse(response);
+}
+
+export async function getTotpStatus(): Promise<TotpStatus> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/auth/totp/status/`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+
+    return handleResponse(response);
+}
+
+export async function getTotpSetupData(): Promise<TotpSetupData> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/auth/totp/setup/`, {
+        method: 'GET',
+        credentials: 'include',
+    });
+
+    return handleResponse(response);
+}
+
+export async function confirmTotp(code: string): Promise<{ detail: string }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/auth/totp/confirm/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+    });
+
+    return handleResponse(response);
+}
+
+export async function disableTotp(password: string, code: string): Promise<{ detail: string }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/auth/totp/disable/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, code }),
     });
 
     return handleResponse(response);
