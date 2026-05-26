@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 
-import { useState, useRef, type ReactElement, type ChangeEvent, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useEffect, Suspense, type ReactElement, type ChangeEvent, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Paperclip, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, Paperclip, Plus, Trash2, X, Info } from "lucide-react";
 import { toast } from "sonner";
 import AccountManagerLayout from "@/components/account-manager/account-manager-layout";
 import { createJob, uploadJobAttachments } from "@/services/jobs";
@@ -11,6 +11,7 @@ import { fetchClients } from "@/services/clients";
 import { fetchProducts } from "@/services/products";
 import type { Job, JobStatus, JobPriority } from "@/types/jobs";
 import type { ClientsResponse } from "@/types/clients";
+import type { Quote } from "@/types/quotes";
 
 interface ProductRow {
     name: string;
@@ -53,12 +54,25 @@ const LABEL = "block text-sm font-medium text-gray-700 mb-1";
 const INPUT = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/40 focus:border-brand-blue";
 const SELECT = INPUT;
 
-export default function CreateJobPage(): ReactElement {
+async function fetchQuote(quoteId: string): Promise<Quote> {
+    const res = await fetch(`/api/proxy/api/v1/quotes/${quoteId}/`, {
+        credentials: "include",
+        cache: "no-store",
+    });
+    if (!res.ok) throw new Error("Failed to fetch quote");
+    return res.json();
+}
+
+function CreateJobPageInner(): ReactElement {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const queryClient = useQueryClient();
+    const quoteId = searchParams.get("quote_id");
+
     const [form, setForm] = useState<CreateJobForm>(defaultForm());
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [jobAttachments, setJobAttachments] = useState<File[]>([]);
+    const [quotePreFilled, setQuotePreFilled] = useState(false);
     const jobFileInputRef = useRef<HTMLInputElement>(null);
 
     const clientsQuery = useQuery({
@@ -71,6 +85,36 @@ export default function CreateJobPage(): ReactElement {
         queryKey: ["products-catalog-dropdown"],
         queryFn: () => fetchProducts({ page: 1, pageSize: 300, search: "", status: "all", pricingMode: "all", printCategory: "", category: "" }),
     });
+
+    const quoteQuery = useQuery({
+        queryKey: ["quote-prefill", quoteId],
+        queryFn: () => fetchQuote(quoteId!),
+        enabled: !!quoteId,
+    });
+
+    // Pre-populate form from quote when it loads
+    useEffect(() => {
+        const quote = quoteQuery.data;
+        if (!quote || quotePreFilled) return;
+
+        const lineItems = quote.line_items ?? [];
+        const productRows: ProductRow[] = lineItems.length > 0
+            ? lineItems.map((item) => ({
+                name: item.product_name,
+                quantity: item.quantity,
+                unit: "pcs",
+                attachments: [],
+            }))
+            : [{ name: "", quantity: 1, unit: "pcs", attachments: [] }];
+
+        setForm((prev) => ({
+            ...prev,
+            job_name: `Job for ${quote.quote_id}`,
+            client_id: quote.client ?? "",
+            products: productRows,
+        }));
+        setQuotePreFilled(true);
+    }, [quoteQuery.data, quotePreFilled]);
 
     const set = <K extends keyof CreateJobForm>(key: K, value: CreateJobForm[K]): void => {
         setForm((prev) => ({ ...prev, [key]: value }));
@@ -150,7 +194,6 @@ export default function CreateJobPage(): ReactElement {
                 delivery_method: form.delivery_method,
                 delivery_date: form.delivery_date || null,
                 notes: form.notes || null,
-                // Send all product rows as job_products so the backend creates JobProduct records
                 job_products: validProducts.map((p) => ({
                     name: p.name,
                     quantity: p.quantity,
@@ -198,6 +241,19 @@ export default function CreateJobPage(): ReactElement {
                     <h1 className="text-lg font-semibold text-gray-900">Create New Job</h1>
                 </div>
             </header>
+
+            {/* Quote pre-fill banner */}
+            {quoteId && quotePreFilled && (
+                <div className="mx-8 mt-6 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                    <span>
+                        Pre-filled from quote <span className="font-semibold">{quoteQuery.data?.quote_id}</span> — review all products and adjust as needed before submitting.
+                    </span>
+                </div>
+            )}
+            {quoteId && quoteQuery.isLoading && (
+                <div className="mx-8 mt-6 h-10 rounded-lg bg-gray-100 animate-pulse" />
+            )}
 
             {/* Datalist for product autocomplete */}
             <datalist id="product-catalog">
@@ -304,7 +360,10 @@ export default function CreateJobPage(): ReactElement {
                     {/* ── Section 3: Products / Services ── */}
                     <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Products / Services</h2>
+                            <div>
+                                <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Products / Services</h2>
+                                <p className="text-xs text-gray-400 mt-0.5">Search the catalog or type any product name — including items not in the catalog</p>
+                            </div>
                             <button
                                 type="button"
                                 onClick={addProduct}
@@ -520,5 +579,13 @@ export default function CreateJobPage(): ReactElement {
                 </form>
             </main>
         </AccountManagerLayout>
+    );
+}
+
+export default function CreateJobPage(): ReactElement {
+    return (
+        <Suspense fallback={null}>
+            <CreateJobPageInner />
+        </Suspense>
     );
 }

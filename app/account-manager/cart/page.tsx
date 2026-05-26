@@ -5,7 +5,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
     Search, ShoppingCart, Trash2, Plus, Minus, Paperclip, X, Package,
     Share2, MessageCircle, Mail, Copy, Check, ExternalLink, Loader2, Link2,
+    ClipboardList, ArrowRight,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import AccountManagerLayout from "@/components/account-manager/account-manager-layout";
 import { getCsrfToken } from "@/lib/api/auth";
@@ -42,6 +44,19 @@ interface CartItem {
 }
 interface CartData { cart: CartItem[]; subtotal: number; cart_count: number; }
 
+interface ClientOrderItem { id: number; product_name: string; quantity: number; }
+interface PendingClientOrder {
+    id: number;
+    order_number: string;
+    client_name: string;
+    client: number;
+    quote: number | null;
+    status: string;
+    total_amount: string;
+    submitted_at: string | null;
+    items: ClientOrderItem[];
+}
+
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 async function fetchCartData(): Promise<CartData> {
@@ -67,6 +82,15 @@ async function postCart(path: string, body?: Record<string, string | number>) {
     });
     return res.json() as Promise<{ success: boolean; message?: string }>;
 }
+async function fetchPendingClientOrders(): Promise<PendingClientOrder[]> {
+    const params = new URLSearchParams({ status: "submitted", page_size: "50" });
+    const res = await fetch(`${PROXY}/api/proxy/api/v1/client-orders/?${params}`, { credentials: "include", cache: "no-store" });
+    if (!res.ok) throw new Error("Failed");
+    const data = await res.json() as { results: PendingClientOrder[] };
+    // Only include orders without a quote attached
+    return data.results.filter((o) => !("quote" in o) || o.quote === null);
+}
+
 async function createShareLink(): Promise<string> {
     const csrf = await getCsrfToken();
     const res = await fetch(`${PROXY}/api/proxy/account-manager/cart/share/`, {
@@ -118,6 +142,12 @@ export default function AMCartPage() {
     const { data: quotes = [] } = useQuery({
         queryKey: ["multi-product-quotes-brief"],
         queryFn: () => fetchMultiProductQuotes(),
+    });
+
+    const { data: pendingClientOrders = [], isLoading: pendingOrdersLoading } = useQuery({
+        queryKey: ["am-pending-client-orders"],
+        queryFn: fetchPendingClientOrders,
+        staleTime: 30_000,
     });
 
     const inv = useCallback(() => queryClient.invalidateQueries({ queryKey: ["am-cart"] }), [queryClient]);
@@ -328,6 +358,74 @@ export default function AMCartPage() {
                             )}
                         </div>
                     </div>
+                </div>
+
+                {/* ── Client Orders Awaiting Quote ── */}
+                <div className="mt-8">
+                    <div className="flex items-center gap-2 mb-3">
+                        <ClipboardList className="w-5 h-5 text-brand-blue" />
+                        <h2 className="text-lg font-bold text-gray-900">Client Orders Awaiting Quote</h2>
+                        {pendingClientOrders.length > 0 && (
+                            <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-brand-blue/10 text-brand-blue">
+                                {pendingClientOrders.length}
+                            </span>
+                        )}
+                    </div>
+
+                    {pendingOrdersLoading ? (
+                        <div className="bg-white border border-gray-100 rounded-xl p-6 flex justify-center">
+                            <Loader2 className="w-5 h-5 animate-spin text-gray-300" />
+                        </div>
+                    ) : pendingClientOrders.length === 0 ? (
+                        <div className="bg-white border border-gray-100 rounded-xl p-8 text-center shadow-sm">
+                            <Package className="w-10 h-10 text-gray-200 mx-auto mb-2" />
+                            <p className="text-sm text-gray-400">No client orders pending quote creation.</p>
+                        </div>
+                    ) : (
+                        <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-gray-50 border-b border-gray-100 text-left">
+                                        <th className="px-4 py-3 font-semibold text-gray-700">Order #</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-700">Client</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-700">Items</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-700">Total</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-700">Submitted</th>
+                                        <th className="px-4 py-3 font-semibold text-gray-700 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {pendingClientOrders.map((order) => (
+                                        <tr key={order.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-3 font-mono font-medium text-brand-blue">{order.order_number}</td>
+                                            <td className="px-4 py-3 text-gray-700">{order.client_name}</td>
+                                            <td className="px-4 py-3 text-gray-500">
+                                                {order.items.length} item{order.items.length !== 1 ? "s" : ""}
+                                            </td>
+                                            <td className="px-4 py-3 font-medium text-gray-900">
+                                                {parseFloat(order.total_amount) > 0
+                                                    ? `KES ${parseFloat(order.total_amount).toLocaleString()}`
+                                                    : "—"}
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-500">
+                                                {order.submitted_at
+                                                    ? new Date(order.submitted_at).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" })
+                                                    : "—"}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <Link
+                                                    href={`/account-manager/quotes/create?client=${order.client}&order=${order.id}`}
+                                                    className="inline-flex items-center gap-1 text-xs font-semibold text-white bg-brand-blue px-3 py-1.5 rounded-lg hover:bg-brand-blue/90 transition-colors"
+                                                >
+                                                    Create Quote <ArrowRight className="w-3 h-3" />
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
             </div>
 
