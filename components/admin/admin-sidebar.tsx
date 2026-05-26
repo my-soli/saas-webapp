@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, type ReactElement } from "react";
+import { usePathname } from "next/navigation";
+import { useState, useRef, useEffect, type ReactElement } from "react";
 import { type LucideIcon, X, Loader2, LogOut } from "lucide-react";
 import {
     LayoutDashboard,
@@ -12,8 +12,6 @@ import {
     Package,
     Building2,
     Settings,
-    Truck,
-    ClipboardList,
     BarChart3,
     CreditCard,
     UserCircle,
@@ -25,6 +23,10 @@ import {
     PackageCheck,
     Scale,
     ClipboardCheck,
+    Activity,
+    Bell,
+    Mail,
+    Download,
 } from "lucide-react";
 import { logoutUserSession } from "@/lib/api/auth";
 
@@ -38,6 +40,8 @@ interface MenuSection {
     title?: string;
     items: MenuItem[];
 }
+
+const SCROLL_KEY = "admin-sidebar-scroll";
 
 const menuSections: MenuSection[] = [
     {
@@ -68,9 +72,7 @@ const menuSections: MenuSection[] = [
         items: [
             { label: "Products", href: "/admin/products", icon: Package },
             { label: "Catalog Setup", href: "/admin/products/catalog-setup", icon: Layers },
-            { label: "LPOs", href: "/admin/lpos", icon: ClipboardList },
             { label: "Vendors", href: "/admin/vendors", icon: Building2 },
-            { label: "Deliveries", href: "/admin/deliveries", icon: Truck },
             { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
         ],
     },
@@ -79,6 +81,10 @@ const menuSections: MenuSection[] = [
         items: [
             { label: "Users", href: "/admin/users", icon: Users },
             { label: "Subscription Plans", href: "/admin/subscription-plans", icon: BadgeDollarSign },
+            { label: "Activities", href: "/admin/activities", icon: Activity },
+            { label: "Notifications", href: "/admin/notifications", icon: Bell },
+            { label: "Email Log", href: "/admin/email-log", icon: Mail },
+            { label: "Reports", href: "/admin/reports", icon: Download },
             { label: "Audit Logs", href: "/admin/audit-logs", icon: ShieldCheck },
             { label: "Alerts", href: "/admin/alerts", icon: AlertTriangle },
             { label: "Settings", href: "/admin/settings", icon: Settings },
@@ -93,14 +99,26 @@ interface AdminSidebarProps {
 
 export default function AdminSidebar({ isDrawerOpen, onClose }: AdminSidebarProps): ReactElement {
     const pathname = usePathname();
-    const router = useRouter();
     const [loggingOut, setLoggingOut] = useState(false);
+    const sidebarRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        const el = sidebarRef.current;
+        if (!el) return;
+        const saved = sessionStorage.getItem(SCROLL_KEY);
+        if (saved) el.scrollTop = parseInt(saved, 10);
+    }, []);
+
+    const handleScroll = (): void => {
+        if (sidebarRef.current) {
+            sessionStorage.setItem(SCROLL_KEY, String(sidebarRef.current.scrollTop));
+        }
+    };
 
     const isActiveLink = (href: string): boolean => {
         if (pathname === href) return true;
         if (href === "/admin/dashboard") return false;
         if (pathname.startsWith(href)) return true;
-        // Job detail sub-pages belong to Control Tower
         if (href === "/admin/orchestration" && pathname.startsWith("/admin/jobs/")) return true;
         return false;
     };
@@ -117,6 +135,8 @@ export default function AdminSidebar({ isDrawerOpen, onClose }: AdminSidebarProp
 
     return (
         <aside
+            ref={sidebarRef}
+            onScroll={handleScroll}
             className={`
                 fixed left-0 top-0 z-50 h-screen w-[85vw] lg:w-64 bg-brand-blue text-white
                 flex flex-col overflow-y-auto
@@ -175,7 +195,8 @@ export default function AdminSidebar({ isDrawerOpen, onClose }: AdminSidebarProp
                             })}
                         </ul>
                     </div>
-                ))}            </nav>
+                ))}
+            </nav>
 
             <div className="px-4 py-4 border-t border-white/10">
                 <button

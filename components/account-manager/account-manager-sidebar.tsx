@@ -15,6 +15,7 @@ import {
     Briefcase,
     Bell,
     ShoppingCart,
+    Settings,
 } from "lucide-react";
 import { logoutUserSession } from "@/lib/api/auth";
 import { fetchNotifications } from "@/lib/api/notifications";
@@ -46,6 +47,7 @@ const menuSections: MenuSection[] = [
             { label: "Analytics", href: "/account-manager/analytics", icon: BarChart3 },
             { label: "Jobs", href: "/account-manager/jobs", icon: Briefcase },
             { label: "Notifications", href: "/account-manager/notifications", icon: Bell },
+            { label: "Settings", href: "/account-manager/settings", icon: Settings },
         ],
     },
 ];

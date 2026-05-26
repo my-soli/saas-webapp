@@ -11,10 +11,8 @@ import {
     FileText,
     Package,
     Layers,
-    Briefcase,
     Building2,
     Settings,
-    Truck,
     BarChart3,
     Bell,
     LogOut,
@@ -50,7 +48,6 @@ const menuSections: MenuSection[] = [
         title: "MY WORK",
         items: [
             { label: "My Quotes", href: "/production-team/my-quotes", icon: FileText },
-            { label: "My Jobs", href: "/production-team/my-jobs", icon: Briefcase },
         ],
     },
     {
@@ -58,9 +55,7 @@ const menuSections: MenuSection[] = [
         items: [
             { label: "Product Catalog", href: "/production-team/products", icon: Package },
             { label: "Catalog Setup", href: "/production-team/catalog-setup", icon: Layers },
-            
             { label: "Vendors", href: "/production-team/vendors", icon: Building2 },
-            { label: "Deliveries", href: "/production-team/deliveries", icon: Truck },
         ],
     },
     {
