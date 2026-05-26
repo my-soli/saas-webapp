@@ -57,12 +57,14 @@ import {
     fetchComponentFiles,
     uploadComponentFile,
     deleteComponentFile,
+    fetchVendorBriefStatus,
     type JobComponent,
     type ComponentDependency,
     type ComponentTask,
     type ComponentQCResult,
     type ComponentFile,
     type ComponentFileSlot,
+    type VendorBriefStatus,
 } from "@/services/orchestration";
 import { jobComponentToProductionComponent } from "../lib/api-job-helpers";
 import type { ProductionComponent } from "../types";
@@ -206,6 +208,14 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
         enabled: isNumericComp,
     });
 
+    const vendorBriefStatusQuery = useQuery({
+        queryKey: ["vendor-brief-status", numericCompId],
+        queryFn: () => fetchVendorBriefStatus(numericCompId),
+        enabled: isNumericComp,
+        staleTime: 15_000,
+        refetchInterval: 30_000,
+    });
+
     const ptUsers = usersQuery.data ?? [];
     const customTemplates = customTemplatesQuery.data ?? [];
     const vendors = vendorsQuery.data ?? [];
@@ -278,6 +288,7 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
 
     const sendBriefMut = useMutation({
         mutationFn: () => sendVendorBrief(numericCompId),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vendor-brief-status", numericCompId] }),
     });
 
     const assignVendorMut = useMutation({
@@ -1403,42 +1414,86 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
 
                             {/* Vendor Status Timeline */}
                             <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-                                <div className="border-b border-gray-100 px-5 py-3">
+                                <div className="border-b border-gray-100 px-5 py-3 flex items-center justify-between">
                                     <span className="text-sm font-semibold text-gray-800">Vendor Status Timeline</span>
+                                    {vendorBriefStatusQuery.data?.has_brief && !vendorBriefStatusQuery.data.is_active && (
+                                        <span className="text-xs font-medium text-brand-orange bg-brand-orange/10 border border-brand-orange/20 rounded-full px-2 py-0.5">Link expired</span>
+                                    )}
                                 </div>
                                 <div className="p-5">
                                     {(() => {
-                                        const briefSent = sendBriefMut.isSuccess;
-                                        const createdDate = rawComp?.created_at
-                                            ? new Date(rawComp.created_at)
-                                            : null;
-                                        const fmtDate = (d: Date) =>
-                                            `${d.toLocaleDateString("en-KE", { day: "numeric", month: "short" })} · ${d.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}`;
+                                        const bs: VendorBriefStatus | undefined = vendorBriefStatusQuery.data;
+                                        const fmtDate = (iso: string) => {
+                                            const d = new Date(iso);
+                                            return `${d.toLocaleDateString("en-KE", { day: "numeric", month: "short" })} · ${d.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}`;
+                                        };
+                                        const createdDate = rawComp?.created_at ? rawComp.created_at : null;
+                                        const briefSentAt = bs?.brief_sent_at ?? (sendBriefMut.isSuccess ? new Date().toISOString() : null);
+                                        const firstProof = bs?.proofs?.[0];
+                                        const inProduction = rawComp?.status === "in_progress" || rawComp?.status === "completed" || rawComp?.status === "dispatched";
+                                        const readyOrDone = rawComp?.status === "completed" || rawComp?.status === "dispatched";
 
-                                        const steps = [
-                                            { label: "Brief prepared by PT", time: createdDate ? fmtDate(createdDate) : null, done: true },
-                                            { label: "Brief sent — awaiting acknowledgement", time: briefSent ? "Just now" : null, done: briefSent },
-                                            { label: "Proof upload", time: null, done: false },
-                                            { label: "Production running", time: null, done: false },
-                                            { label: "Ready for pickup", time: null, done: false },
+                                        const steps: { label: string; time: string | null; done: boolean; detail?: string }[] = [
+                                            {
+                                                label: "Brief prepared by PT",
+                                                time: createdDate ? fmtDate(createdDate) : null,
+                                                done: true,
+                                            },
+                                            {
+                                                label: "Brief sent — awaiting acknowledgement",
+                                                time: briefSentAt ? fmtDate(briefSentAt) : null,
+                                                done: Boolean(briefSentAt),
+                                            },
+                                            {
+                                                label: bs?.acknowledged ? `Acknowledged by ${bs.acknowledged_by || "vendor"}` : "Vendor acknowledgement",
+                                                time: bs?.acknowledged_at ? fmtDate(bs.acknowledged_at) : null,
+                                                done: Boolean(bs?.acknowledged),
+                                            },
+                                            {
+                                                label: firstProof ? `Proof uploaded by ${firstProof.uploaded_by_name || "vendor"}` : "Proof upload",
+                                                time: firstProof ? fmtDate(firstProof.uploaded_at) : null,
+                                                done: Boolean(firstProof),
+                                                detail: bs?.proofs && bs.proofs.length > 1 ? `${bs.proofs.length} proofs total` : undefined,
+                                            },
+                                            {
+                                                label: "Production running",
+                                                time: bs?.vendor_accepted_at ? fmtDate(bs.vendor_accepted_at) : null,
+                                                done: inProduction,
+                                            },
+                                            {
+                                                label: "Ready for pickup",
+                                                time: null,
+                                                done: readyOrDone,
+                                            },
                                         ];
 
-                                        return steps.map((step, i) => (
-                                            <div key={i} className="flex gap-3">
-                                                <div className="flex flex-col items-center">
-                                                    <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${step.done ? "bg-brand-green/15 text-brand-green" : "bg-gray-100 text-gray-400"}`}>
-                                                        {step.done ? <CheckIcon className="h-3.5 w-3.5" /> : i + 1}
+                                        return (
+                                            <>
+                                                {steps.map((step, i) => (
+                                                    <div key={i} className="flex gap-3">
+                                                        <div className="flex flex-col items-center">
+                                                            <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${step.done ? "bg-brand-green/15 text-brand-green" : "bg-gray-100 text-gray-400"}`}>
+                                                                {step.done ? <CheckIcon className="h-3.5 w-3.5" /> : i + 1}
+                                                            </div>
+                                                            {i < steps.length - 1 && (
+                                                                <div className={`mt-1 w-px min-h-[20px] flex-1 ${step.done ? "bg-brand-green/30" : "bg-gray-100"}`} />
+                                                            )}
+                                                        </div>
+                                                        <div className="pb-4 min-w-0">
+                                                            <p className={`text-sm font-semibold ${step.done ? "text-gray-800" : "text-gray-400"}`}>{step.label}</p>
+                                                            <p className="text-xs text-gray-400">{step.time ?? "—"}</p>
+                                                            {step.detail && <p className="text-xs text-brand-blue mt-0.5">{step.detail}</p>}
+                                                        </div>
                                                     </div>
-                                                    {i < steps.length - 1 && (
-                                                        <div className={`mt-1 w-px min-h-[20px] flex-1 ${step.done ? "bg-brand-green/30" : "bg-gray-100"}`} />
-                                                    )}
-                                                </div>
-                                                <div className="pb-4 min-w-0">
-                                                    <p className={`text-sm font-semibold ${step.done ? "text-gray-800" : "text-gray-400"}`}>{step.label}</p>
-                                                    <p className="text-xs text-gray-300">{step.time ?? "—"}</p>
-                                                </div>
-                                            </div>
-                                        ));
+                                                ))}
+                                                {bs?.time_adjustment_requested && (
+                                                    <div className="mt-2 rounded-lg border border-brand-orange/20 bg-brand-orange/5 px-3 py-2">
+                                                        <p className="text-xs font-semibold text-brand-orange">Vendor requested time adjustment</p>
+                                                        {bs.time_adjustment_reason && <p className="text-xs text-gray-600 mt-0.5">{bs.time_adjustment_reason}</p>}
+                                                    </div>
+                                                )}
+                                            </>
+                                        );
                                     })()}
                                 </div>
                             </div>

@@ -435,6 +435,54 @@ export const uploadComponentFile = async (compId: number, slot: ComponentFileSlo
 export const deleteComponentFile = (fileId: number): Promise<void> =>
     del(`job-component-files/${fileId}/`);
 
+// ── Vendor Brief Status (for PT timeline) ─────────────────────────────────────
+
+export interface VendorBriefProofStatus {
+    id: number;
+    file_name: string;
+    uploaded_at: string;
+    uploaded_by_name: string;
+    pt_feedback: string | null;
+    feedback_at: string | null;
+}
+
+export interface VendorBriefStatus {
+    has_brief: boolean;
+    brief_sent_at?: string;
+    acknowledged?: boolean;
+    acknowledged_at?: string | null;
+    acknowledged_by?: string;
+    vendor_accepted?: boolean;
+    vendor_accepted_at?: string | null;
+    time_adjustment_requested?: boolean;
+    time_adjustment_reason?: string;
+    proofs?: VendorBriefProofStatus[];
+    updates?: { note: string; created_at: string }[];
+    is_active?: boolean;
+}
+
+export const fetchVendorBriefStatus = (compId: number): Promise<VendorBriefStatus> =>
+    get<VendorBriefStatus>(`job-components/${compId}/vendor-brief-status/`);
+
+// ── Vendor Job Analytics ──────────────────────────────────────────────────────
+
+export interface VendorJobStat {
+    id: number;
+    name: string;
+    email: string;
+    active: boolean;
+    total_jobs: number;
+    completed_jobs: number;
+    completion_rate: number;
+    briefs_sent: number;
+    acknowledged: number;
+    proofs_uploaded: number;
+    avg_completion_days: number | null;
+}
+
+export const fetchVendorJobAnalytics = (): Promise<VendorJobStat[]> =>
+    get<VendorJobStat[]>("pt/vendor-analytics/").then((d) => (Array.isArray(d) ? d : []));
+
 // ── Vendors ───────────────────────────────────────────────────────────────────
 
 export interface VendorOption {
