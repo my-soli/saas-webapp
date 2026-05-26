@@ -39,7 +39,7 @@ const productionLinks: ProductionLink[] = [
     {
         label: "Jobs",
         description: "Track production execution from start to completion.",
-        href: "/staff/production/my-jobs",
+        href: "/production-team/orchestration",
     },
     {
         label: "Processes",

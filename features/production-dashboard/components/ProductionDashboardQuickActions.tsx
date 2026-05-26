@@ -15,7 +15,7 @@ interface ProductionQuickAction {
 
 const productionQuickActions: ProductionQuickAction[] = [
     { label: "My Quotes", href: "/staff/production/my-quotes", Icon: FileTextIcon },
-    { label: "My Jobs", href: "/staff/production/my-jobs", Icon: BriefcaseBusinessIcon },
+    { label: "Master Jobs", href: "/production-team/orchestration", Icon: BriefcaseBusinessIcon },
     { label: "Processes", href: "/production-team/processes", Icon: SettingsIcon },
     { label: "Vendors", href: "/production-team/vendors", Icon: Building2Icon },
 ];

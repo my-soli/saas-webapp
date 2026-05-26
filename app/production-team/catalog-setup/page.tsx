@@ -131,17 +131,17 @@ export default function ProductionTeamCatalogSetupPage(): ReactElement {
 
     const createPrintMutation = useMutation({
         mutationFn: (d: FormState) => createPrintCategory({ name: d.name, description: d.description }),
-        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print category created."); resetForm(); },
+        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print process created."); resetForm(); },
         onError: () => toast.error("Failed to create print category."),
     });
     const updatePrintMutation = useMutation({
         mutationFn: (d: FormState & { id: number }) => updatePrintCategory(d.id, { name: d.name, description: d.description }),
-        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print category updated."); resetForm(); },
+        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print process updated."); resetForm(); },
         onError: () => toast.error("Failed to update print category."),
     });
     const deletePrintMutation = useMutation({
         mutationFn: (id: number) => deletePrintCategory(id),
-        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print category deleted."); setDeletingId(null); },
+        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print process deleted."); setDeletingId(null); },
         onError: () => toast.error("Failed to delete print category."),
     });
 
@@ -219,7 +219,7 @@ export default function ProductionTeamCatalogSetupPage(): ReactElement {
         { id: "categories", label: "Categories", count: categories.length },
         { id: "subcategories", label: "Sub-Categories", count: subcategories.length },
         { id: "families", label: "Product Families", count: families.length },
-        { id: "print-categories", label: "Print Categories", count: printCategories.length },
+        { id: "print-categories", label: "Print Processes", count: printCategories.length },
     ];
 
     const activeItems: Array<ProductCategory | ProductSubCategory | ProductFamily | PrintCategory> =

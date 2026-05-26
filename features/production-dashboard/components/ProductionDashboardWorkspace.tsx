@@ -159,10 +159,10 @@ export default function ProductionDashboardWorkspace(): ReactElement {
                         </p>
                     </div>
                     <Link
-                        href="/staff/production/my-jobs"
+                        href="/production-team/orchestration"
                         className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90"
                     >
-                        My Jobs
+                        Master Jobs
                     </Link>
                 </div>
             </header>
@@ -290,7 +290,7 @@ export default function ProductionDashboardWorkspace(): ReactElement {
                         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                             <h2 className="text-sm font-semibold text-gray-900">Recent Jobs</h2>
                             <Link
-                                href="/staff/production/my-jobs"
+                                href="/production-team/orchestration"
                                 className="inline-flex items-center gap-1 text-xs font-semibold text-brand-blue hover:underline"
                             >
                                 View all
@@ -331,7 +331,7 @@ export default function ProductionDashboardWorkspace(): ReactElement {
                                                     key={job.id}
                                                     className="cursor-pointer hover:bg-gray-50"
                                                     onClick={(): void =>
-                                                        router.push(`/staff/production/my-jobs?job=${job.id}`)
+                                                        router.push(`/production-team/jobs/${job.id}`)
                                                     }
                                                 >
                                                     <td className="px-5 py-3 font-semibold text-gray-900">
@@ -385,8 +385,8 @@ export default function ProductionDashboardWorkspace(): ReactElement {
                                 {(
                                     [
                                         {
-                                            href: "/staff/production/my-jobs",
-                                            label: "My Jobs",
+                                            href: "/production-team/orchestration",
+                                            label: "Master Jobs",
                                             icon: ClipboardListIcon,
                                             colorText: "text-brand-blue",
                                         },

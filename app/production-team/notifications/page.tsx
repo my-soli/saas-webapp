@@ -8,7 +8,9 @@ import {
     BellIcon,
     CheckCircle2Icon,
     SearchIcon,
+    ArrowRightIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin/admin-layout";
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/api/notifications";
@@ -231,6 +233,18 @@ export default function ProductionNotificationsPage(): ReactElement {
                                                     {!notification.is_read ? <span className="text-xs font-medium text-brand-red">New</span> : null}
                                                 </div>
                                                 <p className="mt-2 text-sm text-gray-700">{notification.message}</p>
+
+                                                {notification.action_url ? (
+                                                    <Link
+                                                        href={notification.action_url}
+                                                        onClick={() => !notification.is_read && handleMarkRead(notification.id)}
+                                                        className="mt-2.5 inline-flex items-center gap-1.5 rounded-md bg-brand-blue px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-blue/90 active:scale-95 transition-all"
+                                                    >
+                                                        {notification.action_label || 'View'}
+                                                        <ArrowRightIcon className="h-3 w-3" />
+                                                    </Link>
+                                                ) : null}
+
                                                 <p className="mt-2 text-xs text-gray-500">{formatDate(notification.created_at)}</p>
                                             </div>
 
