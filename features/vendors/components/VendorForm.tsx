@@ -1,5 +1,7 @@
 import type { ChangeEvent, FormEvent, ReactElement } from "react";
-import { VendorFormValues, VendorSustainablePractices } from "@/types/vendors";
+import { useQuery } from "@tanstack/react-query";
+import { fetchPrintCategories } from "@/services/product-catalog-setup";
+import { VendorFormValues, VendorSustainablePractices, ServiceRating } from "@/types/vendors";
 
 interface VendorFormProps {
     values: VendorFormValues;
@@ -11,6 +13,146 @@ interface VendorFormProps {
     onSendInvite?: () => void;
     isSendingInvite?: boolean;
 }
+
+const RATING_OPTIONS = ["", "Excellent", "Good", "Fair", "Poor"];
+
+function ServicesSection({
+    values,
+    updateField,
+}: {
+    values: VendorFormValues;
+    updateField: <K extends keyof VendorFormValues>(field: K, value: VendorFormValues[K]) => void;
+}): ReactElement {
+    const { data: printCategories = [] } = useQuery({
+        queryKey: ["print-categories"],
+        queryFn: fetchPrintCategories,
+        staleTime: 60_000,
+    });
+
+    const selectedNames = new Set(values.service_ratings.map((s) => s.name));
+
+    const toggleService = (name: string): void => {
+        if (selectedNames.has(name)) {
+            updateField("service_ratings", values.service_ratings.filter((s) => s.name !== name));
+        } else {
+            updateField("service_ratings", [
+                ...values.service_ratings,
+                { name, rating: 0, quality: "", reliability: "", min_order: "", lead_time: "" },
+            ]);
+        }
+    };
+
+    const updateServiceField = (name: string, key: keyof ServiceRating, val: string | number): void => {
+        updateField(
+            "service_ratings",
+            values.service_ratings.map((s) => (s.name === name ? { ...s, [key]: val } : s)),
+        );
+    };
+
+    return (
+        <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-gray-900">Services &amp; Per-Service Ratings</h2>
+            <p className="text-xs text-gray-500 mt-2">
+                Select the print processes this vendor offers. Each selected service has its own capacity and quality ratings.
+            </p>
+
+            {/* Print process multi-select */}
+            <div className="mt-4">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Print Processes Offered</p>
+                {printCategories.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">No print processes configured yet. Add them in Catalog Setup → Print Processes.</p>
+                ) : (
+                    <div className="flex flex-wrap gap-2">
+                        {printCategories.map((pc) => {
+                            const active = selectedNames.has(pc.name);
+                            return (
+                                <button
+                                    key={pc.id}
+                                    type="button"
+                                    onClick={() => toggleService(pc.name)}
+                                    className={`px-3 py-1.5 text-sm rounded-full border font-medium transition-colors ${
+                                        active
+                                            ? "bg-brand-blue text-white border-brand-blue"
+                                            : "bg-white text-gray-600 border-gray-300 hover:border-brand-blue hover:text-brand-blue"
+                                    }`}
+                                >
+                                    {active ? "✓ " : ""}{pc.name}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+
+            {/* Per-service detail cards */}
+            {values.service_ratings.length > 0 && (
+                <div className="mt-5 space-y-4">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Per-Service Details</p>
+                    {values.service_ratings.map((sr) => (
+                        <div key={sr.name} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <p className="text-sm font-semibold text-brand-blue mb-3">{sr.name}</p>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Overall Rating (0–5)</label>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        max={5}
+                                        step={0.1}
+                                        value={sr.rating}
+                                        onChange={(e) => updateServiceField(sr.name, "rating", Number(e.target.value))}
+                                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Quality</label>
+                                    <select
+                                        value={sr.quality}
+                                        onChange={(e) => updateServiceField(sr.name, "quality", e.target.value)}
+                                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    >
+                                        {RATING_OPTIONS.map((o) => <option key={o} value={o}>{o || "— Not rated —"}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Reliability</label>
+                                    <select
+                                        value={sr.reliability}
+                                        onChange={(e) => updateServiceField(sr.name, "reliability", e.target.value)}
+                                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    >
+                                        {RATING_OPTIONS.map((o) => <option key={o} value={o}>{o || "— Not rated —"}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Min Order (KES)</label>
+                                    <input
+                                        type="text"
+                                        value={sr.min_order}
+                                        onChange={(e) => updateServiceField(sr.name, "min_order", e.target.value)}
+                                        placeholder="e.g. 500"
+                                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lead Time</label>
+                                    <input
+                                        type="text"
+                                        value={sr.lead_time}
+                                        onChange={(e) => updateServiceField(sr.name, "lead_time", e.target.value)}
+                                        placeholder="e.g. 3 days"
+                                        className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
 
 export default function VendorForm({
     values,
@@ -164,57 +306,12 @@ export default function VendorForm({
                 </div>
             </div>
 
-            <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-gray-900">Services</h2>
-                <p className="text-xs text-gray-500 mt-2">What this vendor can produce.</p>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="md:col-span-2">
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Services</label>
-                        <p className="text-xs text-gray-500 mt-1">List services separated by commas.</p>
-                        <textarea
-                            value={values.services}
-                            onChange={handleTextareaChange("services")}
-                            rows={2}
-                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                        />
-                    </div>
-                    <div className="md:col-span-2">
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Specialization</label>
-                        <p className="text-xs text-gray-500 mt-1">What they do best or most often.</p>
-                        <textarea
-                            value={values.specialization}
-                            onChange={handleTextareaChange("specialization")}
-                            rows={2}
-                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                        />
-                    </div>
-                </div>
-            </div>
+            <ServicesSection values={values} updateField={updateField} />
 
             <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-gray-900">Capacity</h2>
-                <p className="text-xs text-gray-500 mt-2">How much and how fast the vendor can deliver.</p>
+                <h2 className="text-lg font-semibold text-gray-900">General Capacity</h2>
+                <p className="text-xs text-gray-500 mt-2">Overall limits across all services.</p>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Minimum Order (KES)</label>
-                        <p className="text-xs text-gray-500 mt-1">Smallest order they accept.</p>
-                        <input
-                            type="text"
-                            value={values.minimum_order}
-                            onChange={handleTextChange("minimum_order")}
-                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Lead Time</label>
-                        <p className="text-xs text-gray-500 mt-1">Typical completion time, e.g. 5 days.</p>
-                        <input
-                            type="text"
-                            value={values.lead_time}
-                            onChange={handleTextChange("lead_time")}
-                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                        />
-                    </div>
                     <div>
                         <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Max Concurrent Jobs</label>
                         <p className="text-xs text-gray-500 mt-1">How many jobs they can handle at once.</p>
@@ -242,58 +339,14 @@ export default function VendorForm({
             </div>
 
             <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                <h2 className="text-lg font-semibold text-gray-900">Ratings</h2>
-                <p className="text-xs text-gray-500 mt-2">Manual performance ratings for this vendor.</p>
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Overall Rating (0–5)</label>
-                        <p className="text-xs text-gray-500 mt-1">Composite score across all criteria.</p>
-                        <input
-                            type="number"
-                            min={0}
-                            max={5}
-                            step={0.01}
-                            value={values.rating}
-                            onChange={handleTextChange("rating")}
-                            placeholder="e.g. 4.50"
-                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                        />
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Quality Rating</label>
-                        <p className="text-xs text-gray-500 mt-1">E.g. Excellent, Good, Fair, Poor.</p>
-                        <select
-                            value={values.quality_rating}
-                            onChange={(e: import("react").ChangeEvent<HTMLSelectElement>): void =>
-                                updateField("quality_rating", e.target.value)
-                            }
-                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                        >
-                            <option value="">— Not rated —</option>
-                            <option value="Excellent">Excellent</option>
-                            <option value="Good">Good</option>
-                            <option value="Fair">Fair</option>
-                            <option value="Poor">Poor</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Reliability Rating</label>
-                        <p className="text-xs text-gray-500 mt-1">E.g. Excellent, Good, Fair, Poor.</p>
-                        <select
-                            value={values.reliability_rating}
-                            onChange={(e: import("react").ChangeEvent<HTMLSelectElement>): void =>
-                                updateField("reliability_rating", e.target.value)
-                            }
-                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                        >
-                            <option value="">— Not rated —</option>
-                            <option value="Excellent">Excellent</option>
-                            <option value="Good">Good</option>
-                            <option value="Fair">Fair</option>
-                            <option value="Poor">Poor</option>
-                        </select>
-                    </div>
-                </div>
+                <h2 className="text-lg font-semibold text-gray-900">Specialization</h2>
+                <p className="text-xs text-gray-500 mt-2">What they do best or most often.</p>
+                <textarea
+                    value={values.specialization}
+                    onChange={handleTextareaChange("specialization")}
+                    rows={2}
+                    className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                />
             </div>
 
             <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">

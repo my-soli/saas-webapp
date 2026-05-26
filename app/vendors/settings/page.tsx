@@ -6,7 +6,8 @@ import type { ReactElement, FormEvent, ChangeEvent } from "react";
 import VendorLayout from "@/components/vendor/vendor-layout";
 import { fetchCurrentVendor, updateVendorSelf } from "@/services/vendors";
 import type { Vendor, UpdateVendorPayload } from "@/types/vendors";
-import { Building2, User, Mail, Phone, MapPin, FileText, Clock, Zap } from "lucide-react";
+import { Building2, User, Mail, Phone, MapPin, FileText, Clock, Zap, Shield } from "lucide-react";
+import TotpSetupCard from "@/components/settings/TotpSetupCard";
 import { toast } from "sonner";
 
 interface FieldProps {
@@ -312,7 +313,7 @@ export default function VendorSettingsPage(): ReactElement {
                         </div>
                     </section>
 
-                    <div className="flex justify-end pb-8">
+                    <div className="flex justify-end pb-4">
                         <button
                             type="submit"
                             disabled={mutation.isPending}
@@ -322,6 +323,15 @@ export default function VendorSettingsPage(): ReactElement {
                         </button>
                     </div>
                 </form>
+
+                {/* Security */}
+                <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-4 pb-8">
+                    <div className="flex items-center gap-2 text-brand-blue font-semibold">
+                        <Shield className="w-5 h-5" />
+                        Security
+                    </div>
+                    <TotpSetupCard />
+                </section>
             </main>
         </VendorLayout>
     );

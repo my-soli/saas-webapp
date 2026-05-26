@@ -1,5 +1,14 @@
 export type VendorSustainablePractices = "yes" | "partly";
 
+export interface ServiceRating {
+    name: string;
+    rating: number;
+    quality: string;
+    reliability: string;
+    min_order: string;
+    lead_time: string;
+}
+
 export interface Vendor {
     id: number;
     user: number | null;
@@ -13,6 +22,7 @@ export interface Vendor {
     payment_terms: string | null;
     payment_method: string | null;
     services: string | null;
+    service_ratings: ServiceRating[];
     specialization: string | null;
     minimum_order: string;
     lead_time: string | null;
@@ -59,6 +69,7 @@ export interface CreateVendorPayload {
     payment_terms: string | null;
     payment_method: string | null;
     services: string | null;
+    service_ratings: ServiceRating[];
     specialization: string | null;
     minimum_order: string;
     lead_time: string | null;
@@ -89,6 +100,7 @@ export interface VendorFormValues {
     payment_terms: string;
     payment_method: string;
     services: string;
+    service_ratings: ServiceRating[];
     specialization: string;
     minimum_order: string;
     lead_time: string;
