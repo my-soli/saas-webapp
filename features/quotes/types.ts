@@ -1,6 +1,7 @@
 export interface LineItem {
     tempId: string;
     product_id: number;
+    product?: number | null;
     product_name: string;
     product_sku: string;
     pricing_mode: string;

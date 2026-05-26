@@ -22,11 +22,22 @@ export default function InventoryTab({ values, onValuesChange }: InventoryTabPro
         staleTime: 60_000,
     });
 
+    const additionalVendors = Array.isArray(values.additional_vendors) ? values.additional_vendors : [];
+
+    const toggleAdditionalVendor = (id: string): void => {
+        const current = additionalVendors;
+        if (current.includes(id)) {
+            set("additional_vendors", current.filter((v) => v !== id));
+        } else {
+            set("additional_vendors", [...current, id]);
+        }
+    };
+
     return (
         <div className="max-w-2xl space-y-5">
             <FormField
-                label="Vendor"
-                hint="Primary vendor or supplier who provides this product"
+                label="Primary Vendor"
+                hint="Main vendor or supplier who provides this product"
                 required
             >
                 <select
@@ -43,6 +54,40 @@ export default function InventoryTab({ values, onValuesChange }: InventoryTabPro
                         </option>
                     ))}
                 </select>
+            </FormField>
+
+            <FormField
+                label="Additional Vendors"
+                hint="Other vendors who can also supply this product (optional)"
+            >
+                {vendorsLoading ? (
+                    <p className="text-sm text-gray-400">Loading vendors…</p>
+                ) : (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                        {vendors
+                            .filter((v) => String(v.id) !== values.vendor)
+                            .map((v) => {
+                                const isSelected = additionalVendors.includes(String(v.id));
+                                return (
+                                    <button
+                                        key={v.id}
+                                        type="button"
+                                        onClick={() => toggleAdditionalVendor(String(v.id))}
+                                        className={`px-3 py-1.5 text-sm rounded-full border font-medium transition-colors ${
+                                            isSelected
+                                                ? "bg-brand-blue text-white border-brand-blue"
+                                                : "bg-white text-gray-600 border-gray-300 hover:border-brand-blue hover:text-brand-blue"
+                                        }`}
+                                    >
+                                        {isSelected ? "✓ " : ""}{v.name}
+                                    </button>
+                                );
+                            })}
+                        {vendors.filter((v) => String(v.id) !== values.vendor).length === 0 && (
+                            <p className="text-sm text-gray-400 italic">No other vendors available.</p>
+                        )}
+                    </div>
+                )}
             </FormField>
 
             <FormField label="Stock Status" hint="Availability shown to customers on the storefront and used in order management">
