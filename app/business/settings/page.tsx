@@ -8,6 +8,7 @@ import { fetchSettings, updateSettings } from "@/lib/api/settings";
 import { SystemSettings, UpdateSettingsPayload } from "@/types/settings";
 import { LoaderOne } from "@/components/ui/loader";
 import { Save, Settings as SettingsIcon, Bell, Shield, CheckCircle2, AlertCircle } from "lucide-react";
+import TotpSetupCard from "@/components/settings/TotpSetupCard";
 
 type TabType = "general" | "notifications" | "security";
 
@@ -313,6 +314,11 @@ export default function BusinessSettingsPage() {
                                         max="1440"
                                     />
                                     <p className="mt-1 text-sm text-gray-500">Users will be logged out after this period of inactivity</p>
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-200">
+                                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Your Account Security</h3>
+                                    <TotpSetupCard />
                                 </div>
                             </div>
                         )}

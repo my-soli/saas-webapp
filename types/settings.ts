@@ -9,6 +9,13 @@ export interface SystemSettings {
     daily_digest?: boolean;
     allow_registration?: boolean;
     session_timeout?: number;
+    tax_rate_ke?: number;
+    tax_rate_export?: number;
+    turnaround_standard?: number;
+    turnaround_rush?: number;
+    turnaround_expedited?: number;
+    quote_validity_days?: number;
+    otp_expiry_minutes?: number;
 }
 
 export interface SettingItem {

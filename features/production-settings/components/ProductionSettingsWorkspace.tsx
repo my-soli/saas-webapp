@@ -7,7 +7,9 @@ import {
     CheckCircle2,
     LoaderCircle,
     Save,
+    Shield,
 } from "lucide-react";
+import TotpSetupCard from "@/components/settings/TotpSetupCard";
 import { toast } from "sonner";
 import { changePassword, getCurrentUser } from "@/lib/api/auth";
 import {
@@ -613,6 +615,14 @@ export default function ProductionSettingsWorkspace(): ReactElement {
                                 Update Password
                             </button>
                         </div>
+                    </section>
+
+                    <section id="2fa-section" className="rounded-xl border border-gray-200 bg-white p-6 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Shield className="w-5 h-5 text-brand-blue" />
+                            <h2 className="text-lg font-semibold text-gray-900">Two-Factor Authentication</h2>
+                        </div>
+                        <TotpSetupCard />
                     </section>
                 </div>
             </div>
