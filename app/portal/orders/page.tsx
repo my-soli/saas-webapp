@@ -3,7 +3,7 @@
 import { useState, type ReactElement } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Search, Filter, Eye, Package, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { Search, Filter, Eye, Package, ChevronLeft, ChevronRight, AlertCircle, Plus } from "lucide-react";
 import { fetchClientOrders } from "@/services/client-orders";
 import type { ClientOrder, OrderStatus } from "@/types/client-orders";
 
@@ -133,11 +133,20 @@ export default function OrdersPage(): ReactElement {
     return (
         <>
             <div className="p-4 lg:p-8 space-y-6">
-                <div>
-                    <h1 className="text-3xl font-bold text-brand-black">Orders</h1>
-                    <p className="text-gray-500 mt-1">
-                        Track and manage all your print orders
-                    </p>
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div>
+                        <h1 className="text-3xl font-bold text-brand-black">Orders</h1>
+                        <p className="text-gray-500 mt-1">
+                            Track and manage all your print orders
+                        </p>
+                    </div>
+                    <Link
+                        href="/portal/cart"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-blue text-white text-sm font-semibold rounded-lg hover:bg-brand-blue/90 transition-colors shadow-sm"
+                    >
+                        <Plus className="w-4 h-4" />
+                        New Order
+                    </Link>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3">

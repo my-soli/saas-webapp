@@ -2,7 +2,8 @@
 
 import { useState, useEffect, type ReactElement } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { User, Building2, Mail, Phone, MapPin, Lock, Save, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { User, Building2, Mail, Phone, MapPin, Lock, Save, Loader2, CheckCircle, AlertCircle, Shield } from "lucide-react";
+import TotpSetupCard from "@/components/settings/TotpSetupCard";
 import {
     fetchClientPortalProfile,
     updateClientPortalProfile,
@@ -576,6 +577,18 @@ export default function SettingsPage(): ReactElement {
                         </div>
                     </div>
                 )}
+
+                {/* Security Card */}
+                <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-4">
+                    <div className="flex items-center gap-2">
+                        <Shield className="w-5 h-5 text-brand-blue" />
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-900">Security</h2>
+                            <p className="text-sm text-gray-500">Protect your account with two-factor authentication</p>
+                        </div>
+                    </div>
+                    <TotpSetupCard />
+                </div>
             </div>
         </>
     );
