@@ -131,18 +131,18 @@ export default function CatalogSetupPage(): ReactElement {
 
     const createPrintMutation = useMutation({
         mutationFn: (d: FormState) => createPrintCategory({ name: d.name, description: d.description }),
-        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print category created."); resetForm(); },
-        onError: () => toast.error("Failed to create print category."),
+        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print process created."); resetForm(); },
+        onError: () => toast.error("Failed to create print process."),
     });
     const updatePrintMutation = useMutation({
         mutationFn: (d: FormState & { id: number }) => updatePrintCategory(d.id, { name: d.name, description: d.description }),
-        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print category updated."); resetForm(); },
-        onError: () => toast.error("Failed to update print category."),
+        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print process updated."); resetForm(); },
+        onError: () => toast.error("Failed to update print process."),
     });
     const deletePrintMutation = useMutation({
         mutationFn: (id: number) => deletePrintCategory(id),
-        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print category deleted."); setDeletingId(null); },
-        onError: () => toast.error("Failed to delete print category."),
+        onSuccess: () => { invalidate(["print-categories"]); toast.success("Print process deleted."); setDeletingId(null); },
+        onError: () => toast.error("Failed to delete print process."),
     });
 
     const resetForm = (): void => {
@@ -219,7 +219,7 @@ export default function CatalogSetupPage(): ReactElement {
         { id: "categories", label: "Categories", count: categories.length },
         { id: "subcategories", label: "Sub-Categories", count: subcategories.length },
         { id: "families", label: "Product Families", count: families.length },
-        { id: "print-categories", label: "Print Categories", count: printCategories.length },
+        { id: "print-categories", label: "Print Processes", count: printCategories.length },
     ];
 
     const activeItems: Array<ProductCategory | ProductSubCategory | ProductFamily | PrintCategory> =
@@ -244,7 +244,7 @@ export default function CatalogSetupPage(): ReactElement {
                     <div>
                         <h1 className="text-xl font-bold text-gray-900">Catalog Setup</h1>
                         <p className="text-sm text-gray-500 mt-0.5">
-                            Manage categories, sub-categories, product families, and print categories used across products.
+                            Manage categories, sub-categories, product families, and print processes used across products.
                         </p>
                     </div>
                 </div>

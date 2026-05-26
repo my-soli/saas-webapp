@@ -7,9 +7,10 @@ import Tabs from "@/components/admin/tabs";
 import { fetchSettings, updateSettings } from "@/lib/api/settings";
 import { SystemSettings, UpdateSettingsPayload } from "@/types/settings";
 import { LoaderOne } from "@/components/ui/loader";
-import { Save, Settings as SettingsIcon, Bell, Shield, CheckCircle2, AlertCircle } from "lucide-react";
+import { Save, Settings as SettingsIcon, Bell, Shield, CheckCircle2, AlertCircle, SlidersHorizontal } from "lucide-react";
+import TotpSetupCard from "@/components/settings/TotpSetupCard";
 
-type TabType = "general" | "notifications" | "security";
+type TabType = "general" | "notifications" | "security" | "platform";
 
 export default function SettingsPage() {
     const queryClient = useQueryClient();
@@ -67,6 +68,12 @@ export default function SettingsPage() {
             label: "Security",
             icon: Shield,
             description: "User authentication and session management"
+        },
+        {
+            key: "platform" as TabType,
+            label: "Platform",
+            icon: SlidersHorizontal,
+            description: "Tax rates, turnaround times, and business rules"
         },
     ];
 
@@ -313,6 +320,132 @@ export default function SettingsPage() {
                                         max="1440"
                                     />
                                     <p className="mt-1 text-sm text-gray-500">Users will be logged out after this period of inactivity</p>
+                                </div>
+
+                                <div className="pt-4 border-t border-gray-200">
+                                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Your Account Security</h3>
+                                    <TotpSetupCard />
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === "platform" && (
+                            <div className="space-y-8 max-w-2xl">
+                                <div>
+                                    <h3 className="text-base font-semibold text-gray-900 mb-4">Tax Rates</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Kenya VAT Rate (%)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={formData.tax_rate_ke ?? 16}
+                                                onChange={(e) => handleChange("tax_rate_ke", parseFloat(e.target.value))}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                                min="0"
+                                                max="100"
+                                                step="0.1"
+                                            />
+                                            <p className="mt-1 text-sm text-gray-500">Applied to all Kenya-based quotes</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Export VAT Rate (%)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={formData.tax_rate_export ?? 0}
+                                                onChange={(e) => handleChange("tax_rate_export", parseFloat(e.target.value))}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                                min="0"
+                                                max="100"
+                                                step="0.1"
+                                            />
+                                            <p className="mt-1 text-sm text-gray-500">Applied to export orders (usually 0%)</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-gray-200 pt-6">
+                                    <h3 className="text-base font-semibold text-gray-900 mb-4">Turnaround Times (Days)</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Standard
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={formData.turnaround_standard ?? 7}
+                                                onChange={(e) => handleChange("turnaround_standard", parseInt(e.target.value))}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                                min="1"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Rush
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={formData.turnaround_rush ?? 3}
+                                                onChange={(e) => handleChange("turnaround_rush", parseInt(e.target.value))}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                                min="1"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Expedited
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={formData.turnaround_expedited ?? 1}
+                                                onChange={(e) => handleChange("turnaround_expedited", parseInt(e.target.value))}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                                min="1"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-gray-200 pt-6">
+                                    <h3 className="text-base font-semibold text-gray-900 mb-4">Quote &amp; OTP Settings</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                Quote Validity (Days)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={formData.quote_validity_days ?? 30}
+                                                onChange={(e) => handleChange("quote_validity_days", parseInt(e.target.value))}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                                min="1"
+                                            />
+                                            <p className="mt-1 text-sm text-gray-500">How long a quote stays valid after creation</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                OTP Expiry (Minutes)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={formData.otp_expiry_minutes ?? 10}
+                                                onChange={(e) => handleChange("otp_expiry_minutes", parseInt(e.target.value))}
+                                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                                min="1"
+                                                max="60"
+                                            />
+                                            <p className="mt-1 text-sm text-gray-500">Time before a one-time password expires</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-gray-200 pt-4">
+                                    <p className="text-xs text-gray-400">
+                                        Note: Tax rates and turnaround times stored here are informational. Changes take effect on new quotes and jobs after saving.
+                                    </p>
                                 </div>
                             </div>
                         )}

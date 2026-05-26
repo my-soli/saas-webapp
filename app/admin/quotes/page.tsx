@@ -1,413 +1,371 @@
-﻿"use client";
+"use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { ReactElement } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircleIcon, X } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Search, Plus } from "lucide-react";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin/admin-layout";
-import QuoteDetailDrawer from "@/features/quotes/components/QuoteDetailDrawer";
-import QuotesFilters from "@/features/quotes/components/QuotesFilters";
-import QuotesMetrics from "@/features/quotes/components/QuotesMetrics";
-import QuotesPagination from "@/features/quotes/components/QuotesPagination";
-import QuotesTable from "@/features/quotes/components/QuotesTable";
-import CreateQuoteModal from "@/features/quotes/components/CreateQuoteModal";
+import QuotesStatsCards from "@/features/quotes/components/QuotesStatsCards";
+import MultiProductQuotesTable from "@/features/quotes/components/MultiProductQuotesTable";
+import QuoteDetailModal from "@/features/quotes/components/QuoteDetailModal";
+import SelectProductionMemberModal from "@/features/quotes/components/SelectProductionMemberModal";
+import MarkLostModal from "@/features/quotes/components/MarkLostModal";
+import ConfirmModal from "@/features/quotes/components/ConfirmModal";
+import ConvertToJobModal from "@/features/quotes/components/ConvertToJobModal";
+import type { MultiProductQuote, QuoteStatus } from "@/types/quotes";
 import {
-    approveQuote,
+    fetchMultiProductQuotes,
+    fetchQuoteStats,
+    downloadQuotePdf,
     cloneQuote,
-    createMultiProductQuote,
-    deleteQuote,
-    fetchQuote,
-    fetchQuoteHistory,
-    fetchQuotes,
-    patchQuote,
-    sendQuoteToCustomer,
     sendQuoteToPT,
+    sendQuoteToCustomer,
+    markQuoteLost,
+    convertQuoteToJob,
+    deleteQuote,
+    fetchMultiProductQuoteDetail,
 } from "@/services/quotes";
-import type { CreateQuoteInput, Quote, QuoteHistoryResponse, QuoteStatus, QuotesQueryParams, QuotesResponse } from "@/types/quotes";
+import type { LineItemAssignment, SendEmailFields } from "@/services/quotes";
 
-interface QuoteEditState {
-    quote_date: string;
-    valid_until: string;
-    payment_terms: string;
-    reference_number: string;
-    customer_notes: string;
-    custom_terms: string;
-}
-
-export default function QuotesPage(): ReactElement {
+export default function AdminQuotesPage() {
+    const router = useRouter();
+    const [statusFilter, setStatusFilter] = useState<QuoteStatus | "all">("all");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [selectedQuote, setSelectedQuote] = useState<MultiProductQuote | null>(null);
+    const [selectPTModalQuoteId, setSelectPTModalQuoteId] = useState<number | null>(null);
+    const [markLostModalQuoteId, setMarkLostModalQuoteId] = useState<number | null>(null);
+    const [cloneConfirmQuoteId, setCloneConfirmQuoteId] = useState<number | null>(null);
+    const [convertToJobQuote, setConvertToJobQuote] = useState<MultiProductQuote | null>(null);
+    const [deleteConfirmQuoteId, setDeleteConfirmQuoteId] = useState<number | null>(null);
     const queryClient = useQueryClient();
-    const [search, setSearch] = useState<string>("");
-    const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-    const [status, setStatus] = useState<"all" | QuoteStatus>("all");
-    const [page, setPage] = useState<number>(1);
-    const [pageSize, setPageSize] = useState<number>(20);
-    const [selectedQuoteId, setSelectedQuoteId] = useState<number | null>(null);
-    const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
-    const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
-    const [editState, setEditState] = useState<QuoteEditState | null>(null);
 
-    useEffect((): (() => void) => {
-        const timer = setTimeout((): void => {
-            setDebouncedSearch(search);
-        }, 400);
-
-        return (): void => clearTimeout(timer);
-    }, [search]);
-
-    const quoteQueryParams = useMemo(
-        (): QuotesQueryParams => ({
-            page,
-            pageSize,
-            search: debouncedSearch,
-            status,
-        }),
-        [page, pageSize, debouncedSearch, status]
-    );
-
-    const { data, isLoading, error } = useQuery({
-        queryKey: ["quotes", quoteQueryParams],
-        queryFn: (): Promise<QuotesResponse> => fetchQuotes(quoteQueryParams),
+    const { data: stats, isLoading: statsLoading } = useQuery({
+        queryKey: ["quote-stats"],
+        queryFn: fetchQuoteStats,
     });
 
-    const { data: detailData, isLoading: isDetailLoading } = useQuery({
-        queryKey: ["quote", selectedQuoteId],
-        queryFn: (): Promise<Quote> => fetchQuote(selectedQuoteId as number),
-        enabled: selectedQuoteId !== null,
-    });
-
-    const { data: historyData } = useQuery({
-        queryKey: ["quote-history", selectedQuoteId],
-        queryFn: (): Promise<QuoteHistoryResponse> => fetchQuoteHistory(selectedQuoteId as number),
-        enabled: selectedQuoteId !== null,
-    });
-
-    const createMutation = useMutation({
-        mutationFn: (payload: CreateQuoteInput) => createMultiProductQuote(payload),
-        onSuccess: (): void => {
-            toast.success("Quote created.");
-            setIsCreateOpen(false);
-            queryClient.invalidateQueries({ queryKey: ["quotes"] });
-        },
-        onError: (): void => {
-            toast.error("Unable to create quote.");
-        },
-    });
-
-    const editMutation = useMutation({
-        mutationFn: ({ id, payload }: { id: number; payload: Partial<Quote> }) => patchQuote(id, payload),
-        onSuccess: (): void => {
-            toast.success("Quote updated.");
-            setEditingQuote(null);
-            setEditState(null);
-            queryClient.invalidateQueries({ queryKey: ["quotes"] });
-        },
-        onError: (): void => {
-            toast.error("Unable to update quote.");
-        },
-    });
-
-    const deleteMutation = useMutation({
-        mutationFn: (quoteId: number): Promise<void> => deleteQuote(quoteId),
-        onSuccess: (): void => {
-            toast.success("Quote deleted.");
-            queryClient.invalidateQueries({ queryKey: ["quotes"] });
-        },
-        onError: (): void => {
-            toast.error("Unable to delete quote.");
-        },
-    });
-
-    const sendToPTMutation = useMutation({
-        mutationFn: (quoteId: number): Promise<unknown> => sendQuoteToPT(quoteId),
-        onSuccess: (): void => {
-            toast.success("Quote sent to PT.");
-            queryClient.invalidateQueries({ queryKey: ["quotes"] });
-            if (selectedQuoteId !== null) {
-                queryClient.invalidateQueries({ queryKey: ["quote", selectedQuoteId] });
-                queryClient.invalidateQueries({ queryKey: ["quote-history", selectedQuoteId] });
-            }
-        },
-        onError: (): void => {
-            toast.error("Unable to send quote to PT.");
-        },
-    });
-
-    const sendToCustomerMutation = useMutation({
-        mutationFn: (quoteId: number): Promise<unknown> => sendQuoteToCustomer(quoteId),
-        onSuccess: (): void => {
-            toast.success("Quote sent to customer.");
-            queryClient.invalidateQueries({ queryKey: ["quotes"] });
-            if (selectedQuoteId !== null) {
-                queryClient.invalidateQueries({ queryKey: ["quote", selectedQuoteId] });
-                queryClient.invalidateQueries({ queryKey: ["quote-history", selectedQuoteId] });
-            }
-        },
-        onError: (): void => {
-            toast.error("Unable to send quote to customer.");
-        },
-    });
-
-    const approveMutation = useMutation({
-        mutationFn: (quoteId: number): Promise<unknown> => approveQuote(quoteId),
-        onSuccess: (): void => {
-            toast.success("Quote approved.");
-            queryClient.invalidateQueries({ queryKey: ["quotes"] });
-            if (selectedQuoteId !== null) {
-                queryClient.invalidateQueries({ queryKey: ["quote", selectedQuoteId] });
-                queryClient.invalidateQueries({ queryKey: ["quote-history", selectedQuoteId] });
-            }
-        },
-        onError: (): void => {
-            toast.error("Unable to approve quote.");
-        },
+    const { data: quotes = [], isLoading: quotesLoading } = useQuery({
+        queryKey: ["multi-product-quotes", statusFilter, searchQuery],
+        queryFn: () => fetchMultiProductQuotes(statusFilter, searchQuery),
     });
 
     const cloneMutation = useMutation({
-        mutationFn: (quoteId: number): Promise<unknown> => cloneQuote(quoteId),
-        onSuccess: (): void => {
-            toast.success("Quote cloned as revision.");
-            queryClient.invalidateQueries({ queryKey: ["quotes"] });
-            if (selectedQuoteId !== null) {
-                queryClient.invalidateQueries({ queryKey: ["quote", selectedQuoteId] });
-                queryClient.invalidateQueries({ queryKey: ["quote-history", selectedQuoteId] });
-            }
+        mutationFn: cloneQuote,
+        onSuccess: () => {
+            toast.success("Quote cloned successfully!");
+            queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
+            setCloneConfirmQuoteId(null);
         },
-        onError: (): void => {
-            toast.error("Unable to clone quote.");
-        },
+        onError: () => toast.error("Failed to clone quote."),
     });
 
-    const handleResetFilters = (): void => {
-        setSearch("");
-        setStatus("all");
-        setPage(1);
-    };
+    const sendToPTMutation = useMutation({
+        mutationFn: ({ quoteId, assignedTo }: { quoteId: number; assignedTo?: number }) =>
+            sendQuoteToPT(quoteId, assignedTo),
+        onSuccess: () => {
+            toast.success("Quote sent to production team!");
+            queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
+            setSelectedQuote(null);
+            setSelectPTModalQuoteId(null);
+        },
+        onError: () => toast.error("Failed to send quote to production team."),
+    });
 
-    const handleDelete = (quote: Quote): void => {
-        const shouldDelete = window.confirm(`Delete ${quote.quote_id}? This cannot be undone.`);
-        if (!shouldDelete) {
-            return;
+    const sendToCustomerMutation = useMutation({
+        mutationFn: ({ quoteId, emailFields }: { quoteId: number; emailFields: SendEmailFields }) =>
+            sendQuoteToCustomer(quoteId, emailFields),
+        onSuccess: (data) => {
+            if (data.email_sent === false) {
+                toast.warning("Quote status updated, but email could not be delivered.");
+            } else {
+                toast.success("Quote sent to customer!");
+            }
+            queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
+            setSelectedQuote(null);
+        },
+        onError: () => toast.error("Failed to send quote to customer."),
+    });
+
+    const markLostMutation = useMutation({
+        mutationFn: ({ quoteId, reason }: { quoteId: number; reason: string }) =>
+            markQuoteLost(quoteId, reason),
+        onSuccess: () => {
+            toast.success("Quote marked as lost.");
+            queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
+            setSelectedQuote(null);
+            setMarkLostModalQuoteId(null);
+        },
+        onError: () => toast.error("Failed to mark quote as lost."),
+    });
+
+    const convertToJobMutation = useMutation({
+        mutationFn: ({ quoteId, ownerUserId, assignments }: { quoteId: number; ownerUserId: number | null; assignments: LineItemAssignment[] }) =>
+            convertQuoteToJob(quoteId, ownerUserId, assignments),
+        onSuccess: () => {
+            toast.success("Quote converted to job!");
+            queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
+            setSelectedQuote(null);
+            setConvertToJobQuote(null);
+        },
+        onError: () => toast.error("Failed to convert quote to job."),
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: deleteQuote,
+        onSuccess: () => {
+            toast.success("Quote deleted.");
+            queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
+            setDeleteConfirmQuoteId(null);
+        },
+        onError: () => toast.error("Failed to delete quote."),
+    });
+
+    const handleViewDetail = (quote: MultiProductQuote) => setSelectedQuote(quote);
+
+    const handleDownloadPdf = async (quoteId: string) => {
+        try {
+            const blob = await downloadQuotePdf(quoteId);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `quote-${quoteId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch {
+            toast.error("Failed to download PDF.");
         }
-
-        deleteMutation.mutate(quote.id);
     };
 
-    const handleView = (quote: Quote): void => {
-        setSelectedQuoteId(quote.id);
+    const handleClone = (quoteId: number) => setCloneConfirmQuoteId(quoteId);
+
+    const handleEdit = (quoteId: number) => {
+        router.push(`/admin/quotes/create?edit=${quoteId}`);
     };
 
-    const handleOpenEdit = (quote: Quote): void => {
-        setEditingQuote(quote);
-        setEditState({
-            quote_date: quote.quote_date?.split("T")[0] ?? "",
-            valid_until: quote.valid_until?.split("T")[0] ?? "",
-            payment_terms: quote.payment_terms ?? "",
-            reference_number: quote.reference_number ?? "",
-            customer_notes: quote.customer_notes ?? "",
-            custom_terms: quote.custom_terms ?? "",
-        });
+    const handleConfirmClone = async () => {
+        if (cloneConfirmQuoteId) {
+            try {
+                await cloneMutation.mutateAsync(cloneConfirmQuoteId);
+            } catch {
+                toast.error("Failed to clone quote.");
+            }
+        }
     };
 
-    const handleEditSubmit = (e: React.FormEvent): void => {
-        e.preventDefault();
-        if (!editingQuote || !editState) return;
-        editMutation.mutate({ id: editingQuote.id, payload: editState });
+    const handleSendToPT = (quoteId: number) => setSelectPTModalQuoteId(quoteId);
+
+    const handleConfirmSendToPT = async (memberId: number) => {
+        if (selectPTModalQuoteId) {
+            try {
+                await sendToPTMutation.mutateAsync({ quoteId: selectPTModalQuoteId, assignedTo: memberId });
+            } catch {
+                toast.error("Failed to send quote to production team.");
+            }
+        }
     };
 
-    const handleSendToPT = (quote: Quote): void => {
-        sendToPTMutation.mutate(quote.id);
+    const handleSendToCustomer = (quoteId: number, emailFields: SendEmailFields) => {
+        sendToCustomerMutation.mutate({ quoteId, emailFields });
     };
 
-    const handleSendToCustomer = (quote: Quote): void => {
-        sendToCustomerMutation.mutate(quote.id);
+    const handleMarkLost = (quoteId: number) => setMarkLostModalQuoteId(quoteId);
+
+    const handleConfirmMarkLost = async (reason: string) => {
+        if (markLostModalQuoteId) {
+            try {
+                await markLostMutation.mutateAsync({ quoteId: markLostModalQuoteId, reason });
+            } catch {
+                toast.error("Failed to mark quote as lost.");
+            }
+        }
     };
 
-    const handleApprove = (quote: Quote): void => {
-        approveMutation.mutate(quote.id);
+    const handleConvertToJob = async (quoteId: number) => {
+        const found = quotes.find((q) => q.id === quoteId);
+        if (!found) return;
+        try {
+            const detail = await fetchMultiProductQuoteDetail(found.quote_id);
+            setConvertToJobQuote(detail);
+        } catch {
+            setConvertToJobQuote(found);
+        }
     };
 
-    const handleClone = (quote: Quote): void => {
-        cloneMutation.mutate(quote.id);
+    const handleConfirmConvertToJob = async (ownerUserId: number | null, assignments: LineItemAssignment[]) => {
+        if (convertToJobQuote) {
+            try {
+                await convertToJobMutation.mutateAsync({ quoteId: convertToJobQuote.id, ownerUserId, assignments });
+            } catch {
+                toast.error("Failed to convert quote to job.");
+            }
+        }
     };
 
-    const quotes = data?.results ?? [];
-    const totalCount = data?.count ?? 0;
+    const handleDelete = (quoteId: number) => setDeleteConfirmQuoteId(quoteId);
+
+    const handleConfirmDelete = async () => {
+        if (deleteConfirmQuoteId) {
+            await deleteMutation.mutateAsync(deleteConfirmQuoteId);
+        }
+    };
 
     return (
         <AdminLayout>
-            <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-                <div className="px-4 lg:px-8 py-4">
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                        <a href="/staff" className="hover:text-brand-blue">
-                            Staff Portal
-                        </a>
-                        <span>/</span>
-                        <span className="text-gray-900">Quotes</span>
-                    </div>
-                    <div className="flex items-center justify-between">
+            <div className="bg-gray-50 min-h-screen">
+                <div className="max-w-7xl mx-auto px-4 lg:px-8 py-4 lg:py-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Quotes</h1>
-                            <p className="mt-2 text-sm text-gray-600">
-                                Track and manage quote records across draft, costing, and approval stages.
+                            <h1 className="text-2xl font-semibold text-gray-900 mb-1">Quotes</h1>
+                            <p className="text-sm text-gray-600">
+                                Manage quotes with multiple products and line items
                             </p>
                         </div>
                         <button
                             type="button"
-                            onClick={(): void => setIsCreateOpen(true)}
-                            className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90"
+                            onClick={() => router.push("/admin/quotes/create")}
+                            className="px-4 py-2 bg-brand-blue text-white rounded-lg hover:bg-brand-blue/90 transition-colors flex items-center gap-2"
                         >
-                            + New Quote
+                            <Plus className="w-4 h-4" />
+                            New Quote
                         </button>
                     </div>
-                </div>
-            </header>
-            <main className="bg-gray-50 min-h-screen">
-                <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-6">
-                    {!isLoading && (error || !data) && (
-                        <div className="bg-brand-red/10 border border-brand-red/20 rounded-lg p-6">
-                            <div className="flex items-center gap-3">
-                                <AlertCircleIcon className="h-6 w-6 text-brand-red" />
-                                <div>
-                                    <h3 className="font-semibold text-brand-red">Failed to load quotes</h3>
-                                    <p className="text-sm text-gray-600 mt-1">
-                                        Unable to fetch quote data. Please try again later.
-                                    </p>
+
+                    {statsLoading ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                            {[1, 2, 3, 4].map((i) => (
+                                <div key={i} className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm animate-pulse">
+                                    <div className="h-10 bg-gray-200 rounded mb-3"></div>
+                                    <div className="h-8 bg-gray-200 rounded mb-2"></div>
+                                    <div className="h-4 bg-gray-200 rounded"></div>
                                 </div>
+                            ))}
+                        </div>
+                    ) : stats ? (
+                        <div className="mb-6">
+                            <QuotesStatsCards stats={stats} />
+                        </div>
+                    ) : null}
+
+                    <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+                        <div className="flex gap-4">
+                            <div className="flex-1 relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search by quote number or client name..."
+                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent text-sm"
+                                />
+                            </div>
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value as QuoteStatus | "all")}
+                                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent text-sm bg-white"
+                            >
+                                <option value="all">All Status</option>
+                                <option value="Draft">Draft</option>
+                                <option value="Sent to PT">Sent to PT</option>
+                                <option value="Costed">Costed</option>
+                                <option value="Sent to Customer">Sent to Customer</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Lost">Lost</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="mb-4">
+                        <p className="text-sm text-gray-600">
+                            Showing {quotes.length} {quotes.length === 1 ? "quote" : "quotes"}
+                        </p>
+                    </div>
+
+                    {quotesLoading ? (
+                        <div className="bg-white rounded-lg border border-gray-200 p-8">
+                            <div className="animate-pulse space-y-4">
+                                {[1, 2, 3, 4, 5].map((i) => (
+                                    <div key={i} className="h-16 bg-gray-200 rounded"></div>
+                                ))}
                             </div>
                         </div>
-                    )}
-
-                    {!error && (
-                        <>
-                            <QuotesMetrics quotes={quotes} totalCount={totalCount} />
-
-                            <QuotesFilters
-                                search={search}
-                                status={status}
-                                onSearchChange={(value: string): void => {
-                                    setSearch(value);
-                                    setPage(1);
-                                }}
-                                onStatusChange={(value: "all" | QuoteStatus): void => {
-                                    setStatus(value);
-                                    setPage(1);
-                                }}
-                                onReset={handleResetFilters}
-                            />
-
-                            {isLoading ? (
-                                <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm animate-pulse">
-                                    <div className="h-6 bg-gray-200 rounded w-48"></div>
-                                    <div className="h-4 bg-gray-200 rounded w-72 mt-3"></div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-                                        {[1, 2, 3, 4].map((item: number): ReactElement => (
-                                            <div key={item} className="h-16 bg-gray-100 rounded"></div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : quotes.length > 0 ? (
-                                <>
-                                    <QuotesTable
-                                        quotes={quotes}
-                                        onView={handleView}
-                                        onEdit={handleOpenEdit}
-                                        onSendToPT={handleSendToPT}
-                                        onSendToCustomer={handleSendToCustomer}
-                                        onApprove={handleApprove}
-                                        onClone={handleClone}
-                                        onDelete={handleDelete}
-                                    />
-                                    <QuotesPagination
-                                        count={totalCount}
-                                        page={page}
-                                        pageSize={pageSize}
-                                        onPageChange={setPage}
-                                        onPageSizeChange={(size: number): void => {
-                                            setPageSize(size);
-                                            setPage(1);
-                                        }}
-                                    />
-                                </>
-                            ) : (
-                                <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-                                    <h3 className="text-lg font-semibold text-gray-900">No quotes found</h3>
-                                    <p className="text-sm text-gray-600 mt-2">
-                                        Try changing the search or status filter.
-                                    </p>
-                                </div>
-                            )}
-                        </>
+                    ) : (
+                        <MultiProductQuotesTable
+                            quotes={quotes}
+                            onViewDetail={handleViewDetail}
+                            onDownloadPdf={handleDownloadPdf}
+                            onClone={handleClone}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                        />
                     )}
                 </div>
+            </div>
 
-                <QuoteDetailDrawer
-                    quote={detailData ?? null}
-                    history={historyData?.history ?? []}
-                    isOpen={selectedQuoteId !== null}
-                    isLoading={isDetailLoading}
-                    onClose={(): void => setSelectedQuoteId(null)}
-                />
-            </main>
-
-            <CreateQuoteModal
-                isOpen={isCreateOpen}
-                onClose={(): void => setIsCreateOpen(false)}
-                onSubmit={(data: CreateQuoteInput): void => { createMutation.mutate(data); }}
-                isSubmitting={createMutation.isPending}
+            <QuoteDetailModal
+                quote={selectedQuote}
+                onClose={() => setSelectedQuote(null)}
+                onSendToPT={handleSendToPT}
+                onSendToCustomer={handleSendToCustomer}
+                isSendingToCustomer={sendToCustomerMutation.isPending}
+                onMarkLost={handleMarkLost}
+                onConvertToJob={handleConvertToJob}
+                onDownloadPdf={handleDownloadPdf}
             />
 
-            {editingQuote && editState && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                            <h2 className="text-lg font-semibold text-gray-900">Edit Quote — {editingQuote.quote_id}</h2>
-                            <button type="button" onClick={(): void => { setEditingQuote(null); setEditState(null); }}>
-                                <X className="w-5 h-5 text-gray-500" />
-                            </button>
-                        </div>
-                        <form onSubmit={handleEditSubmit} className="px-6 py-5 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Quote Date</label>
-                                    <input type="date" value={editState.quote_date} onChange={(e): void => setEditState(s => s ? { ...s, quote_date: e.target.value } : s)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Valid Until</label>
-                                    <input type="date" value={editState.valid_until} onChange={(e): void => setEditState(s => s ? { ...s, valid_until: e.target.value } : s)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Payment Terms</label>
-                                    <select value={editState.payment_terms} onChange={(e): void => setEditState(s => s ? { ...s, payment_terms: e.target.value } : s)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
-                                        <option value="Prepaid">Prepaid</option>
-                                        <option value="Net 7">Net 7</option>
-                                        <option value="Net 15">Net 15</option>
-                                        <option value="Net 30">Net 30</option>
-                                        <option value="Net 60">Net 60</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Reference Number</label>
-                                    <input type="text" value={editState.reference_number} onChange={(e): void => setEditState(s => s ? { ...s, reference_number: e.target.value } : s)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Customer Notes</label>
-                                <textarea rows={2} value={editState.customer_notes} onChange={(e): void => setEditState(s => s ? { ...s, customer_notes: e.target.value } : s)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Custom Terms</label>
-                                <textarea rows={2} value={editState.custom_terms} onChange={(e): void => setEditState(s => s ? { ...s, custom_terms: e.target.value } : s)} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                            </div>
-                            <div className="flex justify-end gap-3 pt-2">
-                                <button type="button" onClick={(): void => { setEditingQuote(null); setEditState(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
-                                <button type="submit" disabled={editMutation.isPending} className="px-4 py-2 text-sm font-medium text-white bg-brand-blue rounded-md hover:bg-brand-blue/90 disabled:opacity-50">
-                                    {editMutation.isPending ? "Saving..." : "Save Changes"}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+            {selectPTModalQuoteId && (
+                <SelectProductionMemberModal
+                    quoteId={quotes.find(q => q.id === selectPTModalQuoteId)?.quote_id || String(selectPTModalQuoteId)}
+                    onClose={() => setSelectPTModalQuoteId(null)}
+                    onConfirm={handleConfirmSendToPT}
+                />
+            )}
+
+            {markLostModalQuoteId && (
+                <MarkLostModal
+                    quoteId={quotes.find(q => q.id === markLostModalQuoteId)?.quote_id || String(markLostModalQuoteId)}
+                    onClose={() => setMarkLostModalQuoteId(null)}
+                    onConfirm={handleConfirmMarkLost}
+                />
+            )}
+
+            {cloneConfirmQuoteId && (
+                <ConfirmModal
+                    title="Clone Quote"
+                    message="Are you sure you want to clone this quote? This will create a new draft quote with the same items and details."
+                    confirmText="Clone Quote"
+                    confirmColor="blue"
+                    onClose={() => setCloneConfirmQuoteId(null)}
+                    onConfirm={handleConfirmClone}
+                />
+            )}
+
+            {convertToJobQuote && (
+                <ConvertToJobModal
+                    quote={convertToJobQuote}
+                    onClose={() => setConvertToJobQuote(null)}
+                    onConfirm={handleConfirmConvertToJob}
+                    isLoading={convertToJobMutation.isPending}
+                />
+            )}
+
+            {deleteConfirmQuoteId && (
+                <ConfirmModal
+                    title="Delete Quote"
+                    message="Are you sure you want to delete this quote? This action cannot be undone."
+                    confirmText="Delete Quote"
+                    confirmColor="red"
+                    onClose={() => setDeleteConfirmQuoteId(null)}
+                    onConfirm={handleConfirmDelete}
+                />
             )}
         </AdminLayout>
     );
