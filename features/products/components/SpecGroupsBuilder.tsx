@@ -640,28 +640,65 @@ function SpecGroupCard({
     onDeleted,
     onRefresh,
     dragHandleProps,
+    existingGroups,
 }: {
     group: ProductSpecGroup;
     onDeleted: () => void;
     onRefresh: () => void;
     dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
+    existingGroups: ProductSpecGroup[];
 }): ReactElement {
     const [expanded, setExpanded] = useState<boolean>(false);
-    const [editingName, setEditingName] = useState<boolean>(false);
-    const [nameValue, setNameValue] = useState<string>(group.name);
+    const [editingGroup, setEditingGroup] = useState<boolean>(false);
     const [confirmDelete, setConfirmDelete] = useState<boolean>(false);
 
-    const saveName = async (): Promise<void> => {
-        if (!nameValue.trim()) return;
+    // Edit form state — initialised from current group values
+    const [editName, setEditName] = useState<string>(group.name);
+    const [editType, setEditType] = useState<SpecGroupType>(group.group_type);
+    const [editRequired, setEditRequired] = useState<boolean>(group.is_required);
+    const [editSaving, setEditSaving] = useState<boolean>(false);
+
+    const findParentGroupId = (): string => {
+        if (!group.parent_option) return "";
+        const pg = existingGroups.find((g) => g.options.some((o) => o.id === group.parent_option));
+        return pg ? String(pg.id) : "";
+    };
+    const [editParentGroupId, setEditParentGroupId] = useState<string>(findParentGroupId);
+    const [editParentOptionId, setEditParentOptionId] = useState<string>(
+        group.parent_option ? String(group.parent_option) : "",
+    );
+
+    const editParentGroup = existingGroups.find((g) => String(g.id) === editParentGroupId) ?? null;
+    const editParentOptions = editParentGroup?.options ?? [];
+
+    const openEdit = (): void => {
+        setEditName(group.name);
+        setEditType(group.group_type);
+        setEditRequired(group.is_required);
+        setEditParentGroupId(findParentGroupId());
+        setEditParentOptionId(group.parent_option ? String(group.parent_option) : "");
+        setEditingGroup(true);
+        setExpanded(true);
+    };
+
+    const saveGroupSettings = async (): Promise<void> => {
+        if (!editName.trim()) { toast.error("Group name is required"); return; }
+        setEditSaving(true);
         try {
             await updateSpecGroup(group.id, {
-                name: nameValue.trim(),
-                display_label: nameValue.trim(),
+                name: editName.trim(),
+                display_label: editName.trim(),
+                group_type: editType,
+                is_required: editRequired,
+                parent_option: editParentOptionId ? Number(editParentOptionId) : null,
             });
-            setEditingName(false);
+            setEditingGroup(false);
             onRefresh();
+            toast.success("Spec group updated");
         } catch (_e: unknown) {
-            toast.error("Failed to rename group");
+            toast.error("Failed to update spec group");
+        } finally {
+            setEditSaving(false);
         }
     };
 
@@ -674,10 +711,11 @@ function SpecGroupCard({
         }
     };
 
-    const needsOptions =
-        group.group_type !== "numeric_input" && group.group_type !== "dimension_input";
-    const needsRanges = group.group_type === "numeric_input";
-    const needsDimensions = group.group_type === "dimension_input";
+    // After editing, re-derive the active group type for rendering editors
+    const activeType: SpecGroupType = editingGroup ? editType : group.group_type;
+    const needsOptions = activeType !== "numeric_input" && activeType !== "dimension_input";
+    const needsRanges = activeType === "numeric_input";
+    const needsDimensions = activeType === "dimension_input";
 
     return (
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -703,31 +741,14 @@ function SpecGroupCard({
                     )}
                 </button>
                 <div className="flex-1 min-w-0">
-                    {editingName ? (
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="text"
-                                autoFocus
-                                className="rounded border border-brand-blue px-2 py-1 text-sm font-medium text-gray-900 focus:outline-none"
-                                value={nameValue}
-                                onChange={(e) => setNameValue(e.target.value)}
-                                onBlur={() => void saveName()}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") void saveName();
-                                    if (e.key === "Escape") setEditingName(false);
-                                }}
-                            />
-                        </div>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={() => setEditingName(true)}
-                            className="text-sm font-semibold text-gray-900 hover:text-brand-blue text-left"
-                            title="Click to rename"
-                        >
-                            {group.name}
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        onClick={openEdit}
+                        className="text-sm font-semibold text-gray-900 hover:text-brand-blue text-left transition-colors"
+                        title="Click to edit group settings"
+                    >
+                        {group.name}
+                    </button>
                 </div>
                 <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600">
                     {GROUP_TYPE_LABELS[group.group_type]}
@@ -758,7 +779,108 @@ function SpecGroupCard({
             </div>
 
             {expanded && (
-                <div className="p-4 space-y-3">
+                <div className="p-4 space-y-4">
+                    {/* ── Edit group settings panel ── */}
+                    {editingGroup && (
+                        <div className="rounded-lg border border-brand-blue/30 bg-brand-blue/5 p-4 space-y-3">
+                            <p className="text-xs font-semibold text-brand-blue">Edit Spec Group Settings</p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Group Name *</label>
+                                    <input
+                                        autoFocus
+                                        type="text"
+                                        className={inputCls}
+                                        value={editName}
+                                        onChange={(e) => setEditName(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") void saveGroupSettings(); if (e.key === "Escape") setEditingGroup(false); }}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-gray-600 mb-1">Group Type *</label>
+                                    <select
+                                        className={selectCls}
+                                        value={editType}
+                                        onChange={(e) => setEditType(e.target.value as SpecGroupType)}
+                                    >
+                                        {(Object.entries(GROUP_TYPE_LABELS) as Array<[SpecGroupType, string]>).map(([value, label]) => (
+                                            <option key={value} value={value}>{label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={editRequired}
+                                    onChange={(e) => setEditRequired(e.target.checked)}
+                                    className="h-4 w-4 rounded text-brand-blue"
+                                />
+                                <span className="text-xs text-gray-700">Required — customer must make a selection</span>
+                            </label>
+
+                            {existingGroups.filter((g) => g.id !== group.id).length > 0 && (
+                                <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                                    <p className="text-xs font-medium text-gray-700">
+                                        Display condition{" "}
+                                        <span className="font-normal text-gray-400">(optional — show only when…)</span>
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">When group</label>
+                                            <select
+                                                className={selectCls}
+                                                value={editParentGroupId}
+                                                onChange={(e) => { setEditParentGroupId(e.target.value); setEditParentOptionId(""); }}
+                                            >
+                                                <option value="">— always show —</option>
+                                                {existingGroups.filter((g) => g.id !== group.id).map((g) => (
+                                                    <option key={g.id} value={String(g.id)}>{g.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-500 mb-1">Has option selected</label>
+                                            <select
+                                                className={selectCls}
+                                                value={editParentOptionId}
+                                                onChange={(e) => setEditParentOptionId(e.target.value)}
+                                                disabled={!editParentGroupId || editParentOptions.length === 0}
+                                            >
+                                                <option value="">— select option —</option>
+                                                {editParentOptions.map((opt) => (
+                                                    <option key={opt.id} value={String(opt.id)}>{opt.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {editType !== group.group_type && group.options.length > 0 && (
+                                <p className="text-xs text-amber-600">
+                                    ⚠ Changing the group type may make existing options incompatible.
+                                </p>
+                            )}
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => void saveGroupSettings()}
+                                    disabled={editSaving}
+                                    className="rounded-lg bg-brand-blue px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-blue/90 disabled:opacity-50 transition-colors"
+                                >
+                                    {editSaving ? "Saving…" : "Save Changes"}
+                                </button>
+                                <button type="button" onClick={() => setEditingGroup(false)} className={btnSecondary}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── Header image + type hint ── */}
                     <div className="flex items-start justify-between gap-4">
                         <p className="text-xs text-gray-500">{GROUP_TYPE_HINTS[group.group_type]}</p>
                         <label className="flex flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-dashed border-gray-300 px-2.5 py-1.5 text-xs text-gray-500 hover:border-brand-blue hover:text-brand-blue transition-colors">
@@ -1019,10 +1141,12 @@ function SortableSpecGroupCard({
     group,
     onDeleted,
     onRefresh,
+    existingGroups,
 }: {
     group: ProductSpecGroup;
     onDeleted: () => void;
     onRefresh: () => void;
+    existingGroups: ProductSpecGroup[];
 }): ReactElement {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
         useSortable({ id: group.id });
@@ -1040,6 +1164,7 @@ function SortableSpecGroupCard({
                 group={group}
                 onDeleted={onDeleted}
                 onRefresh={onRefresh}
+                existingGroups={existingGroups}
                 dragHandleProps={{ ...attributes, ...listeners }}
             />
         </div>
@@ -1153,6 +1278,7 @@ export default function SpecGroupsBuilder({
                                     group={group}
                                     onDeleted={refresh}
                                     onRefresh={refresh}
+                                    existingGroups={localGroups}
                                 />
                             ))}
                         </div>
