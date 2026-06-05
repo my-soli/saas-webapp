@@ -19,10 +19,14 @@ import {
     CopyIcon,
     UserIcon,
     BikeIcon,
+    Pencil,
+    Trash2,
 } from "lucide-react";
 import {
     fetchDispatchUnits,
     createDispatchUnit,
+    updateDispatchUnit,
+    deleteDispatchUnit,
     approveDispatch,
     markDelivered,
     flagDispatchException,
@@ -74,7 +78,11 @@ const DISPATCH_TYPES: { value: string; label: string }[] = [
 
 // ── Delivery Note Printer ─────────────────────────────────────────────────────
 
-const printDeliveryNote = (unit: DispatchUnit) => {
+const downloadDeliveryNote = async (unit: DispatchUnit) => {
+    // Use absolute URL so the logo loads from the server when the HTML file is opened
+    const logoSrc = `${window.location.origin}/logo/pd.png`;
+    const logoHtml = `<img src="${logoSrc}" style="height:60px;width:auto;display:block;" alt="PrintDuka" onerror="this.style.display='none'" />`;
+
     const rows = unit.components_detail.map((c) => `
         <tr>
             <td style="padding:8px 12px;border-bottom:1px solid #eee">${c.product_name}</td>
@@ -82,14 +90,17 @@ const printDeliveryNote = (unit: DispatchUnit) => {
             <td style="padding:8px 12px;border-bottom:1px solid #eee;text-align:center">${c.status.replace(/_/g, " ")}</td>
         </tr>`).join("");
 
-    const html = `<!DOCTYPE html><html><head><title>Delivery Note — ${unit.dispatch_number}</title>
-<style>body{font-family:sans-serif;margin:40px;color:#111}h1{font-size:20px}table{width:100%;border-collapse:collapse}th{background:#f5f5f5;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em}@media print{button{display:none}}</style></head>
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Delivery Note — ${unit.dispatch_number}</title>
+<style>body{font-family:Arial,sans-serif;margin:40px;color:#111}table{width:100%;border-collapse:collapse}th{background:#f5f5f5;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em}@media print{button{display:none}}</style></head>
 <body>
-<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px">
-  <div><h1 style="margin:0">Delivery Note</h1><p style="margin:4px 0 0;color:#666;font-size:13px">${unit.dispatch_number}</p></div>
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px">
+  <div>
+    ${logoHtml}
+    <h1 style="margin:8px 0 2px;font-size:20px">Delivery Note</h1>
+    <p style="margin:0;color:#666;font-size:13px">${unit.dispatch_number}</p>
+  </div>
   <div style="text-align:right;font-size:13px;color:#444">
-    <p style="margin:0"><strong>Job:</strong> ${unit.job_name}</p>
-    <p style="margin:4px 0 0"><strong>Client:</strong> ${unit.client_name ?? "—"}</p>
+    <p style="margin:0"><strong>Client:</strong> ${unit.client_name ?? "—"}</p>
     <p style="margin:4px 0 0"><strong>Type:</strong> ${unit.dispatch_type}</p>
     <p style="margin:4px 0 0"><strong>Courier:</strong> ${unit.courier || "—"}</p>
     <p style="margin:4px 0 0"><strong>Delivery to:</strong> ${unit.delivery_location || "—"}</p>
@@ -100,31 +111,46 @@ const printDeliveryNote = (unit: DispatchUnit) => {
 ${unit.exception_notes ? `<div style="margin-top:24px;padding:12px;background:#fff3cd;border-radius:6px"><strong>Exception Notes:</strong> ${unit.exception_notes}</div>` : ""}
 ${unit.pod_signed_by ? `<p style="margin-top:24px;font-size:13px"><strong>POD Signed by:</strong> ${unit.pod_signed_by}${unit.pod_signed_at ? ` · ${formatDate(unit.pod_signed_at)}` : ""}</p>` : ""}
 <div style="margin-top:48px;display:flex;gap:80px">
-  <div><div style="border-top:1px solid #333;width:200px;padding-top:4px;font-size:12px">Dispatched by / Date</div></div>
-  <div><div style="border-top:1px solid #333;width:200px;padding-top:4px;font-size:12px">Received by / Date</div></div>
+  <div>
+    ${unit.rider_confirmed_by ? `<p style="margin:0 0 4px;font-size:13px;font-weight:bold">${unit.rider_confirmed_by}</p><p style="margin:0 0 6px;font-size:11px;color:#666">${unit.rider_confirmed_at ? formatDate(unit.rider_confirmed_at) : ""}</p>` : ""}
+    <div style="border-top:1px solid #333;width:200px;padding-top:4px;font-size:12px">Dispatched by / Date</div>
+  </div>
+  <div>
+    ${unit.recipient_confirmed_by ? `<p style="margin:0 0 4px;font-size:13px;font-weight:bold">${unit.recipient_confirmed_by}</p><p style="margin:0 0 6px;font-size:11px;color:#666">${unit.recipient_confirmed_at ? formatDate(unit.recipient_confirmed_at) : ""}</p>` : ""}
+    <div style="border-top:1px solid #333;width:200px;padding-top:4px;font-size:12px">Received by / Date</div>
+  </div>
 </div>
 <button onclick="window.print()" style="margin-top:32px;padding:8px 20px;background:#1d4ed8;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">Print</button>
 </body></html>`;
 
-    const w = window.open("", "_blank");
-    if (w) { w.document.write(html); w.document.close(); }
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `delivery-note-${unit.dispatch_number}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 };
 
 // ── New Dispatch Unit Modal ───────────────────────────────────────────────────
 
 interface NewDispatchModalProps {
     onClose: () => void;
+    editUnit?: DispatchUnit;
 }
 
-function NewDispatchModal({ onClose }: NewDispatchModalProps): ReactElement {
+function NewDispatchModal({ onClose, editUnit }: NewDispatchModalProps): ReactElement {
     const queryClient = useQueryClient();
+    const isEdit = !!editUnit;
 
-    const [selectedJob, setSelectedJob] = useState<number | "">("");
-    const [dispatchType, setDispatchType] = useState(DISPATCH_TYPES[0].value);
-    const [courier, setCourier] = useState("");
-    const [deliveryLocation, setDeliveryLocation] = useState("");
-    const [dispatchDate, setDispatchDate] = useState("");
-    const [selectedComponents, setSelectedComponents] = useState<number[]>([]);
+    const [selectedJob, setSelectedJob] = useState<number | "">(editUnit?.job ?? "");
+    const [dispatchType, setDispatchType] = useState(editUnit?.dispatch_type ?? DISPATCH_TYPES[0].value);
+    const [courier, setCourier] = useState(editUnit?.courier ?? "");
+    const [deliveryLocation, setDeliveryLocation] = useState(editUnit?.delivery_location ?? "");
+    const [dispatchDate, setDispatchDate] = useState(editUnit?.dispatch_date ?? "");
+    const [selectedComponents, setSelectedComponents] = useState<number[]>(editUnit?.components ?? []);
     const [error, setError] = useState("");
 
     const jobsQuery = useQuery({
@@ -140,10 +166,13 @@ function NewDispatchModal({ onClose }: NewDispatchModalProps): ReactElement {
 
     const createMut = useMutation({
         mutationFn: (payload: CreateDispatchUnitPayload) => createDispatchUnit(payload),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["dispatch-units"] });
-            onClose();
-        },
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["dispatch-units"] }); onClose(); },
+        onError: (err: Error) => setError(err.message),
+    });
+
+    const updateMut = useMutation({
+        mutationFn: (payload: Partial<CreateDispatchUnitPayload>) => updateDispatchUnit(editUnit!.id, payload),
+        onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["dispatch-units"] }); onClose(); },
         onError: (err: Error) => setError(err.message),
     });
 
@@ -159,15 +188,19 @@ function NewDispatchModal({ onClose }: NewDispatchModalProps): ReactElement {
         setError("");
         if (!selectedJob) { setError("Please select a job."); return; }
         if (!deliveryLocation.trim()) { setError("Delivery location is required."); return; }
-        createMut.mutate({
+        const payload = {
             job: selectedJob as number,
             dispatch_type: dispatchType,
             courier: courier.trim(),
             delivery_location: deliveryLocation.trim(),
             dispatch_date: dispatchDate || null,
             components: selectedComponents,
-        });
+        };
+        if (isEdit) updateMut.mutate(payload);
+        else createMut.mutate(payload);
     };
+
+    const isPending = createMut.isPending || updateMut.isPending;
 
     return (
         <div
@@ -179,7 +212,7 @@ function NewDispatchModal({ onClose }: NewDispatchModalProps): ReactElement {
                 <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                     <div className="flex items-center gap-3">
                         <PackageCheckIcon className="h-5 w-5 text-brand-green" />
-                        <h2 className="text-lg font-bold text-gray-900">New Dispatch Unit</h2>
+                        <h2 className="text-lg font-bold text-gray-900">{isEdit ? `Edit ${editUnit!.dispatch_number}` : "New Dispatch Unit"}</h2>
                     </div>
                     <button onClick={onClose} className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
                         <XIcon className="h-5 w-5" />
@@ -317,12 +350,12 @@ function NewDispatchModal({ onClose }: NewDispatchModalProps): ReactElement {
                     </button>
                     <button
                         onClick={handleSubmit}
-                        disabled={createMut.isPending}
+                        disabled={isPending}
                         className="flex items-center gap-2 rounded-lg bg-brand-green px-5 py-2 text-sm font-semibold text-white hover:bg-brand-green/90 disabled:opacity-50 transition-colors"
                     >
-                        {createMut.isPending
-                            ? <><LoaderCircleIcon className="h-4 w-4 animate-spin" /> Creating…</>
-                            : <><PackageCheckIcon className="h-4 w-4" /> Create Dispatch Unit</>
+                        {isPending
+                            ? <><LoaderCircleIcon className="h-4 w-4 animate-spin" /> {isEdit ? "Saving…" : "Creating…"}</>
+                            : <><PackageCheckIcon className="h-4 w-4" /> {isEdit ? "Save Changes" : "Create Dispatch Unit"}</>
                         }
                     </button>
                 </div>
@@ -506,6 +539,7 @@ export default function DispatchWorkspace(): ReactElement {
     const [flagNotes, setFlagNotes] = useState<Record<number, string>>({});
     const [showFlagInput, setShowFlagInput] = useState<Set<number>>(() => new Set());
     const [showNewModal, setShowNewModal] = useState(false);
+    const [editUnit, setEditUnit] = useState<DispatchUnit | null>(null);
     const [signatureUnit, setSignatureUnit] = useState<DispatchUnit | null>(null);
     const [deliveryLinks, setDeliveryLinks] = useState<{ dispatchNumber: string; riderLink: string; recipientLink: string } | null>(null);
 
@@ -538,6 +572,11 @@ export default function DispatchWorkspace(): ReactElement {
         },
     });
 
+    const deleteMut = useMutation({
+        mutationFn: (unitId: number) => deleteDispatchUnit(unitId),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dispatch-units"] }),
+    });
+
     const units: DispatchUnit[] = dispatchQuery.data ?? [];
 
     const toggle = (id: number) =>
@@ -555,6 +594,7 @@ export default function DispatchWorkspace(): ReactElement {
     return (
         <>
             {showNewModal && <NewDispatchModal onClose={() => setShowNewModal(false)} />}
+            {editUnit && <NewDispatchModal onClose={() => setEditUnit(null)} editUnit={editUnit} />}
             {signatureUnit && (
                 <CaptureSignatureModal
                     unit={signatureUnit}
@@ -584,12 +624,12 @@ export default function DispatchWorkspace(): ReactElement {
                     <div className="flex items-center gap-3">
                         {dispatchQuery.isFetching && <LoaderCircleIcon className="h-4 w-4 animate-spin text-gray-300" />}
                         <button
-                            onClick={() => units.forEach((u) => printDeliveryNote(u))}
+                            onClick={() => units.forEach((u) => void downloadDeliveryNote(u))}
                             disabled={units.length === 0}
                             className="flex items-center gap-2 rounded-md border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue transition-colors disabled:opacity-40"
                         >
                             <PrinterIcon className="h-4 w-4" />
-                            Print All Delivery Notes
+                            Download All Delivery Notes
                         </button>
                         <button
                             onClick={() => setShowNewModal(true)}
@@ -705,11 +745,11 @@ export default function DispatchWorkspace(): ReactElement {
                                             {" · Financial closure initiated."}
                                         </p>
                                         <button
-                                            onClick={() => printDeliveryNote(unit)}
+                                            onClick={() => void downloadDeliveryNote(unit)}
                                             className="ml-auto flex items-center gap-1.5 text-xs text-brand-green font-semibold hover:underline"
                                         >
                                             <PrinterIcon className="h-3.5 w-3.5" />
-                                            Reprint Note
+                                            Download Note
                                         </button>
                                     </div>
                                 )}
@@ -828,6 +868,24 @@ export default function DispatchWorkspace(): ReactElement {
                                                 )}
                                                 <div className="flex items-center gap-2 ml-auto">
                                                     <button
+                                                        onClick={() => setEditUnit(unit)}
+                                                        className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 hover:border-brand-blue hover:text-brand-blue transition-colors flex items-center gap-1.5"
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                        Edit
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm(`Delete dispatch unit ${unit.dispatch_number}? This cannot be undone.`))
+                                                                deleteMut.mutate(unit.id);
+                                                        }}
+                                                        disabled={deleteMut.isPending}
+                                                        className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 hover:border-brand-red hover:text-brand-red transition-colors flex items-center gap-1.5 disabled:opacity-40"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        Delete
+                                                    </button>
+                                                    <button
                                                         onClick={() => setShowFlagInput((p) => {
                                                             const n = new Set(p);
                                                             n.has(unit.id) ? n.delete(unit.id) : n.add(unit.id);
@@ -839,11 +897,11 @@ export default function DispatchWorkspace(): ReactElement {
                                                         Flag Exception
                                                     </button>
                                                     <button
-                                                        onClick={() => printDeliveryNote(unit)}
+                                                        onClick={() => void downloadDeliveryNote(unit)}
                                                         className="rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 hover:border-brand-blue hover:text-brand-blue transition-colors flex items-center gap-1.5"
                                                     >
                                                         <PrinterIcon className="h-3.5 w-3.5" />
-                                                        Print Delivery Note
+                                                        Download Delivery Note
                                                     </button>
                                                     <button
                                                         onClick={() => approveMut.mutate(unit.id)}
@@ -871,11 +929,11 @@ export default function DispatchWorkspace(): ReactElement {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        onClick={() => printDeliveryNote(unit)}
+                                                        onClick={() => void downloadDeliveryNote(unit)}
                                                         className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 hover:border-brand-blue hover:text-brand-blue transition-colors"
                                                     >
                                                         <PrinterIcon className="h-3.5 w-3.5" />
-                                                        Print Delivery Note
+                                                        Download Delivery Note
                                                     </button>
                                                     <button
                                                         onClick={() => setSignatureUnit(unit)}

@@ -69,6 +69,9 @@ export interface PTUser {
 export interface JobComponent {
     id: number;
     job: number;
+    job_name: string | null;
+    job_number: string | null;
+    job_person_in_charge_id: number | null;
     product_name: string;
     quantity: number;
     unit: string;
@@ -106,12 +109,19 @@ export interface ComponentDependency {
 export interface ComponentTask {
     id: number;
     component: number;
+    component_name: string | null;
+    job_id: number | null;
+    job_name: string | null;
+    job_number: string | null;
     name: string;
+    description: string;
     assigned_to: number | null;
     assigned_to_name: string | null;
     status: "pending" | "in_progress" | "done" | "overdue" | "blocked";
     due_by: string | null;
+    notes: string;
     created_at: string;
+    updated_at: string;
 }
 
 export interface ComponentQCResult {
@@ -156,10 +166,37 @@ export interface DispatchUnit {
     created_at: string;
     rider_link?: string;
     recipient_link?: string;
+    rider_confirmed_by?: string;
+    rider_confirmed_at?: string | null;
+    recipient_confirmed_by?: string;
+    recipient_confirmed_at?: string | null;
+}
+
+export interface ProductionCostItem {
+    service_name: string;
+    cost: number;
+}
+
+export interface ComponentCost {
+    componentId: number;
+    name: string;
+    quantity: number;
+    unit: string;
+    quotedAmount: number;
+    items: ProductionCostItem[];
+    total: number;
+}
+
+export interface ProductionCostEntry {
+    job_product_id: number;
+    items: ProductionCostItem[];
+    total: number;
+    updated_at?: string;
 }
 
 export interface ReconciliationRow {
     jobId: string;
+    jobDbId: number;
     jobName: string;
     client: string;
     quotedRevenue: number;
@@ -169,6 +206,21 @@ export interface ReconciliationRow {
     margin: number;
     status: "MATCHED" | "VARIANCE" | "PENDING";
     jobStatus: string;
+    components: ComponentCost[];
+    zohoSynced: boolean;
+    zohoInvoiceNumber: string | null;
+    zohoStatus: string | null;
+    zohoBalance: number | null;
+    hasLpo: boolean;
+}
+
+export interface ZohoSyncResult {
+    status: "success" | "already_synced";
+    zoho_invoice_id: string;
+    zoho_invoice_number: string;
+    zoho_status: string;
+    zoho_balance: number;
+    message: string;
 }
 
 export interface ReconciliationData {
@@ -264,6 +316,13 @@ export const fetchJobComponents = (jobId: number): Promise<JobComponent[]> =>
         Array.isArray(d) ? d : (d as { results: JobComponent[] }).results ?? []
     );
 
+/** All components visible to the current user (backend-scoped). For non-PIC
+ *  PT members this returns only the components directly assigned to them. */
+export const fetchAssignedComponents = (): Promise<JobComponent[]> =>
+    get<{ results?: JobComponent[] } | JobComponent[]>("job-components/").then((d) =>
+        Array.isArray(d) ? d : (d as { results: JobComponent[] }).results ?? []
+    );
+
 export const createJobComponent = (payload: Partial<JobComponent>): Promise<JobComponent> =>
     post<JobComponent>("job-components/", payload);
 
@@ -293,6 +352,12 @@ export const deleteDependency = (depId: number): Promise<void> =>
 
 export const fetchTasks = (compId: number): Promise<ComponentTask[]> =>
     get<{ results?: ComponentTask[] } | ComponentTask[]>(`job-component-tasks/?component=${compId}`).then(
+        (d) => (Array.isArray(d) ? d : (d as { results: ComponentTask[] }).results ?? [])
+    );
+
+/** Returns all tasks assigned to the current user (across all components). */
+export const fetchMyTasks = (): Promise<ComponentTask[]> =>
+    get<{ results?: ComponentTask[] } | ComponentTask[]>(`job-component-tasks/?assigned_to_me=1`).then(
         (d) => (Array.isArray(d) ? d : (d as { results: ComponentTask[] }).results ?? [])
     );
 
@@ -339,6 +404,12 @@ export const fetchDispatchUnits = (jobId?: number): Promise<DispatchUnit[]> => {
 export const createDispatchUnit = (payload: CreateDispatchUnitPayload): Promise<DispatchUnit> =>
     post<DispatchUnit>("dispatch-units/", payload);
 
+export const updateDispatchUnit = (unitId: number, payload: Partial<CreateDispatchUnitPayload>): Promise<DispatchUnit> =>
+    patch<DispatchUnit>(`dispatch-units/${unitId}/`, payload);
+
+export const deleteDispatchUnit = (unitId: number): Promise<void> =>
+    del(`dispatch-units/${unitId}/`);
+
 export const approveDispatch = (unitId: number): Promise<DispatchUnit> =>
     post<DispatchUnit>(`dispatch-units/${unitId}/approve/`);
 
@@ -359,13 +430,104 @@ export const fetchReconciliation = (): Promise<ReconciliationData> =>
     get<{ results: ReconciliationRow[]; count: number; rework_costs_total: number }>("pt/reconciliation/")
         .then((d) => ({ rows: d.results ?? [], count: d.count ?? 0, rework_costs_total: d.rework_costs_total ?? 0 }));
 
+export const fetchProductionCost = (jobProductId: number): Promise<ProductionCostEntry> =>
+    get<ProductionCostEntry>(`pt/production-cost/${jobProductId}/`);
+
+export const saveProductionCost = (jobProductId: number, items: ProductionCostItem[]): Promise<ProductionCostEntry> =>
+    post<ProductionCostEntry>(`pt/production-cost/${jobProductId}/`, { items });
+
+export const sendAdjustmentRequest = (jobProductId: number, note: string): Promise<{ detail: string }> =>
+    post<{ detail: string }>(`pt/component-adjustment/${jobProductId}/`, { note });
+
 export const fetchOverrideLog = (): Promise<OverrideLogEntry[]> =>
     get<{ results: OverrideLogEntry[] }>("pt/override-log/").then((d) => d.results ?? []);
 
+export const postReconciliationOverride = (jobDbId: number, reason: string): Promise<{ detail: string }> =>
+    post<{ detail: string }>("pt/reconciliation/override/", { job_id: jobDbId, reason });
+
+export const syncJobToZoho = (jobDbId: number): Promise<ZohoSyncResult> =>
+    post<ZohoSyncResult>(`pt/zoho/sync-job/${jobDbId}/`, {});
+
+export const pullZohoPayments = (): Promise<{ created: number; updated: number; total: number; payments_created: number }> =>
+    post<{ created: number; updated: number; total: number; payments_created: number }>("zoho-invoices/import/", {});
+
 // ── Vendor Brief ──────────────────────────────────────────────────────────────
 
-export const sendVendorBrief = (compId: number): Promise<{ detail: string }> =>
-    post<{ detail: string }>(`job-components/${compId}/send_brief/`);
+export interface SendBriefResult {
+    detail: string;
+    channel: string;
+    acknowledge_url: string;
+    wa_message: string;
+    vendor_phone: string;
+    vendor_email: string;
+}
+
+export const sendVendorBrief = (compId: number, channel: "email" | "whatsapp" | "both" = "email"): Promise<SendBriefResult> =>
+    post<SendBriefResult>(`job-components/${compId}/send_brief/`, { channel });
+
+// ── Brief Attachments ──────────────────────────────────────────────────────────
+
+export interface BriefAttachment {
+    id: number;
+    attachment_name: string;
+    description: string;
+    uploaded_at: string;
+    uploaded_by: string | null;
+}
+
+export const fetchBriefAttachments = (compId: number): Promise<BriefAttachment[]> =>
+    get<BriefAttachment[]>(`job-components/${compId}/brief-attachments/`);
+
+export const uploadBriefAttachment = async (compId: number, file: File | null, attachmentName: string, description: string): Promise<BriefAttachment> => {
+    const csrf = await getCsrfToken();
+    const formData = new FormData();
+    if (file) formData.append("file", file);
+    formData.append("attachment_name", attachmentName);
+    formData.append("description", description);
+    const res = await fetch(`${PROXY_BASE}/api/proxy/api/v1/job-components/${compId}/brief-attachments/`, {
+        method: "POST",
+        headers: { ...(csrf ? { "X-CSRFToken": csrf } : {}) },
+        credentials: "include",
+        body: formData,
+    });
+    if (!res.ok) throw new Error(`Upload failed: ${res.status}`);
+    return res.json();
+};
+
+export const deleteBriefAttachment = (attachmentId: number): Promise<void> =>
+    del(`brief-attachments/${attachmentId}/`);
+
+// ── Off-System Communication Log ───────────────────────────────────────────────
+
+export type OffSystemChannel = "phone" | "whatsapp" | "email" | "in_person" | "other";
+export type OffSystemDirection = "outbound" | "inbound";
+
+export interface OffSystemLog {
+    id: number;
+    channel: string;
+    direction: string;
+    summary: string;
+    occurred_at: string;
+    recorded_by: string;
+}
+
+export const logCommunication = (compId: number, payload: {
+    channel: OffSystemChannel;
+    direction: OffSystemDirection;
+    summary: string;
+    occurred_at: string;
+}): Promise<OffSystemLog> =>
+    post<OffSystemLog>(`job-components/${compId}/log-communication/`, payload);
+
+// ── Adjustment Response ────────────────────────────────────────────────────────
+
+export const respondToAdjustment = (compId: number, payload: {
+    action: "approve" | "reject" | "reply";
+    message?: string;
+    new_deadline?: string;
+    new_cost?: string;
+}): Promise<{ detail: string; adjustment_status: string }> =>
+    post(`job-components/${compId}/respond-to-adjustment/`, payload);
 
 // ── QC Custom Templates ───────────────────────────────────────────────────────
 
@@ -419,7 +581,7 @@ export const uploadComponentFile = async (compId: number, slot: ComponentFileSlo
     const formData = new FormData();
     formData.append("slot", slot);
     formData.append("file", file);
-    const res = await fetch(`${PROXY_BASE}/api/proxy/api/v1/job-components/${compId}/files/`, {
+    const res = await fetch(`${PROXY_BASE}/api/proxy/api/v1/job-components/${compId}/files`, {
         method: "POST",
         headers: { ...(csrf ? { "X-CSRFToken": csrf } : {}) },
         credentials: "include",
@@ -456,9 +618,18 @@ export interface VendorBriefStatus {
     vendor_accepted_at?: string | null;
     time_adjustment_requested?: boolean;
     time_adjustment_reason?: string;
+    time_adjustment_requested_at?: string | null;
+    proposed_deadline?: string | null;
+    proposed_cost?: string;
+    adjustment_status?: "pending" | "approved" | "rejected";
+    adjustment_response?: string;
+    adjustment_responded_at?: string | null;
+    adjustment_responded_by?: string | null;
     proofs?: VendorBriefProofStatus[];
     updates?: { note: string; created_at: string }[];
     is_active?: boolean;
+    brief_attachments?: BriefAttachment[];
+    off_system_logs?: OffSystemLog[];
 }
 
 export const fetchVendorBriefStatus = (compId: number): Promise<VendorBriefStatus> =>

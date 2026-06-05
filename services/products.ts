@@ -94,8 +94,8 @@ export async function publishProduct(productId: number): Promise<void> {
         credentials: "include",
     });
     if (!response.ok) {
-        const err = await response.text().catch((_e: unknown): string => "Unknown error");
-        throw new Error(`Failed to publish product: ${response.status} ${err}`);
+        const body = await response.json().catch(() => null) as { detail?: string } | null;
+        throw new Error(body?.detail ?? `Failed to publish product (${response.status})`);
     }
 }
 

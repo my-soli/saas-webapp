@@ -55,6 +55,7 @@ export async function fetchCatalogProducts(params?: {
     pricing_mode?: string;
     search?: string;
     page_size?: number;
+    page?: number;
 }): Promise<{ count: number; results: CatalogProduct[] }> {
     const qs = new URLSearchParams();
     if (params?.category) qs.set("category", params.category);
@@ -62,6 +63,7 @@ export async function fetchCatalogProducts(params?: {
     if (params?.pricing_mode) qs.set("pricing_mode", params.pricing_mode);
     if (params?.search) qs.set("search", params.search);
     qs.set("page_size", String(params?.page_size ?? 48));
+    if (params?.page && params.page > 1) qs.set("page", String(params.page));
 
     const url = `${PROXY_BASE}/api/proxy/api/v1/product-catalog/?${qs.toString()}`;
     const response = await fetch(url, { cache: "no-store" });

@@ -152,6 +152,23 @@ export async function fetchQuote(quoteId: number): Promise<Quote> {
     return normalizeQuote(payload);
 }
 
+export async function voidQuote(quoteId: number, reason: string): Promise<Quote> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/void/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ reason }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to void quote"));
+    }
+
+    const apiQuote = (await response.json()) as ApiQuote;
+    return normalizeQuote(apiQuote);
+}
+
 export async function updateQuote(quoteId: number, data: CreateQuoteInput): Promise<Quote> {
     const totalQuantity = data.line_items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
     const subtotal = data.line_items.reduce((sum, item) => {

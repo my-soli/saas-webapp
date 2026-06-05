@@ -33,7 +33,15 @@ import {
     TrashIcon,
     AlertCircleIcon,
     BuildingIcon,
+    MessageSquareIcon,
+    PhoneIcon,
+    ThumbsUpIcon,
+    ThumbsDownIcon,
+    MessageCircleIcon,
+    PaperclipIcon,
+    UploadIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
     fetchJobComponents,
     fetchDependencies,
@@ -58,6 +66,14 @@ import {
     uploadComponentFile,
     deleteComponentFile,
     fetchVendorBriefStatus,
+    fetchProductionCost,
+    saveProductionCost,
+    sendAdjustmentRequest,
+    fetchBriefAttachments,
+    uploadBriefAttachment,
+    deleteBriefAttachment,
+    logCommunication,
+    respondToAdjustment,
     type JobComponent,
     type ComponentDependency,
     type ComponentTask,
@@ -65,11 +81,17 @@ import {
     type ComponentFile,
     type ComponentFileSlot,
     type VendorBriefStatus,
+    type BriefAttachment,
+    type OffSystemLog,
+    type OffSystemChannel,
+    type OffSystemDirection,
+    type ProductionCostItem,
 } from "@/services/orchestration";
+import { getCurrentUser } from "@/services/users";
 import { jobComponentToProductionComponent } from "../lib/api-job-helpers";
 import type { ProductionComponent } from "../types";
 
-type Tab = "deps" | "tasks" | "qc" | "brief" | "files" | "audit";
+type Tab = "deps" | "tasks" | "qc" | "brief" | "files" | "adjustment" | "audit";
 
 // ── Built-in QC template options (match backend QC_TEMPLATES keys) ─────────────
 const BUILTIN_QC_OPTIONS = [
@@ -91,12 +113,13 @@ const FILE_SLOT_DEFS: { slot: ComponentFileSlot; label: string; icon: ReactEleme
 ];
 
 const tabs: { key: Tab; label: string; icon: ReactElement }[] = [
-    { key: "deps",  label: "Dependencies",   icon: <LinkIcon className="h-4 w-4" /> },
-    { key: "tasks", label: "Tasks",          icon: <ListChecksIcon className="h-4 w-4" /> },
-    { key: "qc",    label: "QC Checkpoints", icon: <ClipboardCheckIcon className="h-4 w-4" /> },
-    { key: "brief", label: "Vendor Brief",   icon: <SendIcon className="h-4 w-4" /> },
-    { key: "files", label: "Files & Assets", icon: <FolderOpenIcon className="h-4 w-4" /> },
-    { key: "audit", label: "Audit Log",      icon: <ActivityIcon className="h-4 w-4" /> },
+    { key: "deps",       label: "Dependencies",   icon: <LinkIcon className="h-4 w-4" /> },
+    { key: "tasks",      label: "Tasks",          icon: <ListChecksIcon className="h-4 w-4" /> },
+    { key: "qc",         label: "QC Checkpoints", icon: <ClipboardCheckIcon className="h-4 w-4" /> },
+    { key: "brief",      label: "Vendor Brief",   icon: <SendIcon className="h-4 w-4" /> },
+    { key: "files",      label: "Files & Assets", icon: <FolderOpenIcon className="h-4 w-4" /> },
+    { key: "adjustment", label: "Adjustment",     icon: <AlertCircleIcon className="h-4 w-4" /> },
+    { key: "audit",      label: "Audit Log",      icon: <ActivityIcon className="h-4 w-4" /> },
 ];
 
 const compStatusColor = (status: string) => {
@@ -216,6 +239,58 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
         refetchInterval: 30_000,
     });
 
+    const productionCostQuery = useQuery({
+        queryKey: ["production-cost", numericCompId],
+        queryFn: () => fetchProductionCost(numericCompId),
+        enabled: isNumericComp,
+        staleTime: 60_000,
+    });
+
+    const saveCostMut = useMutation({
+        mutationFn: (items: ProductionCostItem[]) => saveProductionCost(numericCompId, items),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["production-cost", numericCompId] });
+            queryClient.invalidateQueries({ queryKey: ["pt-reconciliation"] });
+            setCostEditing(false);
+        },
+    });
+
+    const adjustmentMut = useMutation({
+        mutationFn: (note: string) => sendAdjustmentRequest(numericCompId, note),
+        onSuccess: () => { setAdjustmentNote(""); },
+    });
+
+    const currentUserQuery = useQuery({
+        queryKey: ["orchestration", "current-user"],
+        queryFn: getCurrentUser,
+        staleTime: 5 * 60_000,
+    });
+
+    // PIC = the production lead who owns this job.
+    const isPIC =
+        currentUserQuery.data != null &&
+        rawComp?.job_person_in_charge_id != null &&
+        currentUserQuery.data.id === rawComp.job_person_in_charge_id;
+
+    // Admins and superusers can manage tasks on any component.
+    // groups is an array of objects {id, name} from the API — must use .some(), not .includes()
+    const isPrivileged =
+        currentUserQuery.data?.is_superuser === true ||
+        (currentUserQuery.data?.groups ?? []).some((g) => (g as { name: string }).name === "Admin");
+
+    // canManageTasks = PIC, component-assigned, or privileged admin
+    const canManageTasks = isPIC || isPrivileged;
+
+    // Whether the current user is assigned the whole component (vs. only individual tasks inside it).
+    const isComponentAssigned = currentUserQuery.data != null && rawComp?.assigned_to === currentUserQuery.data.id;
+
+    // Non-PICs/non-admins who don't own the whole component only see their own tasks.
+    const myUserId = currentUserQuery.data?.id;
+    const allTasks = tasksQuery.data ?? [];
+    const visibleTasks = canManageTasks || isComponentAssigned
+        ? allTasks
+        : allTasks.filter((t) => t.assigned_to === myUserId);
+
     const ptUsers = usersQuery.data ?? [];
     const customTemplates = customTemplatesQuery.data ?? [];
     const vendors = vendorsQuery.data ?? [];
@@ -287,8 +362,88 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
     });
 
     const sendBriefMut = useMutation({
-        mutationFn: () => sendVendorBrief(numericCompId),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["vendor-brief-status", numericCompId] }),
+        mutationFn: (channel: "email" | "whatsapp" | "both" = "email") => sendVendorBrief(numericCompId, channel),
+        onSuccess: (data, channel) => {
+            queryClient.invalidateQueries({ queryKey: ["vendor-brief-status", numericCompId] });
+            if ((channel === "whatsapp" || channel === "both") && data.wa_message) {
+                const phone = data.vendor_phone.replace(/\D/g, "");
+                const url = `https://api.whatsapp.com/send?${phone ? `phone=${phone}&` : ""}text=${encodeURIComponent(data.wa_message)}`;
+                window.open(url, "_blank");
+            }
+        },
+    });
+
+    // Brief attachments
+    const briefAttachmentsQuery = useQuery({
+        queryKey: ["brief-attachments", numericCompId],
+        queryFn: () => fetchBriefAttachments(numericCompId),
+        enabled: isNumericComp,
+    });
+    const [baRows, setBaRows] = useState<{ name: string; desc: string; file: File | null }[]>([{ name: "", desc: "", file: null }]);
+    const [baUploading, setBaUploading] = useState(false);
+    const [baUploadError, setBaUploadError] = useState<string | null>(null);
+
+    const handleBaUploadAll = async () => {
+        const toUpload = baRows.filter((r) => r.file || r.name.trim() || r.desc.trim());
+        if (!toUpload.length) return;
+        setBaUploading(true);
+        setBaUploadError(null);
+        try {
+            await Promise.all(toUpload.map((r) => uploadBriefAttachment(numericCompId, r.file ?? null, r.name.trim(), r.desc.trim())));
+            queryClient.invalidateQueries({ queryKey: ["brief-attachments", numericCompId] });
+            setBaRows([{ name: "", desc: "", file: null }]);
+        } catch (err) {
+            setBaUploadError(err instanceof Error ? err.message : "Upload failed");
+        } finally {
+            setBaUploading(false);
+        }
+    };
+
+    const deleteBaMut = useMutation({
+        mutationFn: (id: number) => deleteBriefAttachment(id),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["brief-attachments", numericCompId] }),
+    });
+
+    // Off-system communication log
+    const [showLogForm, setShowLogForm] = useState(false);
+    const [logChannel, setLogChannel] = useState<OffSystemChannel>("phone");
+    const [logDirection, setLogDirection] = useState<OffSystemDirection>("outbound");
+    const [logSummary, setLogSummary] = useState("");
+    const [logOccurredAt, setLogOccurredAt] = useState(() => new Date().toISOString().slice(0, 16));
+
+    const logCommMut = useMutation({
+        mutationFn: () => logCommunication(numericCompId, {
+            channel: logChannel,
+            direction: logDirection,
+            summary: logSummary,
+            occurred_at: logOccurredAt,
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["vendor-brief-status", numericCompId] });
+            setShowLogForm(false); setLogSummary(""); setLogOccurredAt(new Date().toISOString().slice(0, 16));
+        },
+    });
+
+    // Adjustment response
+    const [showAdjReply, setShowAdjReply] = useState(false);
+    const [adjAction, setAdjAction] = useState<"approve" | "reject" | "reply">("reply");
+    const [adjMessage, setAdjMessage] = useState("");
+    const [adjNewDeadline, setAdjNewDeadline] = useState("");
+    const [adjNewCost, setAdjNewCost] = useState("");
+
+    const respondAdjMut = useMutation({
+        mutationFn: () => respondToAdjustment(numericCompId, {
+            action: adjAction,
+            message: adjMessage,
+            new_deadline: adjNewDeadline || undefined,
+            new_cost: adjNewCost || undefined,
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["vendor-brief-status", numericCompId] });
+            setShowAdjReply(false); setAdjMessage(""); setAdjNewDeadline(""); setAdjNewCost("");
+            toast.success("Response sent.");
+        },
+        onError: (err: Error) => toast.error(err.message || "Failed to respond."),
     });
 
     const assignVendorMut = useMutation({
@@ -330,6 +485,7 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
     const [activeTab, setActiveTab] = useState<Tab>("deps");
     const [selectedTemplate, setSelectedTemplate] = useState("");
     const [briefMasked, setBriefMasked] = useState(true);
+    const [briefChannel, setBriefChannel] = useState<"email" | "whatsapp" | "both">("email");
     const [showVendorPicker, setShowVendorPicker] = useState(false);
     const [briefDraft, setBriefDraft] = useState({
         product_name: "",
@@ -347,6 +503,13 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
     const [briefEditing, setBriefEditing] = useState(false);
     const [briefSaving, setBriefSaving] = useState(false);
 
+    // Production cost breakdown state
+    const [costEditing, setCostEditing] = useState(false);
+    const [costItems, setCostItems] = useState<ProductionCostItem[]>([{ service_name: "", cost: 0 }]);
+
+    // Adjustment request state
+    const [adjustmentNote, setAdjustmentNote] = useState("");
+
     // Add dependency form
     const [showAddDep, setShowAddDep] = useState(false);
     const [depForm, setDepForm] = useState({ description: "", dependency_type: "artwork_approval", due_by: "" });
@@ -354,7 +517,7 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
 
     // Add task form
     const [showAddTask, setShowAddTask] = useState(false);
-    const [taskForm, setTaskForm] = useState({ name: "", due_by: "", assigned_to: "" });
+    const [taskForm, setTaskForm] = useState({ name: "", description: "", due_by: "", assigned_to: "" });
     const [taskError, setTaskError] = useState("");
 
     useEffect(() => {
@@ -362,7 +525,7 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
         setShowAddDep(false);
         setShowAddTask(false);
         setDepForm({ description: "", dependency_type: "artwork_approval", due_by: "" });
-        setTaskForm({ name: "", due_by: "", assigned_to: "" });
+        setTaskForm({ name: "", description: "", due_by: "", assigned_to: "" });
         setDepError("");
         setTaskError("");
         setShowVendorPicker(false);
@@ -475,11 +638,12 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
             await createTaskMut.mutateAsync({
                 component: numericCompId,
                 name: taskForm.name,
+                description: taskForm.description,
                 status: "pending",
                 due_by: taskForm.due_by || null,
                 assigned_to: taskForm.assigned_to ? Number(taskForm.assigned_to) : null,
             });
-            setTaskForm({ name: "", due_by: "", assigned_to: "" });
+            setTaskForm({ name: "", description: "", due_by: "", assigned_to: "" });
             setShowAddTask(false);
         } catch (err: unknown) {
             const msg = err instanceof Error ? err.message : "Failed to add task";
@@ -599,9 +763,9 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                         {openDepsCount}
                                     </span>
                                 )}
-                                {tab.key === "tasks" && tasksQuery.data && tasksQuery.data.length > 0 && (
+                                {tab.key === "tasks" && visibleTasks.length > 0 && (
                                     <span className="ml-1 rounded-full bg-gray-100 px-1.5 py-0 text-[10px] font-bold text-gray-500">
-                                        {tasksQuery.data.length}
+                                        {visibleTasks.length}
                                     </span>
                                 )}
                             </button>
@@ -749,13 +913,15 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
                         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
                             <span className="text-sm font-semibold text-gray-800">Tasks</span>
-                            <button
-                                onClick={() => { setShowAddTask((v) => !v); setTaskError(""); }}
-                                className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue transition-colors"
-                            >
-                                <PlusIcon className="h-3.5 w-3.5" />
-                                Add Task
-                            </button>
+                            {canManageTasks && (
+                                <button
+                                    onClick={() => { setShowAddTask((v) => !v); setTaskError(""); }}
+                                    className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue transition-colors"
+                                >
+                                    <PlusIcon className="h-3.5 w-3.5" />
+                                    Add Task
+                                </button>
+                            )}
                         </div>
 
                         {showAddTask && (
@@ -774,6 +940,13 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                         className="rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
                                     />
                                 </div>
+                                <textarea
+                                    placeholder="Task description (optional)"
+                                    value={taskForm.description}
+                                    onChange={(e) => setTaskForm((p) => ({ ...p, description: e.target.value }))}
+                                    rows={2}
+                                    className="w-full rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none resize-none"
+                                />
                                 <div className="flex items-center gap-3">
                                     <div className="relative flex-1">
                                         <select
@@ -830,7 +1003,7 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                     <span className="text-sm">Loading…</span>
                                 </div>
                             )}
-                            {(tasksQuery.data ?? []).map((task) => (
+                            {visibleTasks.map((task) => (
                                 <div key={task.id} className="flex items-center gap-4 px-5 py-3.5">
                                     <button
                                         onClick={() =>
@@ -852,48 +1025,69 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                             {task.name}
                                         </p>
                                         <div className="mt-1 flex items-center gap-2">
-                                            <select
-                                                value={task.assigned_to ?? ""}
-                                                onChange={(e) =>
-                                                    updateTaskMut.mutate({
-                                                        taskId: task.id,
-                                                        payload: { assigned_to: e.target.value ? Number(e.target.value) : null },
-                                                    })
-                                                }
-                                                disabled={updateTaskMut.isPending}
-                                                className="rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600 focus:border-brand-blue focus:outline-none disabled:opacity-40"
-                                            >
-                                                <option value="">
-                                                    {task.assigned_to_name ? "Reassign…" : "Unassigned"}
-                                                </option>
-                                                {ptUsers.map((u) => (
-                                                    <option key={u.id} value={u.id}>
-                                                        {(u.first_name + " " + u.last_name).trim() || u.username}
+                                            {canManageTasks ? (
+                                                <select
+                                                    value={task.assigned_to ?? ""}
+                                                    onChange={(e) =>
+                                                        updateTaskMut.mutate({
+                                                            taskId: task.id,
+                                                            payload: { assigned_to: e.target.value ? Number(e.target.value) : null },
+                                                        })
+                                                    }
+                                                    disabled={updateTaskMut.isPending}
+                                                    className="rounded border border-gray-200 bg-white px-2 py-0.5 text-xs text-gray-600 focus:border-brand-blue focus:outline-none disabled:opacity-40"
+                                                >
+                                                    <option value="">
+                                                        {task.assigned_to_name ? "Reassign…" : "Unassigned"}
                                                     </option>
-                                                ))}
-                                            </select>
-                                            {task.assigned_to_name && (
-                                                <span className="text-xs text-gray-500">{task.assigned_to_name}</span>
+                                                    {ptUsers.map((u) => (
+                                                        <option key={u.id} value={u.id}>
+                                                            {(u.first_name + " " + u.last_name).trim() || u.username}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                task.assigned_to_name && (
+                                                    <span className="text-xs text-gray-500">{task.assigned_to_name}</span>
+                                                )
                                             )}
                                             {task.due_by && (
                                                 <span className="text-xs text-gray-400">Due {task.due_by}</span>
                                             )}
                                         </div>
                                     </div>
-                                    <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${taskStatusColor(task.status)}`}>
-                                        {apiTaskStatusLabel(task.status)}
-                                    </span>
-                                    <button
-                                        onClick={() => deleteTaskMut.mutate(task.id)}
-                                        disabled={deleteTaskMut.isPending}
-                                        className="shrink-0 text-gray-200 hover:text-brand-red transition-colors disabled:opacity-40"
+                                    <select
+                                        value={task.status}
+                                        onChange={(e) =>
+                                            updateTaskMut.mutate({
+                                                taskId: task.id,
+                                                payload: { status: e.target.value as ComponentTask["status"] },
+                                            })
+                                        }
+                                        disabled={updateTaskMut.isPending}
+                                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold border-0 focus:outline-none focus:ring-1 focus:ring-brand-blue cursor-pointer disabled:opacity-40 ${taskStatusColor(task.status)}`}
                                     >
-                                        <TrashIcon className="h-3.5 w-3.5" />
-                                    </button>
+                                        <option value="pending">Pending</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="done">Done</option>
+                                        <option value="blocked">Blocked</option>
+                                        <option value="overdue">Overdue</option>
+                                    </select>
+                                    {canManageTasks && (
+                                        <button
+                                            onClick={() => deleteTaskMut.mutate(task.id)}
+                                            disabled={deleteTaskMut.isPending}
+                                            className="shrink-0 text-gray-200 hover:text-brand-red transition-colors disabled:opacity-40"
+                                        >
+                                            <TrashIcon className="h-3.5 w-3.5" />
+                                        </button>
+                                    )}
                                 </div>
                             ))}
-                            {!tasksQuery.isLoading && (tasksQuery.data ?? []).length === 0 && (
-                                <p className="px-5 py-8 text-center text-sm text-gray-400">No tasks yet</p>
+                            {!tasksQuery.isLoading && visibleTasks.length === 0 && (
+                                <p className="px-5 py-8 text-center text-sm text-gray-400">
+                                    {canManageTasks || isComponentAssigned ? "No tasks yet" : "No tasks assigned to you on this component"}
+                                </p>
                             )}
                         </div>
                     </div>
@@ -1184,24 +1378,104 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                                 </div>
                                             </div>
 
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-400 mb-1">Placement</label>
-                                                <input
-                                                    value={briefDraft.specifications}
-                                                    onChange={(e) => setBriefDraft((p) => ({ ...p, specifications: e.target.value }))}
-                                                    placeholder="e.g. Centre chest, 8cm width"
-                                                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-xs font-semibold text-gray-400 mb-1">Thread / Color Spec</label>
-                                                <input
-                                                    value={briefDraft.brief_artwork_ref}
-                                                    onChange={(e) => setBriefDraft((p) => ({ ...p, brief_artwork_ref: e.target.value }))}
-                                                    placeholder="e.g. Green #00A651, White — Pantone 485"
-                                                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
-                                                />
+                                            {/* Brief Attachments — inline in form */}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <label className="block text-xs font-semibold text-gray-400">
+                                                        Attachments & Instructions
+                                                        <span className="ml-1 font-normal text-gray-300">(mockups, artworks — visible to vendor)</span>
+                                                    </label>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setBaRows((prev) => [...prev, { name: "", desc: "", file: null }])}
+                                                        className="flex items-center gap-1 text-xs font-semibold text-brand-blue hover:text-brand-blue/80 transition-colors"
+                                                    >
+                                                        <PlusIcon className="h-3.5 w-3.5" /> Add Row
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {baRows.map((row, idx) => (
+                                                        <div key={idx} className="flex items-start gap-2 rounded-lg border border-gray-200 bg-white p-3">
+                                                            <div className="flex-1 space-y-2 min-w-0">
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.name}
+                                                                    onChange={(e) => setBaRows((prev) => prev.map((r, i) => i === idx ? { ...r, name: e.target.value } : r))}
+                                                                    placeholder="Label (optional) — e.g. 'Chest Artwork'"
+                                                                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                                                />
+                                                                <input
+                                                                    type="text"
+                                                                    value={row.desc}
+                                                                    onChange={(e) => setBaRows((prev) => prev.map((r, i) => i === idx ? { ...r, desc: e.target.value } : r))}
+                                                                    placeholder="Instruction for vendor (optional)"
+                                                                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                                                />
+                                                                <input
+                                                                    type="file"
+                                                                    onChange={(e) => setBaRows((prev) => prev.map((r, i) => i === idx ? { ...r, file: e.target.files?.[0] ?? null } : r))}
+                                                                    className="text-sm text-gray-600"
+                                                                />
+                                                            </div>
+                                                            {baRows.length > 1 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setBaRows((prev) => prev.filter((_, i) => i !== idx))}
+                                                                    className="mt-1 rounded border border-gray-200 p-1 text-gray-300 hover:border-brand-red hover:text-brand-red transition-colors shrink-0"
+                                                                >
+                                                                    <XIcon className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleBaUploadAll}
+                                                        disabled={baUploading || !baRows.some((r) => r.file || r.name.trim() || r.desc.trim())}
+                                                        className="flex items-center gap-1.5 rounded-md bg-brand-blue px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
+                                                    >
+                                                        {baUploading ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <UploadIcon className="h-3.5 w-3.5" />}
+                                                        {baUploading ? "Uploading…" : `Save${baRows.filter((r) => r.file || r.name.trim() || r.desc.trim()).length > 1 ? " All" : ""}`}
+                                                    </button>
+                                                    {baUploadError && <span className="text-xs text-brand-red">{baUploadError}</span>}
+                                                </div>
+                                                {/* Already-uploaded attachments */}
+                                                {briefAttachmentsQuery.isLoading ? (
+                                                    <div className="flex items-center gap-2 py-2">
+                                                        <LoaderCircleIcon className="h-4 w-4 animate-spin text-gray-300" />
+                                                        <span className="text-xs text-gray-300">Loading…</span>
+                                                    </div>
+                                                ) : briefAttachmentsQuery.data?.length ? (
+                                                    <div className="rounded-lg border border-gray-100 divide-y divide-gray-50">
+                                                        {briefAttachmentsQuery.data.map((ba) => (
+                                                            <div key={ba.id} className="flex items-center gap-3 px-3 py-2">
+                                                                <PaperclipIcon className="h-4 w-4 text-gray-400 shrink-0" />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-semibold text-gray-800">{ba.attachment_name}</p>
+                                                                    {ba.description && <p className="text-xs text-gray-400">{ba.description}</p>}
+                                                                    <p className="text-[10px] text-gray-300">
+                                                                        {ba.uploaded_by ?? "—"} · {new Date(ba.uploaded_at).toLocaleDateString("en-KE")}
+                                                                    </p>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => deleteBaMut.mutate(ba.id)}
+                                                                    disabled={deleteBaMut.isPending && deleteBaMut.variables === ba.id}
+                                                                    className="rounded border border-gray-200 p-1 text-gray-400 hover:border-brand-red hover:text-brand-red transition-colors disabled:opacity-40"
+                                                                >
+                                                                    {deleteBaMut.isPending && deleteBaMut.variables === ba.id
+                                                                        ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" />
+                                                                        : <TrashIcon className="h-3.5 w-3.5" />
+                                                                    }
+                                                                </button>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-xs text-gray-300 italic">No attachments yet.</p>
+                                                )}
                                             </div>
 
                                             <div>
@@ -1393,21 +1667,150 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                 ) : sendBriefMut.isError ? (
                                     <div className="flex items-start justify-between border-t border-brand-red/20 bg-brand-red/5 px-5 py-3 gap-3">
                                         <p className="text-sm text-brand-red break-all">{sendBriefMut.error instanceof Error ? sendBriefMut.error.message : "Failed to send. Check vendor email address."}</p>
-                                        <button onClick={() => sendBriefMut.mutate()} className="text-xs font-semibold text-brand-red hover:underline shrink-0">Retry</button>
+                                        <button onClick={() => sendBriefMut.mutate(briefChannel)} className="text-xs font-semibold text-brand-red hover:underline shrink-0">Retry</button>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center justify-between border-t border-gray-100 px-5 py-4">
+                                    <div className="border-t border-gray-100 px-5 py-4 space-y-3">
                                         {!rawComp?.vendor && (
                                             <p className="text-xs text-brand-orange">Assign a vendor above before sending the brief</p>
                                         )}
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xs font-semibold text-gray-500 shrink-0">Send via:</span>
+                                            {(["email", "whatsapp", "both"] as const).map((ch) => (
+                                                <button
+                                                    key={ch}
+                                                    onClick={() => setBriefChannel(ch)}
+                                                    className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors ${
+                                                        briefChannel === ch
+                                                            ? "border-brand-blue bg-brand-blue text-white"
+                                                            : "border-gray-200 text-gray-600 hover:border-brand-blue hover:text-brand-blue"
+                                                    }`}
+                                                >
+                                                    {ch === "email" ? "Email" : ch === "whatsapp" ? "WhatsApp" : "Email + WhatsApp"}
+                                                </button>
+                                            ))}
+                                            <button
+                                                onClick={() => sendBriefMut.mutate(briefChannel)}
+                                                disabled={sendBriefMut.isPending || !rawComp?.vendor}
+                                                className="ml-auto flex items-center gap-2 rounded-md bg-brand-blue px-5 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
+                                            >
+                                                {sendBriefMut.isPending ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
+                                                {sendBriefMut.isPending ? "Sending…" : "Send Brief →"}
+                                            </button>
+                                        </div>
+                                        {briefChannel === "whatsapp" && (
+                                            <p className="text-xs text-gray-400">WhatsApp: generates the brief link and opens a pre-filled WhatsApp message in a new tab.</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* ── Production Cost Breakdown ── */}
+                            <div className="lg:col-span-3 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50">
+                                    <div className="flex items-center gap-2">
+                                        <LockIcon className="h-4 w-4 text-gray-400" />
+                                        <span className="text-sm font-semibold text-gray-800">Production Cost Breakdown</span>
+                                        {productionCostQuery.data?.total != null && productionCostQuery.data.total > 0 && (
+                                            <span className="ml-1 rounded-full bg-brand-blue/10 px-2.5 py-0.5 text-xs font-bold text-brand-blue">
+                                                KES {productionCostQuery.data.total.toLocaleString("en-KE", { minimumFractionDigits: 2 })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {!costEditing && (
                                         <button
-                                            onClick={() => sendBriefMut.mutate()}
-                                            disabled={sendBriefMut.isPending || !rawComp?.vendor}
-                                            className="ml-auto flex items-center gap-2 rounded-md bg-brand-blue px-5 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
+                                            onClick={() => {
+                                                const existing = productionCostQuery.data?.items ?? [];
+                                                setCostItems(existing.length > 0 ? existing.map(i => ({ ...i })) : [{ service_name: "", cost: 0 }]);
+                                                setCostEditing(true);
+                                            }}
+                                            className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue transition-colors"
                                         >
-                                            {sendBriefMut.isPending ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
-                                            {sendBriefMut.isPending ? "Sending…" : "Send Brief to Vendor →"}
+                                            <PlusIcon className="h-3.5 w-3.5" />
+                                            {productionCostQuery.data?.items?.length ? "Edit Costs" : "Create Cost"}
                                         </button>
+                                    )}
+                                </div>
+
+                                {costEditing ? (
+                                    <div className="px-5 py-4 space-y-3">
+                                        <p className="text-xs text-gray-400">Add each service/material and its cost in KES. Click <strong>Compute &amp; Save</strong> when done.</p>
+                                        <div className="space-y-2">
+                                            {costItems.map((item, idx) => (
+                                                <div key={idx} className="flex items-center gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={item.service_name}
+                                                        onChange={e => setCostItems(prev => prev.map((it, i) => i === idx ? { ...it, service_name: e.target.value } : it))}
+                                                        placeholder="Service / material name"
+                                                        className="flex-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                                    />
+                                                    <div className="relative w-36">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">KES</span>
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            value={item.cost || ""}
+                                                            onChange={e => setCostItems(prev => prev.map((it, i) => i === idx ? { ...it, cost: parseFloat(e.target.value) || 0 } : it))}
+                                                            placeholder="0.00"
+                                                            className="w-full rounded-md border border-gray-200 pl-10 pr-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        onClick={() => setCostItems(prev => prev.filter((_, i) => i !== idx))}
+                                                        className="p-1.5 text-gray-300 hover:text-brand-red transition-colors"
+                                                    >
+                                                        <TrashIcon className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <button
+                                            onClick={() => setCostItems(prev => [...prev, { service_name: "", cost: 0 }])}
+                                            className="flex items-center gap-1.5 text-xs text-brand-blue hover:underline"
+                                        >
+                                            <PlusIcon className="h-3.5 w-3.5" /> Add Row
+                                        </button>
+
+                                        {/* Total preview */}
+                                        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5">
+                                            <span className="text-sm font-semibold text-gray-700">Total</span>
+                                            <span className="text-sm font-bold text-brand-blue">
+                                                KES {costItems.reduce((s, i) => s + (i.cost || 0), 0).toLocaleString("en-KE", { minimumFractionDigits: 2 })}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-3 pt-1">
+                                            <button
+                                                onClick={() => saveCostMut.mutate(costItems.filter(i => i.service_name.trim()))}
+                                                disabled={saveCostMut.isPending}
+                                                className="flex items-center gap-1.5 rounded-md bg-brand-blue px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
+                                            >
+                                                {saveCostMut.isPending ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-3.5 w-3.5" />}
+                                                {saveCostMut.isPending ? "Saving…" : "Compute & Save"}
+                                            </button>
+                                            <button onClick={() => setCostEditing(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                                            {saveCostMut.isError && <span className="text-xs text-brand-red">Save failed. Try again.</span>}
+                                        </div>
+                                    </div>
+                                ) : productionCostQuery.data?.items?.length ? (
+                                    <div className="divide-y divide-gray-50">
+                                        {productionCostQuery.data.items.map((item, idx) => (
+                                            <div key={idx} className="flex items-center justify-between px-5 py-2.5">
+                                                <span className="text-sm text-gray-700">{item.service_name}</span>
+                                                <span className="text-sm font-mono text-gray-800">KES {Number(item.cost).toLocaleString("en-KE", { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                        ))}
+                                        <div className="flex items-center justify-between bg-gray-50 px-5 py-3">
+                                            <span className="text-sm font-bold text-gray-700">Total</span>
+                                            <span className="text-sm font-bold text-brand-blue">KES {productionCostQuery.data.total.toLocaleString("en-KE", { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="px-5 py-8 text-center">
+                                        <p className="text-sm text-gray-400">No production cost recorded yet.</p>
+                                        <p className="text-xs text-gray-300 mt-1">Click <strong>Create Cost</strong> above to add a breakdown.</p>
                                     </div>
                                 )}
                             </div>
@@ -1498,6 +1901,263 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                 </div>
                             </div>
                         </div>
+
+                        {/* ── Off-System Communication ── */}
+                        <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                            <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-5 py-3.5">
+                                <div className="flex items-center gap-2">
+                                    <MessageCircleIcon className="h-4 w-4 text-gray-400" />
+                                    <span className="text-sm font-semibold text-gray-800">Off-System Communication</span>
+                                    {vendorBriefStatusQuery.data?.off_system_logs?.length ? (
+                                        <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-bold text-gray-500">{vendorBriefStatusQuery.data.off_system_logs.length}</span>
+                                    ) : null}
+                                </div>
+                                <button
+                                    onClick={() => setShowLogForm((v) => !v)}
+                                    className="flex items-center gap-1 text-xs font-semibold text-brand-blue hover:text-brand-blue/80 transition-colors"
+                                >
+                                    <PlusIcon className="h-3.5 w-3.5" />
+                                    Log
+                                </button>
+                            </div>
+                            {showLogForm && (
+                                <div className="border-b border-gray-100 px-5 py-4 space-y-3">
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-400 mb-1">Channel</label>
+                                            <select
+                                                value={logChannel}
+                                                onChange={(e) => setLogChannel(e.target.value as OffSystemChannel)}
+                                                className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                            >
+                                                <option value="phone">Phone Call</option>
+                                                <option value="whatsapp">WhatsApp</option>
+                                                <option value="email">Email (external)</option>
+                                                <option value="in_person">In Person</option>
+                                                <option value="other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-gray-400 mb-1">Direction</label>
+                                            <select
+                                                value={logDirection}
+                                                onChange={(e) => setLogDirection(e.target.value as OffSystemDirection)}
+                                                className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                            >
+                                                <option value="outbound">We contacted them</option>
+                                                <option value="inbound">They contacted us</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-1">When</label>
+                                        <input
+                                            type="datetime-local"
+                                            value={logOccurredAt}
+                                            onChange={(e) => setLogOccurredAt(e.target.value)}
+                                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-gray-400 mb-1">Summary <span className="text-brand-red">*</span></label>
+                                        <textarea
+                                            rows={2}
+                                            value={logSummary}
+                                            onChange={(e) => setLogSummary(e.target.value)}
+                                            placeholder="What was discussed or decided…"
+                                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none resize-none"
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => { if (logSummary.trim()) logCommMut.mutate(); }}
+                                            disabled={!logSummary.trim() || logCommMut.isPending}
+                                            className="flex items-center gap-1.5 rounded-md bg-brand-blue px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
+                                        >
+                                            {logCommMut.isPending ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-3.5 w-3.5" />}
+                                            Save
+                                        </button>
+                                        <button
+                                            onClick={() => { setShowLogForm(false); setLogSummary(""); }}
+                                            className="text-xs text-gray-400 hover:text-gray-600"
+                                        >
+                                            Cancel
+                                        </button>
+                                        {logCommMut.isError && <span className="text-xs text-brand-red">Failed to save.</span>}
+                                    </div>
+                                </div>
+                            )}
+                            {vendorBriefStatusQuery.data?.off_system_logs?.length ? (
+                                <div className="divide-y divide-gray-50">
+                                    {vendorBriefStatusQuery.data.off_system_logs.map((log) => (
+                                        <div key={log.id} className="px-5 py-3">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                                                    String(log.channel).toLowerCase().includes("whatsapp") ? "bg-green-100 text-green-700" :
+                                                    String(log.channel).toLowerCase().includes("phone") ? "bg-blue-100 text-blue-700" :
+                                                    "bg-gray-100 text-gray-600"
+                                                }`}>{log.channel}</span>
+                                                <span className="text-[10px] text-gray-400 uppercase tracking-wide">{log.direction}</span>
+                                                <span className="ml-auto text-xs text-gray-400">
+                                                    {new Date(log.occurred_at).toLocaleDateString("en-KE", { day: "numeric", month: "short" })}
+                                                    {" · "}
+                                                    {new Date(log.occurred_at).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
+                                                </span>
+                                            </div>
+                                            <p className="text-sm text-gray-700">{log.summary}</p>
+                                            <p className="text-xs text-gray-400 mt-0.5">Logged by {log.recorded_by}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : !showLogForm ? (
+                                <div className="px-5 py-6 text-center">
+                                    <p className="text-sm text-gray-300">No off-system communication logged yet.</p>
+                                </div>
+                            ) : null}
+                        </div>
+
+                        {/* ── Vendor Adjustment Response ── */}
+                        {(() => {
+                            const bs = vendorBriefStatusQuery.data;
+                            if (!bs?.time_adjustment_requested) return null;
+                            const fmtBs = (iso: string) => new Date(iso).toLocaleString("en-KE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+                            return (
+                                <div className="rounded-xl border border-brand-orange/30 bg-white shadow-sm overflow-hidden">
+                                    <div className="flex items-center gap-3 border-b border-brand-orange/20 bg-brand-orange/5 px-5 py-4">
+                                        <AlertCircleIcon className="h-5 w-5 text-brand-orange shrink-0" />
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-gray-800">Vendor Adjustment Request</p>
+                                            {bs.time_adjustment_requested_at && (
+                                                <p className="text-xs text-gray-500 mt-0.5">{fmtBs(bs.time_adjustment_requested_at)}</p>
+                                            )}
+                                        </div>
+                                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
+                                            bs.adjustment_status === "approved" ? "bg-brand-green/10 text-brand-green" :
+                                            bs.adjustment_status === "rejected" ? "bg-brand-red/10 text-brand-red" :
+                                            "bg-brand-orange/10 text-brand-orange"
+                                        }`}>
+                                            {(bs.adjustment_status ?? "pending").toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div className="px-5 py-4 space-y-4">
+                                        {bs.time_adjustment_reason && (
+                                            <div>
+                                                <p className="text-xs font-semibold text-gray-400 mb-1">Reason from vendor</p>
+                                                <p className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">{bs.time_adjustment_reason}</p>
+                                            </div>
+                                        )}
+                                        {(bs.proposed_deadline || bs.proposed_cost) && (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {bs.proposed_deadline && (
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-gray-400 mb-1">Proposed Deadline</p>
+                                                        <p className="text-sm font-semibold text-gray-800">{new Date(bs.proposed_deadline).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" })}</p>
+                                                    </div>
+                                                )}
+                                                {bs.proposed_cost && (
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-gray-400 mb-1">Proposed Cost</p>
+                                                        <p className="text-sm font-semibold text-gray-800">{bs.proposed_cost}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {bs.adjustment_status === "pending" ? (
+                                            !showAdjReply ? (
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <button
+                                                        onClick={() => { setAdjAction("approve"); setShowAdjReply(true); }}
+                                                        className="flex items-center gap-1.5 rounded-md border border-brand-green/40 bg-brand-green/5 px-4 py-2 text-sm font-semibold text-brand-green hover:bg-brand-green/10 transition-colors"
+                                                    >
+                                                        <ThumbsUpIcon className="h-4 w-4" /> Approve
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setAdjAction("reject"); setShowAdjReply(true); }}
+                                                        className="flex items-center gap-1.5 rounded-md border border-brand-red/30 bg-brand-red/5 px-4 py-2 text-sm font-semibold text-brand-red hover:bg-brand-red/10 transition-colors"
+                                                    >
+                                                        <ThumbsDownIcon className="h-4 w-4" /> Reject
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setAdjAction("reply"); setShowAdjReply(true); }}
+                                                        className="flex items-center gap-1.5 rounded-md border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue transition-colors"
+                                                    >
+                                                        <MessageSquareIcon className="h-4 w-4" /> Reply
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
+                                                        {adjAction === "approve" ? "Approve Adjustment" : adjAction === "reject" ? "Reject Adjustment" : "Reply to Vendor"}
+                                                    </p>
+                                                    {adjAction === "approve" && (
+                                                        <div className="grid grid-cols-2 gap-3">
+                                                            <div>
+                                                                <label className="block text-xs font-semibold text-gray-400 mb-1">New Deadline <span className="text-gray-300">(optional)</span></label>
+                                                                <input
+                                                                    type="date"
+                                                                    value={adjNewDeadline}
+                                                                    onChange={(e) => setAdjNewDeadline(e.target.value)}
+                                                                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                                                />
+                                                            </div>
+                                                            <div>
+                                                                <label className="block text-xs font-semibold text-gray-400 mb-1">New Cost <span className="text-gray-300">(optional)</span></label>
+                                                                <input
+                                                                    type="text"
+                                                                    value={adjNewCost}
+                                                                    onChange={(e) => setAdjNewCost(e.target.value)}
+                                                                    placeholder="e.g. KES 15,000"
+                                                                    className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-400 mb-1">Message <span className="text-gray-300">(optional)</span></label>
+                                                        <textarea
+                                                            rows={2}
+                                                            value={adjMessage}
+                                                            onChange={(e) => setAdjMessage(e.target.value)}
+                                                            placeholder="Additional note to vendor…"
+                                                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none resize-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => respondAdjMut.mutate()}
+                                                            disabled={respondAdjMut.isPending}
+                                                            className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40 transition-colors ${
+                                                                adjAction === "approve" ? "bg-brand-green hover:bg-brand-green/90" :
+                                                                adjAction === "reject" ? "bg-brand-red hover:bg-brand-red/90" :
+                                                                "bg-brand-blue hover:bg-brand-blue/90"
+                                                            }`}
+                                                        >
+                                                            {respondAdjMut.isPending ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-3.5 w-3.5" />}
+                                                            {adjAction === "approve" ? "Confirm Approval" : adjAction === "reject" ? "Confirm Rejection" : "Send Reply"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { setShowAdjReply(false); setAdjMessage(""); setAdjNewDeadline(""); setAdjNewCost(""); }}
+                                                            className="text-xs text-gray-400 hover:text-gray-600"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        ) : (
+                                            <div className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3">
+                                                <p className="text-xs font-semibold text-gray-400 mb-1">
+                                                    Response by {bs.adjustment_responded_by ?? "Admin"}
+                                                    {bs.adjustment_responded_at && ` · ${fmtBs(bs.adjustment_responded_at)}`}
+                                                </p>
+                                                <p className="text-sm text-gray-700">{bs.adjustment_response || "—"}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -1597,6 +2257,59 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                         </div>
                                     );
                                 })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── ADJUSTMENT REQUEST ── */}
+                {activeTab === "adjustment" && (
+                    <div className="space-y-4">
+                        <div className="rounded-xl border border-brand-orange/30 bg-white shadow-sm overflow-hidden">
+                            <div className="flex items-center gap-2 border-b border-brand-orange/20 bg-brand-orange/5 px-5 py-4">
+                                <AlertCircleIcon className="h-5 w-5 text-brand-orange shrink-0" />
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-800">Request Adjustment</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Notify AM &amp; Admin of a required change on this component — quantity, spec correction, pricing, or any other issue.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="px-5 py-5 space-y-4">
+                                <textarea
+                                    rows={5}
+                                    value={adjustmentNote}
+                                    onChange={e => setAdjustmentNote(e.target.value)}
+                                    placeholder="Describe the adjustment needed — e.g. client requested a colour change, quantity revised from 100 to 150, pricing needs to be updated…"
+                                    className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-brand-blue focus:outline-none resize-none"
+                                />
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        onClick={() => {
+                                            if (adjustmentNote.trim()) adjustmentMut.mutate(adjustmentNote.trim());
+                                        }}
+                                        disabled={!adjustmentNote.trim() || adjustmentMut.isPending}
+                                        className="flex items-center gap-2 rounded-md bg-brand-orange px-5 py-2 text-sm font-semibold text-white hover:bg-brand-orange/90 disabled:opacity-40 transition-colors"
+                                    >
+                                        {adjustmentMut.isPending
+                                            ? <LoaderCircleIcon className="h-4 w-4 animate-spin" />
+                                            : <SendIcon className="h-4 w-4" />
+                                        }
+                                        {adjustmentMut.isPending ? "Sending…" : "Send to AM & Admin"}
+                                    </button>
+                                    {adjustmentMut.isSuccess && (
+                                        <span className="flex items-center gap-1.5 text-sm text-brand-green font-medium">
+                                            <CheckIcon className="h-4 w-4" /> Request sent successfully
+                                        </span>
+                                    )}
+                                    {adjustmentMut.isError && (
+                                        <span className="text-sm text-brand-red">Failed to send. Please try again.</span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-gray-400">
+                                    All Account Managers and Admins will receive a notification with your note.
+                                    The AM will then update the quote or invoice as needed.
+                                </p>
                             </div>
                         </div>
                     </div>

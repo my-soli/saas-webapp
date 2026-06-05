@@ -1,7 +1,8 @@
 "use client";
 
 import { type ReactElement, useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React from "react";
 import {
     ScaleIcon,
     FlagIcon,
@@ -14,10 +15,17 @@ import {
     CheckCircleIcon,
     XCircleIcon,
     RotateCcwIcon,
+    ChevronDownIcon,
+    ChevronRightIcon,
+    ShieldCheckIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 import {
     fetchReconciliation,
     fetchOverrideLog,
+    postReconciliationOverride,
+    syncJobToZoho,
+    pullZohoPayments,
     type ReconciliationRow,
 } from "@/services/orchestration";
 
@@ -56,7 +64,7 @@ const statusCfg = {
 // ── CSV Export ────────────────────────────────────────────────────────────────
 
 const exportCSV = (rows: ReconciliationRow[]) => {
-    const header = ["Job ID", "Job Name", "Client", "Quoted (KES)", "Produced (KES)", "Invoiced (KES)", "Variance (KES)", "Margin %", "Status"];
+    const header = ["Job ID", "Job Name", "Client", "Quoted (KES)", "Production Cost (KES)", "Invoiced (KES)", "Variance (KES)", "Margin %", "Status"];
     const lines = rows.map((r) => [
         r.jobId, r.jobName, r.client,
         r.quotedRevenue, r.actualCost, r.invoicedAmount,
@@ -88,7 +96,63 @@ export default function ReconciliationWorkspace(): ReactElement {
         refetchInterval: 120_000,
     });
 
+    const queryClient = useQueryClient();
     const [flagged, setFlagged] = useState<Set<string>>(new Set());
+    const [overridden, setOverridden] = useState<Set<string>>(new Set());
+    const [expanded, setExpanded] = useState<Set<string>>(new Set());
+    const [overrideTarget, setOverrideTarget] = useState<ReconciliationRow | null>(null);
+    const [overrideReason, setOverrideReason] = useState("");
+
+    const toggleExpand = (jobId: string) =>
+        setExpanded(prev => { const n = new Set(prev); n.has(jobId) ? n.delete(jobId) : n.add(jobId); return n; });
+
+    const [syncingJobId, setSyncingJobId] = useState<number | null>(null);
+    const [syncedJobs, setSyncedJobs] = useState<Map<number, { invoiceNumber: string; zohoStatus: string; balance: number }>>(new Map());
+
+    const zohoSyncMutation = useMutation({
+        mutationFn: (jobDbId: number) => syncJobToZoho(jobDbId),
+        onMutate: (jobDbId) => setSyncingJobId(jobDbId),
+        onSuccess: (result, jobDbId) => {
+            setSyncingJobId(null);
+            setSyncedJobs(prev => new Map(prev).set(jobDbId, {
+                invoiceNumber: result.zoho_invoice_number,
+                zohoStatus: result.zoho_status,
+                balance: result.zoho_balance,
+            }));
+            toast.success(result.message);
+            queryClient.invalidateQueries({ queryKey: ["pt-reconciliation"] });
+        },
+        onError: (err: Error) => {
+            setSyncingJobId(null);
+            toast.error(err.message || "Zoho sync failed.");
+        },
+    });
+
+    const pullPaymentsMutation = useMutation({
+        mutationFn: pullZohoPayments,
+        onSuccess: (result) => {
+            const msg = result.payments_created > 0
+                ? `${result.updated} invoices updated · ${result.payments_created} payment${result.payments_created !== 1 ? "s" : ""} auto-recorded`
+                : `${result.updated} invoices updated · no new payments`;
+            toast.success(msg);
+            queryClient.invalidateQueries({ queryKey: ["pt-reconciliation"] });
+        },
+        onError: (err: Error) => toast.error(err.message || "Failed to pull payments from Zoho."),
+    });
+
+    const overrideMutation = useMutation({
+        mutationFn: ({ jobDbId, reason }: { jobDbId: number; reason: string }) =>
+            postReconciliationOverride(jobDbId, reason),
+        onSuccess: (_data, vars) => {
+            const row = overrideTarget;
+            if (row) setOverridden(prev => { const n = new Set(prev); n.add(row.jobId); return n; });
+            toast.success("Override recorded.");
+            setOverrideTarget(null);
+            setOverrideReason("");
+            queryClient.invalidateQueries({ queryKey: ["pt-override-log"] });
+        },
+        onError: () => toast.error("Failed to record override."),
+    });
 
     const items: ReconciliationRow[] = data?.rows ?? [];
     const reworkCostsTotal: number = data?.rework_costs_total ?? 0;
@@ -143,6 +207,17 @@ export default function ReconciliationWorkspace(): ReactElement {
                             Export Report
                         </button>
                         <button
+                            onClick={() => pullPaymentsMutation.mutate()}
+                            disabled={pullPaymentsMutation.isPending}
+                            className="flex items-center gap-2 rounded-md border border-brand-green/40 px-4 py-2 text-sm font-semibold text-brand-green hover:bg-brand-green/10 transition-colors disabled:opacity-40"
+                        >
+                            {pullPaymentsMutation.isPending
+                                ? <LoaderCircleIcon className="h-4 w-4 animate-spin" />
+                                : <RotateCcwIcon className="h-4 w-4" />
+                            }
+                            Pull Payments from Zoho
+                        </button>
+                        <button
                             onClick={flagAllVariances}
                             disabled={varianceCount === 0}
                             className="flex items-center gap-2 rounded-md bg-brand-red px-4 py-2 text-sm font-semibold text-white hover:bg-brand-red/90 transition-colors disabled:opacity-40"
@@ -166,7 +241,7 @@ export default function ReconciliationWorkspace(): ReactElement {
                     </article>
                     <article className="relative overflow-hidden rounded-xl border border-brand-orange/20 bg-white px-5 py-4 shadow-sm">
                         <div className="absolute top-0 left-0 right-0 h-1 bg-brand-orange" />
-                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Vendor Costs</p>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">Production Cost</p>
                         <p className="mt-2 text-2xl font-extrabold text-gray-900">{fmtKes(totalCost)}</p>
                         <p className="mt-1 text-xs text-gray-400">PT production cost</p>
                     </article>
@@ -209,9 +284,10 @@ export default function ReconciliationWorkspace(): ReactElement {
                             <div key={r.jobId} className="flex items-start gap-3 rounded-xl border border-brand-red/20 bg-brand-red/5 px-5 py-3">
                                 <XCircleIcon className="h-4 w-4 text-brand-red shrink-0 mt-0.5" />
                                 <p className="text-sm text-brand-red">
-                                    <strong>Mismatch:</strong> {r.jobName} ({r.jobId}) — quoted{" "}
-                                    <span className="font-mono">{fmtFull(r.quotedRevenue)}</span> vs produced{" "}
-                                    <span className="font-mono">{fmtFull(r.actualCost)}</span>. Invoice must be reconciled before financial closure.
+                                    <strong>Cost overrun:</strong> {r.jobName} ({r.jobId}) — quoted{" "}
+                                    <span className="font-mono">{fmtFull(r.quotedRevenue)}</span>, production cost{" "}
+                                    <span className="font-mono">{fmtFull(r.actualCost)}</span>{" "}
+                                    (over by <span className="font-mono">{fmtFull(r.actualCost - r.quotedRevenue)}</span>). Adjustment or override required before financial closure.
                                 </p>
                             </div>
                         ))}
@@ -252,7 +328,7 @@ export default function ReconciliationWorkspace(): ReactElement {
                                     <tr className="border-b border-gray-100 bg-gray-50">
                                         <th className="px-5 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Job</th>
                                         <th className="px-5 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Quoted</th>
-                                        <th className="px-5 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Produced</th>
+                                        <th className="px-5 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Production Cost</th>
                                         <th className="px-5 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Invoiced</th>
                                         <th className="px-5 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Margin</th>
                                         <th className="px-5 py-2.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-400">Status</th>
@@ -264,66 +340,174 @@ export default function ReconciliationWorkspace(): ReactElement {
                                         const displayStatus = mapStatus(row);
                                         const sc = statusCfg[displayStatus];
                                         const isFlagged = flagged.has(row.jobId);
+                                        const isExpanded = expanded.has(row.jobId);
+                                        const hasComponents = (row.components ?? []).length > 0;
                                         const quoteVsProdMatch = row.actualCost === 0 || Math.abs(row.quotedRevenue - row.actualCost) < 0.01;
                                         const prodVsInvMatch  = row.invoicedAmount === 0 || Math.abs(row.actualCost - row.invoicedAmount) < 0.01;
                                         return (
-                                            <tr key={row.jobId} className={`hover:bg-gray-50 transition-colors ${isFlagged ? "bg-brand-red/[0.03]" : ""}`}>
-                                                <td className="px-5 py-3.5">
-                                                    <p className="font-semibold text-gray-800">{row.jobName}</p>
-                                                    <p className="text-xs text-gray-400 font-mono">{row.jobId} · {row.client}</p>
-                                                </td>
-                                                {/* Quoted */}
-                                                <td className="px-5 py-3.5 text-right">
-                                                    <span className="font-semibold text-brand-green">{fmtFull(row.quotedRevenue)}</span>
-                                                </td>
-                                                {/* Produced */}
-                                                <td className="px-5 py-3.5 text-right">
-                                                    {row.actualCost === 0
-                                                        ? <span className="text-gray-300 italic text-xs">Not costed</span>
-                                                        : <span className={`font-semibold ${quoteVsProdMatch ? "text-brand-green" : "text-brand-red"}`}>
-                                                            {fmtFull(row.actualCost)}
-                                                          </span>
-                                                    }
-                                                </td>
-                                                {/* Invoiced */}
-                                                <td className="px-5 py-3.5 text-right">
-                                                    {row.invoicedAmount === 0
-                                                        ? <span className="text-gray-300 italic text-xs">—</span>
-                                                        : <span className={`font-semibold ${prodVsInvMatch ? "text-brand-green" : "text-brand-orange"}`}>
-                                                            {fmtFull(row.invoicedAmount)}
-                                                          </span>
-                                                    }
-                                                </td>
-                                                {/* Margin */}
-                                                <td className={`px-5 py-3.5 text-right font-bold ${
-                                                    row.actualCost === 0 ? "text-gray-300" :
-                                                    row.margin < 35 ? "text-brand-red" : "text-brand-green"
-                                                }`}>
-                                                    {row.actualCost === 0 ? "—" : `${row.margin.toFixed(1)}%`}
-                                                </td>
-                                                {/* Status chip */}
-                                                <td className="px-5 py-3.5 text-center">
-                                                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${sc.bg} ${sc.text}`}>
-                                                        <span className={`h-1.5 w-1.5 rounded-full ${sc.dot}`} />
-                                                        {sc.label}
-                                                    </span>
-                                                </td>
-                                                {/* Finance flag */}
-                                                <td className="px-5 py-3.5 text-center">
-                                                    <button
-                                                        onClick={() => toggleFlag(row.jobId)}
-                                                        className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                                                            isFlagged
-                                                                ? "bg-brand-red text-white hover:bg-brand-red/90"
-                                                                : row.status === "VARIANCE"
-                                                                    ? "border border-brand-red/40 text-brand-red hover:bg-brand-red/10"
-                                                                    : "border border-gray-200 text-gray-400 hover:border-gray-300"
-                                                        }`}
-                                                    >
-                                                        {isFlagged ? "Flagged ✓" : "Flag"}
-                                                    </button>
-                                                </td>
-                                            </tr>
+                                            <React.Fragment key={row.jobId}>
+                                                <tr className={`transition-colors ${isFlagged ? "bg-brand-red/[0.03]" : isExpanded ? "bg-blue-50/40" : "hover:bg-gray-50"}`}>
+                                                    <td className="px-5 py-3.5">
+                                                        <div className="flex items-start gap-2">
+                                                            <button
+                                                                onClick={() => hasComponents && toggleExpand(row.jobId)}
+                                                                className={`mt-0.5 shrink-0 transition-colors ${hasComponents ? "text-brand-blue hover:text-brand-blue/70 cursor-pointer" : "text-gray-200 cursor-default"}`}
+                                                                title={hasComponents ? "Show component breakdown" : "No cost entries yet"}
+                                                            >
+                                                                {isExpanded
+                                                                    ? <ChevronDownIcon className="h-4 w-4" />
+                                                                    : <ChevronRightIcon className="h-4 w-4" />
+                                                                }
+                                                            </button>
+                                                            <div>
+                                                                <p className="font-semibold text-gray-800">{row.jobName}</p>
+                                                                <p className="text-xs text-gray-400 font-mono">{row.jobId} · {row.client}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-5 py-3.5 text-right">
+                                                        <span className="font-semibold text-brand-green">{fmtFull(row.quotedRevenue)}</span>
+                                                    </td>
+                                                    <td className="px-5 py-3.5 text-right">
+                                                        {row.actualCost === 0
+                                                            ? <span className="text-gray-300 italic text-xs">Not costed</span>
+                                                            : <span className={`font-semibold ${quoteVsProdMatch ? "text-brand-green" : "text-brand-red"}`}>
+                                                                {fmtFull(row.actualCost)}
+                                                              </span>
+                                                        }
+                                                    </td>
+                                                    <td className="px-5 py-3.5 text-right">
+                                                        {row.invoicedAmount === 0
+                                                            ? <span className="text-gray-300 italic text-xs">—</span>
+                                                            : <span className={`font-semibold ${prodVsInvMatch ? "text-brand-green" : "text-brand-orange"}`}>
+                                                                {fmtFull(row.invoicedAmount)}
+                                                              </span>
+                                                        }
+                                                    </td>
+                                                    <td className={`px-5 py-3.5 text-right font-bold ${
+                                                        row.actualCost === 0 ? "text-gray-300" :
+                                                        row.margin < 35 ? "text-brand-red" : "text-brand-green"
+                                                    }`}>
+                                                        {row.actualCost === 0 ? "—" : `${row.margin.toFixed(1)}%`}
+                                                    </td>
+                                                    <td className="px-5 py-3.5 text-center">
+                                                        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${sc.bg} ${sc.text}`}>
+                                                            <span className={`h-1.5 w-1.5 rounded-full ${sc.dot}`} />
+                                                            {sc.label}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-5 py-3.5 text-center">
+                                                        <div className="flex items-center justify-center gap-2 flex-wrap">
+                                                            {/* Zoho sync */}
+                                                            {(() => {
+                                                                const localSync = syncedJobs.get(row.jobDbId);
+                                                                const synced = row.zohoSynced || !!localSync;
+                                                                const invNum = localSync?.invoiceNumber ?? row.zohoInvoiceNumber;
+                                                                const zStatus = localSync?.zohoStatus ?? row.zohoStatus;
+                                                                const isSyncing = syncingJobId === row.jobDbId;
+                                                                if (synced && invNum) {
+                                                                    return (
+                                                                        <div className="flex flex-col items-center gap-0.5">
+                                                                            <span className="text-[10px] font-bold text-brand-green">{invNum}</span>
+                                                                            {zStatus && (
+                                                                                <span className="text-[9px] uppercase tracking-wider text-gray-400">{zStatus}</span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return (
+                                                                    <button
+                                                                        onClick={() => zohoSyncMutation.mutate(row.jobDbId)}
+                                                                        disabled={isSyncing || !row.hasLpo}
+                                                                        title={!row.hasLpo ? "No LPO — approve quote first" : "Sync to Zoho Books"}
+                                                                        className="flex items-center gap-1 rounded-md border border-brand-green/40 px-2.5 py-1.5 text-[10px] font-bold text-brand-green hover:bg-brand-green/10 transition-colors disabled:opacity-40"
+                                                                    >
+                                                                        {isSyncing
+                                                                            ? <LoaderCircleIcon className="h-3 w-3 animate-spin" />
+                                                                            : <CheckCircleIcon className="h-3 w-3" />
+                                                                        }
+                                                                        {isSyncing ? "Syncing…" : "Zoho"}
+                                                                    </button>
+                                                                );
+                                                            })()}
+                                                            <button
+                                                                onClick={() => toggleFlag(row.jobId)}
+                                                                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                                                    isFlagged
+                                                                        ? "bg-brand-red text-white hover:bg-brand-red/90"
+                                                                        : row.status === "VARIANCE"
+                                                                            ? "border border-brand-red/40 text-brand-red hover:bg-brand-red/10"
+                                                                            : "border border-gray-200 text-gray-400 hover:border-gray-300"
+                                                                }`}
+                                                            >
+                                                                {isFlagged ? "Flagged ✓" : "Flag"}
+                                                            </button>
+                                                            {row.status === "VARIANCE" && !overridden.has(row.jobId) && (
+                                                                <button
+                                                                    onClick={() => { setOverrideTarget(row); setOverrideReason(""); }}
+                                                                    className="flex items-center gap-1 rounded-md border border-brand-blue/40 px-3 py-1.5 text-xs font-semibold text-brand-blue hover:bg-brand-blue/10 transition-colors"
+                                                                    title="Override this mismatch with a reason"
+                                                                >
+                                                                    <ShieldCheckIcon className="h-3 w-3" />
+                                                                    Override
+                                                                </button>
+                                                            )}
+                                                            {overridden.has(row.jobId) && (
+                                                                <span className="text-[10px] font-bold text-brand-green">OVERRIDDEN</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+
+                                                {/* ── Component breakdown rows ── */}
+                                                {isExpanded && (row.components ?? []).map((comp) => {
+                                                    const compVariance = comp.total > 0 ? comp.quotedAmount - comp.total : null;
+                                                    return (
+                                                        <tr key={`${row.jobId}-comp-${comp.componentId}`} className="bg-blue-50/20 border-l-4 border-brand-blue/20">
+                                                            <td className="py-2.5 pl-14 pr-5">
+                                                                <p className="text-xs font-semibold text-gray-700">{comp.name}</p>
+                                                                <p className="text-[10px] text-gray-400">{comp.quantity} {comp.unit}</p>
+                                                                {comp.items.length > 0 && (
+                                                                    <div className="mt-1.5 space-y-0.5">
+                                                                        {comp.items.map((item, i) => (
+                                                                            <p key={i} className="text-[10px] text-gray-500 flex justify-between max-w-xs">
+                                                                                <span>{item.service_name}</span>
+                                                                                <span className="font-mono ml-4">KES {Number(item.cost).toLocaleString("en-KE", { minimumFractionDigits: 2 })}</span>
+                                                                            </p>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            {/* Quoted per component */}
+                                                            <td className="px-5 py-2.5 text-right">
+                                                                {comp.quotedAmount > 0
+                                                                    ? <span className="text-xs font-semibold text-brand-green">{fmtFull(comp.quotedAmount)}</span>
+                                                                    : <span className="text-[10px] italic text-gray-300">—</span>
+                                                                }
+                                                            </td>
+                                                            {/* PT cost per component */}
+                                                            <td className="px-5 py-2.5 text-right">
+                                                                {comp.total > 0
+                                                                    ? <span className={`text-xs font-semibold ${compVariance !== null && compVariance < 0 ? "text-brand-red" : "text-brand-blue"}`}>
+                                                                        {fmtFull(comp.total)}
+                                                                      </span>
+                                                                    : <span className="text-[10px] italic text-gray-300">Not costed</span>
+                                                                }
+                                                            </td>
+                                                            {/* Variance indicator */}
+                                                            <td className="px-5 py-2.5 text-right">
+                                                                {compVariance !== null
+                                                                    ? <span className={`text-[10px] font-semibold ${compVariance < 0 ? "text-brand-red" : "text-brand-green"}`}>
+                                                                        {compVariance < 0 ? `−${fmtFull(Math.abs(compVariance))}` : `+${fmtFull(compVariance)}`}
+                                                                      </span>
+                                                                    : null
+                                                                }
+                                                            </td>
+                                                            <td colSpan={3} />
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </React.Fragment>
                                         );
                                     })}
                                 </tbody>
@@ -388,6 +572,49 @@ export default function ReconciliationWorkspace(): ReactElement {
                 </div>
 
             </main>
+
+            {/* Override reason modal */}
+            {overrideTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                    <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white shadow-2xl">
+                        <div className="border-b border-gray-100 px-6 py-4">
+                            <h3 className="text-base font-bold text-gray-900">Override Reconciliation Mismatch</h3>
+                            <p className="mt-0.5 text-sm text-gray-500">
+                                Job: <span className="font-semibold">{overrideTarget.jobName}</span> ({overrideTarget.jobId})
+                            </p>
+                        </div>
+                        <div className="p-6">
+                            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">
+                                Reason for override <span className="text-brand-red">*</span>
+                            </label>
+                            <textarea
+                                value={overrideReason}
+                                onChange={(e) => setOverrideReason(e.target.value)}
+                                rows={4}
+                                placeholder="e.g., Client approved revised pricing, production cost covers partial scope only..."
+                                className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none resize-none"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+                            <button
+                                onClick={() => setOverrideTarget(null)}
+                                className="rounded-md border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => overrideMutation.mutate({ jobDbId: overrideTarget.jobDbId, reason: overrideReason })}
+                                disabled={!overrideReason.trim() || overrideMutation.isPending}
+                                className="flex items-center gap-2 rounded-md bg-brand-blue px-5 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40"
+                            >
+                                {overrideMutation.isPending ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <ShieldCheckIcon className="h-4 w-4" />}
+                                Record Override
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

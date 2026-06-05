@@ -65,7 +65,7 @@ export default function EditProductPage(): ReactElement {
                             selectedImageName={image?.name ?? null}
                             existingImageUrl={product.primary_image_url}
                             onSubmit={handleSubmit}
-                            onCancel={() => router.push(basePath)}
+                            onCancel={() => router.back()}
                             submitLabel="Save Changes"
                             isSubmitting={isSubmitting}
                         />

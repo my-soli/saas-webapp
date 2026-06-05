@@ -76,7 +76,7 @@ export default function AdminProductsPage(): ReactElement {
             toast.success("Product published.");
             queryClient.invalidateQueries({ queryKey: ["products"] });
         },
-        onError: () => toast.error("Unable to publish product. Please try again."),
+        onError: (err: Error) => toast.error(err.message ?? "Unable to publish product. Please try again."),
     });
 
     const archiveMutation = useMutation({

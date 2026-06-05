@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { DownloadIcon } from "lucide-react";
 
 interface LineItem {
     id: number;
@@ -60,8 +61,29 @@ export default function QuoteApprovePage() {
     const [error, setError] = useState<string | null>(null);
     const [action, setAction] = useState<"accept" | "adjust" | "reject" | null>(null);
     const [notes, setNotes] = useState("");
+    const [approvedBy, setApprovedBy] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [done, setDone] = useState<{ type: string; message: string } | null>(null);
+    const [downloading, setDownloading] = useState(false);
+
+    const handleDownloadPDF = async () => {
+        setDownloading(true);
+        try {
+            const res = await fetch(`/api/proxy/api/v1/quotes/public/${token}/pdf/`);
+            if (!res.ok) throw new Error("Could not generate PDF");
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `quote_${quote?.quote_id ?? token}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            alert("PDF download failed. Please try again.");
+        } finally {
+            setDownloading(false);
+        }
+    };
 
     useEffect(() => {
         if (!token) return;
@@ -91,9 +113,10 @@ export default function QuoteApprovePage() {
     };
 
     const handleAccept = async () => {
+        if (!approvedBy.trim()) return;
         setSubmitting(true);
         try {
-            await post("accept");
+            await post("accept", { approved_by_name: approvedBy.trim() });
             setDone({ type: "accept", message: "Your quote has been accepted! Our team will be in touch shortly to confirm the next steps." });
         } catch (err) { alert((err as Error).message); }
         finally { setSubmitting(false); }
@@ -189,6 +212,15 @@ export default function QuoteApprovePage() {
                         <div className="text-right">
                             <h1 className="text-5xl font-bold text-gray-900 tracking-widest">QUOTE</h1>
                             <p className="text-sm text-gray-500 mt-1"># {quote?.quote_id}</p>
+                            <button
+                                onClick={handleDownloadPDF}
+                                disabled={downloading}
+                                title="Download PDF"
+                                className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-gray-400 hover:text-gray-800 disabled:opacity-50 transition-colors"
+                            >
+                                <DownloadIcon className="h-3.5 w-3.5" />
+                                {downloading ? "Generating…" : "Download PDF"}
+                            </button>
                         </div>
                     </div>
 
@@ -242,16 +274,16 @@ export default function QuoteApprovePage() {
                                             <td className="py-2.5 px-3">
                                                 <p className="font-medium text-gray-800">{item.product_name}</p>
                                                 {item.description && (
-                                                    <p className="text-xs text-gray-500 mt-0.5">{item.description}</p>
-                                                )}
-                                                {quote?.include_vat && (
-                                                    <p className="text-xs text-gray-400 mt-0.5">{taxRate.toFixed(2)}%</p>
+                                                    <p className="text-xs text-gray-500 mt-0.5 whitespace-pre-wrap">{item.description}</p>
                                                 )}
                                             </td>
                                             <td className="py-2.5 px-3 text-right text-gray-700">{Number(item.quantity).toFixed(2)}</td>
                                             <td className="py-2.5 px-3 text-right text-gray-700">{fmtNum(item.unit_price)}</td>
                                             {quote?.include_vat && (
-                                                <td className="py-2.5 px-3 text-right text-gray-700">{fmtNum(vatAmt)}</td>
+                                                <td className="py-2.5 px-3 text-right text-gray-700">
+                                                    <p>{fmtNum(vatAmt)}</p>
+                                                    <p className="text-xs text-gray-400 mt-0.5">{taxRate.toFixed(2)}%</p>
+                                                </td>
                                             )}
                                             <td className="py-2.5 px-3 text-right text-gray-700">{fmtNum(lineTotal)}</td>
                                         </tr>
@@ -380,23 +412,35 @@ export default function QuoteApprovePage() {
                             )}
 
                             {action === "accept" && (
-                                <div className="max-w-sm mx-auto text-center">
-                                    <p className="text-gray-700 mb-5 text-sm">
-                                        Are you sure you want to accept this quote? This will confirm your order.
+                                <div className="max-w-md mx-auto">
+                                    <p className="text-gray-700 mb-4 text-sm text-center">
+                                        By accepting this quote you confirm the order. Please enter the full name of the person approving.
                                     </p>
-                                    <div className="flex gap-3 justify-center">
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Approved by <span className="text-red-500">*</span>
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={approvedBy}
+                                            onChange={(e) => setApprovedBy(e.target.value)}
+                                            placeholder="Full name of approver"
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                        />
+                                    </div>
+                                    <div className="flex gap-3 justify-end">
                                         <button
-                                            onClick={handleAccept}
-                                            disabled={submitting}
-                                            className="px-7 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-60 transition-colors text-sm"
-                                        >
-                                            {submitting ? "Accepting..." : "Yes, Accept"}
-                                        </button>
-                                        <button
-                                            onClick={() => setAction(null)}
-                                            className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors text-sm"
+                                            onClick={() => { setAction(null); setApprovedBy(""); }}
+                                            className="px-5 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg transition-colors text-sm"
                                         >
                                             Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleAccept}
+                                            disabled={submitting || !approvedBy.trim()}
+                                            className="px-7 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-60 transition-colors text-sm"
+                                        >
+                                            {submitting ? "Accepting..." : "Confirm Acceptance"}
                                         </button>
                                     </div>
                                 </div>

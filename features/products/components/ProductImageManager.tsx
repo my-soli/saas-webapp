@@ -199,9 +199,9 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                                 </div>
                             )}
 
-                            {/* Hover actions */}
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-2">
-                                {!img.is_primary && (
+                            {/* Set primary — hover only */}
+                            {!img.is_primary && (
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
                                     <button
                                         type="button"
                                         onClick={() => primaryMutation.mutate(img.id)}
@@ -212,17 +212,21 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                                         <StarIcon className="h-3 w-3 text-brand-yellow" />
                                         Set primary
                                     </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => deleteMutation.mutate(img.id)}
-                                    disabled={deleteMutation.isPending}
-                                    className="ml-auto flex items-center justify-center rounded-lg bg-red-500/90 p-1.5 hover:bg-red-600 transition-colors disabled:opacity-50"
-                                    aria-label="Delete image"
-                                >
-                                    <Trash2Icon className="h-3.5 w-3.5 text-white" />
-                                </button>
-                            </div>
+                                </div>
+                            )}
+                            {/* Delete — always visible */}
+                            <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(img.id); }}
+                                disabled={deleteMutation.isPending && deleteMutation.variables === img.id}
+                                className="absolute top-1.5 right-1.5 z-10 flex items-center justify-center rounded-full bg-red-500 p-1 shadow hover:bg-red-600 transition-colors disabled:opacity-50"
+                                aria-label="Delete image"
+                            >
+                                {deleteMutation.isPending && deleteMutation.variables === img.id
+                                    ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                    : <Trash2Icon className="h-3 w-3 text-white" />
+                                }
+                            </button>
                         </div>
                     ))}
                 </div>

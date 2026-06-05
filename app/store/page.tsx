@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import ImpactSection from "@/components/ImpactSection";
 import {
     ShoppingCartIcon,
@@ -76,6 +76,7 @@ function getBadge(product: CatalogProduct): { label: string; cls: string } | nul
 
 const ProductCard = memo(function ProductCard({ product }: { product: CatalogProduct }): ReactElement {
     const [favorited, setFavorited] = useState<boolean>(false);
+    const [imgError, setImgError] = useState<boolean>(false);
     const minPrice = getMinPrice(product);
     const badge = getBadge(product);
 
@@ -87,13 +88,14 @@ const ProductCard = memo(function ProductCard({ product }: { product: CatalogPro
                 className="relative flex flex-col bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 h-full"
             >
                 <div className="relative aspect-[4/3] bg-gray-100 overflow-hidden">
-                    {product.primary_image_url ? (
+                    {product.primary_image_url && !imgError ? (
                         <Image
                             src={product.primary_image_url}
                             alt={product.name}
                             fill
                             className="object-cover group-hover:scale-105 transition-transform duration-300"
                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                            onError={() => setImgError(true)}
                         />
                     ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-gray-300">
@@ -189,19 +191,31 @@ function StorePageInner(): ReactElement {
         staleTime: 5 * 60_000,
     });
 
-    const { data, isLoading, isError } = useQuery({
+    const {
+        data,
+        isLoading,
+        isError,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+    } = useInfiniteQuery({
         queryKey: ["catalog-products", activeCategoryId, deferredSearch],
-        queryFn: () =>
+        queryFn: ({ pageParam }) =>
             fetchCatalogProducts({
                 search: deferredSearch || undefined,
                 category: activeCategoryId || undefined,
                 page_size: 48,
+                page: pageParam,
             }),
+        initialPageParam: 1,
+        getNextPageParam: (lastPage, allPages) => {
+            const loaded = allPages.reduce((sum, p) => sum + p.results.length, 0);
+            return loaded < lastPage.count ? allPages.length + 1 : undefined;
+        },
         staleTime: 30_000,
-        placeholderData: (prev) => prev,
     });
 
-    const allProducts = data?.results ?? [];
+    const allProducts = data?.pages.flatMap((p) => p.results) ?? [];
 
     const categoryLabel = useMemo(() => {
         const match = categoriesData.find((c) => String(c.id) === activeCategoryId);
@@ -318,7 +332,12 @@ function StorePageInner(): ReactElement {
                     <div>
                         <h2 className="text-xl font-extrabold text-gray-900">Our Products</h2>
                         <p className="text-sm text-gray-500 mt-0.5">
-                            {isLoading ? "Loading\u2026" : `${allProducts.length} product${allProducts.length !== 1 ? "s" : ""}${activeCategoryId ? ` in ${categoryLabel}` : ""}`}
+                            {isLoading
+                                ? "Loading\u2026"
+                                : (() => {
+                                      const total = data?.pages[0]?.count ?? allProducts.length;
+                                      return `${total} product${total !== 1 ? "s" : ""}${activeCategoryId ? ` in ${categoryLabel}` : ""}`;
+                                  })()}
                         </p>
                     </div>
                     <button
@@ -402,14 +421,16 @@ function StorePageInner(): ReactElement {
                         ))}
                     </div>
                 )}
-                {!isLoading && data && data.count > allProducts.length && (
+                {hasNextPage && (
                     <div className="mt-8 text-center">
                         <button
                             type="button"
-                            className="inline-flex items-center gap-2 rounded-xl border-2 border-brand-blue px-8 py-3 text-sm font-semibold text-brand-blue hover:bg-brand-blue hover:text-white transition-all duration-200"
+                            onClick={() => void fetchNextPage()}
+                            disabled={isFetchingNextPage}
+                            className="inline-flex items-center gap-2 rounded-xl border-2 border-brand-blue px-8 py-3 text-sm font-semibold text-brand-blue hover:bg-brand-blue hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Load More Products
-                            <ChevronRightIcon className="h-4 w-4" />
+                            {isFetchingNextPage ? "Loading…" : "Load More Products"}
+                            {!isFetchingNextPage && <ChevronRightIcon className="h-4 w-4" />}
                         </button>
                     </div>
                 )}

@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactElement } from "react";
+import { useRouter } from "next/navigation";
 import type { Product } from "@/types/products";
 
 interface EditProductHeaderProps {
@@ -7,13 +10,14 @@ interface EditProductHeaderProps {
 }
 
 export default function EditProductHeader({ product, basePath }: EditProductHeaderProps): ReactElement {
+    const router = useRouter();
     return (
         <header className="border-b border-gray-200 bg-white">
             <div className="px-4 lg:px-8 py-4">
                 <nav className="flex items-center gap-2 text-xs text-gray-400 mb-3">
                     <a href="/admin" className="hover:text-brand-blue">Admin</a>
                     <span>/</span>
-                    <a href={basePath} className="hover:text-brand-blue">Products</a>
+                    <button type="button" onClick={() => router.back()} className="hover:text-brand-blue">Products</button>
                     <span>/</span>
                     <span className="text-gray-700">{product.name}</span>
                     <span>/</span>
