@@ -18,6 +18,7 @@ interface QuoteDetailModalProps {
     onMarkLost: (quoteId: number) => void;
     onConvertToJob: (quoteId: number) => void;
     onDownloadPdf: (quoteId: string) => void;
+    onEdit?: (quoteId: number) => void;
 }
 
 export default function QuoteDetailModal({
@@ -29,6 +30,7 @@ export default function QuoteDetailModal({
     onMarkLost,
     onConvertToJob,
     onDownloadPdf,
+    onEdit,
 }: QuoteDetailModalProps) {
     const router = useRouter();
     const [showEmailDraft, setShowEmailDraft] = useState(false);
@@ -349,7 +351,13 @@ export default function QuoteDetailModal({
 
                             {(quote.status === "Sent to Customer" || (quote.status === "Approved" && isWithinEditWindow)) && (
                                 <button
-                                    onClick={(): void => router.push(`/account-manager/quotes/create?edit=${quote.id}`)}
+                                    onClick={(): void => {
+                                        if (onEdit) {
+                                            onEdit(quote.id);
+                                        } else {
+                                            router.push(`/account-manager/quotes/create?edit=${quote.id}`);
+                                        }
+                                    }}
                                     className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-brand-blue text-white hover:bg-brand-blue/90 rounded transition-colors"
                                     type="button"
                                     title={quote.status === "Approved" ? "Edit and resend within 30-day window" : "Edit quote"}

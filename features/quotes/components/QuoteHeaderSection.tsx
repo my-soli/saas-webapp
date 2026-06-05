@@ -103,7 +103,7 @@ export default function QuoteHeaderSection({
                             <optgroup label="Qualified Leads">
                                 {leads.map((lead: Lead) => (
                                     <option key={lead.id} value={`lead-${lead.id}`}>
-                                        {lead.name} ({lead.lead_id})
+                                        {lead.preferred_client_type === "B2B" && lead.company ? lead.company : lead.name} ({lead.lead_id})
                                     </option>
                                 ))}
                             </optgroup>

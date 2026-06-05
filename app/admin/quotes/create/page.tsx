@@ -119,7 +119,7 @@ function AdminCreateQuotePageContent() {
     const clients = clientsData?.results || [];
     const leads = leadsData?.results || [];
     const products = productsData?.results || [];
-    const displayUserName = currentUser ? currentUser.name || currentUser.email : "Loading...";
+    const displayUserName = currentUser ? (currentUser.first_name + " " + currentUser.last_name).trim() || currentUser.email : "Loading...";
 
     const isWithinEditWindow = (() => {
         if (!existingQuote || existingQuote.status !== "Approved") return true;
@@ -298,6 +298,14 @@ function AdminCreateQuotePageContent() {
         else { setSelectedLeadId(id); setSelectedClientId(null); }
     };
 
+    const resolveDisplayName = (): string => {
+        const client = clients.find(c => c.id === selectedClientId);
+        if (client) return (client.client_type === "B2B" && client.company) ? client.company : client.name;
+        const lead = leads.find(l => l.id === selectedLeadId);
+        if (!lead) return "Valued Customer";
+        return (lead.preferred_client_type === "B2B" && lead.company) ? lead.company : lead.name;
+    };
+
     const handleSubmit = async (action: "draft" | "send_pt" | "send_customer"): Promise<void> => {
         if (!selectedClientId && !selectedLeadId) { toast.error("Please select a client or lead"); return; }
         if (lineItems.length === 0) { toast.error("Please add at least one product"); return; }
@@ -356,7 +364,7 @@ function AdminCreateQuotePageContent() {
     const handleWhatsApp = async (): Promise<void> => {
         const resolvedQuoteId = existingQuote?.id ?? savedQuoteId;
         if (!resolvedQuoteId) { toast.info("Save the quote first to share via WhatsApp."); return; }
-        const clientLabel = clients.find(c => c.id === selectedClientId)?.name || leads.find(l => l.id === selectedLeadId)?.name || "Valued Customer";
+        const clientLabel = resolveDisplayName();
         const quoteRef = existingQuote?.quote_id || savedQuoteDisplayId || "";
         const refLabel = quoteRef ? ` *${quoteRef}*` : referenceNumber ? ` (Ref: ${referenceNumber})` : "";
         let approvalUrl = "";
@@ -419,10 +427,7 @@ function AdminCreateQuotePageContent() {
                     onSendToPT={() => handleSubmit("send_pt")}
                     onEmailClient={() => handleSubmit("send_customer")}
                     onWhatsApp={handleWhatsApp}
-                    clientName={
-                        clients.find(c => c.id === selectedClientId)?.name ||
-                        leads.find(l => l.id === selectedLeadId)?.name
-                    }
+                    clientName={resolveDisplayName()}
                 />
 
                 <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-4 lg:py-6">
@@ -547,7 +552,7 @@ function AdminCreateQuotePageContent() {
                         <div className="flex gap-2 flex-wrap">
                             <button
                                 onClick={() => {
-                                    const clientLabel = clients.find(c => c.id === selectedClientId)?.name || leads.find(l => l.id === selectedLeadId)?.name || "Valued Customer";
+                                    const clientLabel = resolveDisplayName();
                                     const quoteRef = existingQuote?.quote_id || savedQuoteDisplayId || "";
                                     const refLabel = quoteRef ? ` *${quoteRef}*` : "";
                                     const msg = `Hello ${clientLabel},\n\nPlease find your quote${refLabel} from Print Duka Ltd.\n\nKindly review and approve your quote here:\n${quoteLink}\n\nThank you!`;

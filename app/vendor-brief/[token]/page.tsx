@@ -13,6 +13,14 @@ interface BriefFile {
     file_url: string;
 }
 
+interface BriefAttachmentItem {
+    id: number;
+    attachment_name: string;
+    description: string;
+    file_url: string;
+    uploaded_at: string;
+}
+
 interface BriefProof {
     id: number;
     file_name: string;
@@ -38,6 +46,7 @@ interface BriefComponent {
     status: string;
     job_name: string;
     job_number: string;
+    job_instructions: string;
     vendor_name: string;
     job_priority: string;
     files: BriefFile[];
@@ -51,9 +60,16 @@ interface BriefData {
     vendor_accepted_at: string | null;
     time_adjustment_requested: boolean;
     time_adjustment_reason: string;
+    proposed_deadline: string | null;
+    proposed_cost: string;
+    adjustment_status: "pending" | "approved" | "rejected" | null;
+    adjustment_response: string;
+    adjustment_responded_at: string | null;
+    adjustment_responded_by: string | null;
     component: BriefComponent;
     updates: { note: string; created_at: string }[];
     proofs: BriefProof[];
+    brief_attachments: BriefAttachmentItem[];
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -156,12 +172,16 @@ export default function VendorBriefPage(): ReactElement {
     // Pre-acceptance
     const [showAdjustReason, setShowAdjustReason] = useState(false);
     const [adjustReason, setAdjustReason] = useState("");
+    const [adjustProposedDeadline, setAdjustProposedDeadline] = useState("");
+    const [adjustProposedCost, setAdjustProposedCost] = useState("");
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
 
     // Post-acceptance adjustment
     const [showProgressAdjust, setShowProgressAdjust] = useState(false);
     const [progressReason, setProgressReason] = useState("");
+    const [progressProposedDeadline, setProgressProposedDeadline] = useState("");
+    const [progressProposedCost, setProgressProposedCost] = useState("");
     const [progressLoading, setProgressLoading] = useState(false);
     const [progressError, setProgressError] = useState<string | null>(null);
     const [progressSuccess, setProgressSuccess] = useState(false);
@@ -248,12 +268,20 @@ export default function VendorBriefPage(): ReactElement {
             const r = await fetch(apiBase, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "request_time_adjustment", acknowledged_by: name, reason }),
+                body: JSON.stringify({
+                    action: "request_time_adjustment",
+                    acknowledged_by: name,
+                    reason,
+                    proposed_deadline: adjustProposedDeadline || undefined,
+                    proposed_cost: adjustProposedCost.trim() || undefined,
+                }),
             });
             if (!r.ok) { const b = await r.json() as { detail?: string }; throw new Error(b.detail ?? "Failed"); }
             await refreshData();
             setShowAdjustReason(false);
             setAdjustReason("");
+            setAdjustProposedDeadline("");
+            setAdjustProposedCost("");
         } catch (e: unknown) {
             setActionError(e instanceof Error ? e.message : "Failed to submit");
         } finally {
@@ -271,11 +299,19 @@ export default function VendorBriefPage(): ReactElement {
             const r = await fetch(apiBase, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "request_time_adjustment", acknowledged_by: senderName.trim(), reason }),
+                body: JSON.stringify({
+                    action: "request_time_adjustment",
+                    acknowledged_by: senderName.trim(),
+                    reason,
+                    proposed_deadline: progressProposedDeadline || undefined,
+                    proposed_cost: progressProposedCost.trim() || undefined,
+                }),
             });
             if (!r.ok) { const b = await r.json() as { detail?: string }; throw new Error(b.detail ?? "Failed"); }
             await refreshData();
             setProgressReason("");
+            setProgressProposedDeadline("");
+            setProgressProposedCost("");
             setShowProgressAdjust(false);
             setProgressSuccess(true);
             setTimeout(() => setProgressSuccess(false), 5000);
@@ -443,10 +479,48 @@ export default function VendorBriefPage(): ReactElement {
                                 <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 10, padding: "14px 20px", marginBottom: 16 }}>
                                     <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
                                         <Clock style={{ width: 20, height: 20, color: "#d97706", flexShrink: 0, marginTop: 1 }} />
-                                        <div>
-                                            <div style={{ fontSize: 14, fontWeight: 600, color: "#92400e" }}>Time adjustment requested</div>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                                <div style={{ fontSize: 14, fontWeight: 600, color: "#92400e" }}>Adjustment request submitted</div>
+                                                {data.adjustment_status && (
+                                                    <span style={{
+                                                        fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
+                                                        padding: "2px 8px", borderRadius: 20,
+                                                        background: data.adjustment_status === "approved" ? "#dcfce7" : data.adjustment_status === "rejected" ? "#fee2e2" : "#fef3c7",
+                                                        color: data.adjustment_status === "approved" ? "#15803d" : data.adjustment_status === "rejected" ? "#b91c1c" : "#92400e",
+                                                    }}>
+                                                        {data.adjustment_status}
+                                                    </span>
+                                                )}
+                                            </div>
                                             {data.time_adjustment_reason && (
                                                 <div style={{ fontSize: 13, color: "#78350f", marginTop: 4 }}>{data.time_adjustment_reason}</div>
+                                            )}
+                                            {(data.proposed_deadline || data.proposed_cost) && (
+                                                <div style={{ display: "flex", gap: 20, marginTop: 8, flexWrap: "wrap" }}>
+                                                    {data.proposed_deadline && (
+                                                        <div>
+                                                            <div style={{ fontSize: 10, fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: 1 }}>Proposed Deadline</div>
+                                                            <div style={{ fontSize: 13, color: "#92400e", fontWeight: 600 }}>{fmtDate(data.proposed_deadline)}</div>
+                                                        </div>
+                                                    )}
+                                                    {data.proposed_cost && (
+                                                        <div>
+                                                            <div style={{ fontSize: 10, fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: 1 }}>Proposed Cost</div>
+                                                            <div style={{ fontSize: 13, color: "#92400e", fontWeight: 600 }}>{data.proposed_cost}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {data.adjustment_status && data.adjustment_status !== "pending" && data.adjustment_response && (
+                                                <div style={{ marginTop: 10, background: data.adjustment_status === "approved" ? "#f0fdf4" : "#fef2f2", border: `1px solid ${data.adjustment_status === "approved" ? "#bbf7d0" : "#fecaca"}`, borderRadius: 8, padding: "10px 14px" }}>
+                                                    <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: data.adjustment_status === "approved" ? "#15803d" : "#b91c1c", marginBottom: 4 }}>
+                                                        Response from Production Team
+                                                        {data.adjustment_responded_at && <span style={{ fontWeight: 400, marginLeft: 8, color: "#6b7280", textTransform: "none", letterSpacing: 0 }}>· {fmtDateTime(data.adjustment_responded_at)}</span>}
+                                                    </div>
+                                                    <div style={{ fontSize: 13, color: "#1f2937", whiteSpace: "pre-line" }}>{data.adjustment_response}</div>
+                                                    {data.adjustment_responded_by && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>{data.adjustment_responded_by}</div>}
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -508,9 +582,30 @@ export default function VendorBriefPage(): ReactElement {
                                                         style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}
                                                     />
                                                 </div>
+                                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                                                    <div>
+                                                        <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>Proposed New Deadline <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span></label>
+                                                        <input
+                                                            type="date"
+                                                            value={adjustProposedDeadline}
+                                                            onChange={(e) => setAdjustProposedDeadline(e.target.value)}
+                                                            style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>Proposed Cost <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span></label>
+                                                        <input
+                                                            type="text"
+                                                            value={adjustProposedCost}
+                                                            onChange={(e) => setAdjustProposedCost(e.target.value)}
+                                                            placeholder="e.g. KES 15,000"
+                                                            style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                                                        />
+                                                    </div>
+                                                </div>
                                                 <div style={{ display: "flex", gap: 10 }}>
                                                     <button
-                                                        onClick={() => { setShowAdjustReason(false); setAdjustReason(""); setActionError(null); }}
+                                                        onClick={() => { setShowAdjustReason(false); setAdjustReason(""); setAdjustProposedDeadline(""); setAdjustProposedCost(""); setActionError(null); }}
                                                         style={{ padding: "9px 16px", background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 7, fontSize: 13, fontWeight: 500, cursor: "pointer" }}
                                                     >
                                                         Cancel
@@ -563,9 +658,30 @@ export default function VendorBriefPage(): ReactElement {
                                                     style={{ width: "100%", padding: "8px 12px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }}
                                                 />
                                             </div>
+                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+                                                <div>
+                                                    <label style={{ fontSize: 11, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>Proposed Deadline <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span></label>
+                                                    <input
+                                                        type="date"
+                                                        value={progressProposedDeadline}
+                                                        onChange={(e) => setProgressProposedDeadline(e.target.value)}
+                                                        style={{ width: "100%", padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, boxSizing: "border-box", outline: "none" }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label style={{ fontSize: 11, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>Proposed Cost <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span></label>
+                                                    <input
+                                                        type="text"
+                                                        value={progressProposedCost}
+                                                        onChange={(e) => setProgressProposedCost(e.target.value)}
+                                                        placeholder="e.g. KES 15,000"
+                                                        style={{ width: "100%", padding: "7px 10px", border: "1px solid #d1d5db", borderRadius: 6, fontSize: 12, boxSizing: "border-box", outline: "none" }}
+                                                    />
+                                                </div>
+                                            </div>
                                             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                                                 <button
-                                                    onClick={() => { setShowProgressAdjust(false); setProgressReason(""); setProgressError(null); }}
+                                                    onClick={() => { setShowProgressAdjust(false); setProgressReason(""); setProgressProposedDeadline(""); setProgressProposedCost(""); setProgressError(null); }}
                                                     style={{ padding: "7px 14px", background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: "pointer" }}
                                                 >Cancel</button>
                                                 <button
@@ -603,26 +719,52 @@ export default function VendorBriefPage(): ReactElement {
                                         <div style={{ flex: 1, padding: "11px 20px", fontSize: 14, color: label === "Quantity" || label === "Your Quoted Price" ? "#1e3a5f" : "#374151", fontWeight: label === "Quantity" || label === "Your Quoted Price" ? 700 : 400 }}>{value}</div>
                                     </div>
                                 ))}
+                                {comp.job_instructions && (
+                                    <div style={{ background: "#eff6ff", borderTop: "1px solid #bfdbfe", padding: "12px 20px" }}>
+                                        <div style={{ fontSize: 10, fontWeight: 700, color: "#2563eb", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>General Job Instructions</div>
+                                        <div style={{ fontSize: 13, color: "#1e3a5f", whiteSpace: "pre-line", lineHeight: 1.6 }}>{comp.job_instructions}</div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* ── Files & Assets ── */}
-                            {comp.files.length > 0 && (
+                            {(comp.files.length > 0 || data.brief_attachments?.length > 0) && (
                                 <div style={{ background: "#fff", borderRadius: 10, boxShadow: "0 2px 12px rgba(0,0,0,0.06)", marginBottom: 16, overflow: "hidden" }}>
                                     <div style={{ padding: "14px 20px", borderBottom: "1px solid #f3f4f6" }}>
                                         <span style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: 1.5, textTransform: "uppercase" }}>Files &amp; Assets</span>
                                     </div>
-                                    {comp.files.map((f, i) => (
-                                        <div key={f.id} style={{ display: "flex", alignItems: "center", padding: "12px 20px", borderBottom: i < comp.files.length - 1 ? "1px solid #f3f4f6" : undefined, background: i % 2 === 0 ? "#fafafa" : "#fff" }}>
-                                            <div style={{ width: 36, height: 36, background: "#eff6ff", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 12, flexShrink: 0 }}>
-                                                <FileDown style={{ width: 16, height: 16, color: "#2563eb" }} />
+                                    {comp.files.map((f, i) => {
+                                        const isLast = i === comp.files.length - 1 && !data.brief_attachments?.length;
+                                        return (
+                                            <div key={f.id} style={{ display: "flex", alignItems: "center", padding: "12px 20px", borderBottom: !isLast ? "1px solid #f3f4f6" : undefined, background: i % 2 === 0 ? "#fafafa" : "#fff" }}>
+                                                <div style={{ width: 36, height: 36, background: "#eff6ff", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 12, flexShrink: 0 }}>
+                                                    <FileDown style={{ width: 16, height: 16, color: "#2563eb" }} />
+                                                </div>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>{f.slot_display}</div>
+                                                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.file_name}</div>
+                                                </div>
+                                                <button
+                                                    onClick={() => downloadFile(`${apiBase}file/${f.id}/`, f.file_name)}
+                                                    style={{ background: "#1e3a5f", color: "#fff", fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 6, border: "none", cursor: "pointer", flexShrink: 0, marginLeft: 12 }}
+                                                >
+                                                    Download
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                    {data.brief_attachments?.map((ba, i) => (
+                                        <div key={ba.id} style={{ display: "flex", alignItems: "center", padding: "12px 20px", borderBottom: i < data.brief_attachments.length - 1 ? "1px solid #f3f4f6" : undefined, background: (comp.files.length + i) % 2 === 0 ? "#fafafa" : "#fff" }}>
+                                            <div style={{ width: 36, height: 36, background: "#f0fdf4", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 12, flexShrink: 0 }}>
+                                                <FileDown style={{ width: 16, height: 16, color: "#16a34a" }} />
                                             </div>
                                             <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>{f.slot_display}</div>
-                                                <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.file_name}</div>
+                                                <div style={{ fontSize: 13, fontWeight: 600, color: "#1f2937" }}>{ba.attachment_name}</div>
+                                                {ba.description && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{ba.description}</div>}
                                             </div>
                                             <button
-                                                onClick={() => downloadFile(`${apiBase}file/${f.id}/`, f.file_name)}
-                                                style={{ background: "#1e3a5f", color: "#fff", fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 6, border: "none", cursor: "pointer", flexShrink: 0, marginLeft: 12 }}
+                                                onClick={() => downloadFile(ba.file_url, ba.attachment_name)}
+                                                style={{ background: "#15803d", color: "#fff", fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 6, border: "none", cursor: "pointer", flexShrink: 0, marginLeft: 12 }}
                                             >
                                                 Download
                                             </button>

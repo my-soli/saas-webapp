@@ -18,6 +18,7 @@ import {
     Settings,
 } from "lucide-react";
 import { logoutUserSession } from "@/lib/api/auth";
+import PortalSwitcher from "@/components/shared/PortalSwitcher";
 import { fetchNotifications } from "@/lib/api/notifications";
 
 interface MenuItem {
@@ -174,22 +175,25 @@ export default function AccountManagerSidebar({ isDrawerOpen, onClose, collapsed
                 ))}
             </nav>
 
-            <div className={`py-4 border-t border-white/10 ${collapsed ? "px-2" : "px-4"}`}>
-                <button
-                    onClick={handleLogout}
-                    disabled={loggingOut}
-                    title={collapsed ? (loggingOut ? "Logging out…" : "Logout") : undefined}
-                    className={`flex items-center gap-3 w-full py-2.5 text-sm text-white hover:bg-white/10 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
-                        collapsed ? "justify-center px-2" : "px-4"
-                    }`}
-                >
-                    {loggingOut ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                        <LogOut className="w-5 h-5" />
-                    )}
-                    {!collapsed && <span>{loggingOut ? "Logging out…" : "Logout"}</span>}
-                </button>
+            <div className="border-t border-white/10 pt-2">
+                {!collapsed && <PortalSwitcher current="Account Manager" />}
+                <div className={`pb-4 ${collapsed ? "px-2" : "px-4"}`}>
+                    <button
+                        onClick={handleLogout}
+                        disabled={loggingOut}
+                        title={collapsed ? (loggingOut ? "Logging out…" : "Logout") : undefined}
+                        className={`flex items-center gap-3 w-full py-2.5 text-sm text-white hover:bg-white/10 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                            collapsed ? "justify-center px-2" : "px-4"
+                        }`}
+                    >
+                        {loggingOut ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <LogOut className="w-5 h-5" />
+                        )}
+                        {!collapsed && <span>{loggingOut ? "Logging out…" : "Logout"}</span>}
+                    </button>
+                </div>
             </div>
         </aside>
     );

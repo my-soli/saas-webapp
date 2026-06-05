@@ -16,7 +16,11 @@ const VALUE_EMPTY = "text-sm text-gray-400 italic mt-1";
 const statusStyles: Record<string, string> = {
     pending: "bg-amber-100 text-amber-700",
     in_progress: "bg-blue-100 text-blue-700",
-    on_hold: "bg-gray-100 text-gray-600",
+    on_hold: "bg-orange-100 text-orange-700",
+    blocked: "bg-red-100 text-red-700",
+    qc_hold: "bg-orange-100 text-orange-700",
+    ready: "bg-teal-100 text-teal-700",
+    dispatched: "bg-green-100 text-green-700",
     completed: "bg-green-100 text-green-700",
 };
 

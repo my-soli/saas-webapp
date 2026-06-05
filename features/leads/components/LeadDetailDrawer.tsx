@@ -61,6 +61,17 @@ export default function LeadDetailDrawer({
         }
 
         setClientType(lead.preferred_client_type === "B2B" ? "B2B" : "B2C");
+
+        if (lead.preferred_client_type === "B2B") {
+            setCompany(lead.company || "");
+            setIndustry(lead.industry || "");
+            setVatTaxId(lead.vat_tax_id || "");
+            setKraPin(lead.kra_pin || "");
+            setContactName(lead.primary_contact_name || "");
+            setContactEmail(lead.primary_contact_email || "");
+            setContactPhone(lead.primary_contact_phone || "");
+            setContactRole(lead.primary_contact_role || "");
+        }
     }, [lead]);
 
     if (!isOpen) {
@@ -188,6 +199,12 @@ export default function LeadDetailDrawer({
                                         <p className="text-gray-500">Name</p>
                                         <p className="font-semibold text-gray-900">{lead.name}</p>
                                     </div>
+                                    {lead.preferred_client_type === "B2B" && (
+                                        <div>
+                                            <p className="text-gray-500">Company</p>
+                                            <p className="font-semibold text-gray-900">{lead.company || "—"}</p>
+                                        </div>
+                                    )}
                                     <div>
                                         <p className="text-gray-500">Email</p>
                                         <p className="font-semibold text-gray-900">{lead.email || "—"}</p>

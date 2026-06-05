@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import LoginForm from '@/components/auth/login-form';
-import type { User, PortalRole } from '@/types/auth';
+import type { User, PortalRole, StaffGroup } from '@/types/auth';
 
 const ROLE_DASHBOARD: Record<PortalRole, string> = {
     client: '/portal',
@@ -14,10 +14,25 @@ const ROLE_DASHBOARD: Record<PortalRole, string> = {
     vendor: '/vendors',
 };
 
+const PORTALS_BY_GROUP: Partial<Record<StaffGroup, string>> = {
+    "Admin":           "/admin/dashboard",
+    "Account Manager": "/account-manager",
+    "Production Team": "/production-team/dashboard",
+    "Business Admin":  "/business/dashboard",
+};
+
 export default function LoginPage() {
     const router = useRouter();
 
     const handleLoginSuccess = (user: User) => {
+        // Honour the user's last active portal (saved by PortalSwitcher) if they still have access.
+        const saved = localStorage.getItem("active-portal") as StaffGroup | null;
+        const savedHref = saved ? PORTALS_BY_GROUP[saved] : null;
+        const hasAccess = savedHref && (user.is_superuser || user.groups?.includes(saved!));
+        if (hasAccess) {
+            router.push(savedHref!);
+            return;
+        }
         const destination = user.portal_role ? ROLE_DASHBOARD[user.portal_role] : '/';
         router.push(destination);
     };

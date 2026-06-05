@@ -1,4 +1,4 @@
-export type JobStatus = "pending" | "in_progress" | "on_hold" | "completed";
+export type JobStatus = "pending" | "in_progress" | "on_hold" | "blocked" | "qc_hold" | "ready" | "dispatched" | "completed";
 
 export type JobPriority = "normal" | "high" | "urgent";
 
@@ -19,6 +19,7 @@ export interface JobProduct {
     id: number;
     job: number;
     product_name: string;
+    description: string;
     quantity: number;
     unit: string;
     specifications: string;

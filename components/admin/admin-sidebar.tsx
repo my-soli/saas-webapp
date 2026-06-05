@@ -29,6 +29,7 @@ import {
     Download,
 } from "lucide-react";
 import { logoutUserSession } from "@/lib/api/auth";
+import PortalSwitcher from "@/components/shared/PortalSwitcher";
 
 interface MenuItem {
     label: string;
@@ -61,6 +62,7 @@ const menuSections: MenuSection[] = [
     {
         title: "ORCHESTRATION",
         items: [
+            { label: "Jobs", href: "/admin/jobs", icon: Layers },
             { label: "Control Tower", href: "/admin/orchestration", icon: Zap },
             { label: "Dispatch", href: "/admin/dispatch", icon: PackageCheck },
             { label: "Reconciliation", href: "/admin/reconciliation", icon: Scale },
@@ -119,7 +121,6 @@ export default function AdminSidebar({ isDrawerOpen, onClose }: AdminSidebarProp
         if (pathname === href) return true;
         if (href === "/admin/dashboard") return false;
         if (pathname.startsWith(href)) return true;
-        if (href === "/admin/orchestration" && pathname.startsWith("/admin/jobs/")) return true;
         return false;
     };
 
@@ -198,19 +199,22 @@ export default function AdminSidebar({ isDrawerOpen, onClose }: AdminSidebarProp
                 ))}
             </nav>
 
-            <div className="px-4 py-4 border-t border-white/10">
-                <button
-                    onClick={handleLogout}
-                    disabled={loggingOut}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-white hover:bg-white/10 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                    {loggingOut ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                        <LogOut className="w-5 h-5" />
-                    )}
-                    <span>{loggingOut ? "Logging out…" : "Logout"}</span>
-                </button>
+            <div className="border-t border-white/10 pt-2">
+                <PortalSwitcher current="Admin" />
+                <div className="px-4 pb-4">
+                    <button
+                        onClick={handleLogout}
+                        disabled={loggingOut}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-white hover:bg-white/10 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        {loggingOut ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <LogOut className="w-5 h-5" />
+                        )}
+                        <span>{loggingOut ? "Logging out…" : "Logout"}</span>
+                    </button>
+                </div>
             </div>
         </aside>
     );

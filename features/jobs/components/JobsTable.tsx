@@ -20,7 +20,11 @@ interface JobsTableProps {
 const statusStyles: Record<JobStatus, string> = {
     pending: "bg-brand-yellow/20 text-brand-black",
     in_progress: "bg-brand-blue/10 text-brand-blue",
-    on_hold: "bg-brand-red/10 text-brand-red",
+    on_hold: "bg-brand-orange/10 text-brand-orange",
+    blocked: "bg-brand-red/10 text-brand-red",
+    qc_hold: "bg-brand-orange/10 text-brand-orange",
+    ready: "bg-teal-100 text-teal-700",
+    dispatched: "bg-brand-green/20 text-brand-green",
     completed: "bg-brand-green/10 text-brand-green",
 };
 
@@ -50,8 +54,10 @@ export default function JobsTable({
         });
     };
 
+    const DONE_STATUSES: JobStatus[] = ["completed", "dispatched", "ready"];
+
     const isOverdue = (job: Job): boolean => {
-        if (!job.expected_completion || job.status === "completed") {
+        if (!job.expected_completion || DONE_STATUSES.includes(job.status)) {
             return false;
         }
         return new Date(job.expected_completion) < new Date();

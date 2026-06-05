@@ -61,7 +61,7 @@ export default function BusinessJobsPage(): ReactElement {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState<string>("");
     const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-    const [status, setStatus] = useState<"all" | "pending" | "in_progress" | "on_hold" | "completed">("all");
+    const [status, setStatus] = useState<"all" | JobStatus>("all");
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(20);
 
@@ -267,7 +267,7 @@ export default function BusinessJobsPage(): ReactElement {
         setPage(1);
     };
 
-    const handleStatusChange = (value: "all" | "pending" | "in_progress" | "on_hold" | "completed"): void => {
+    const handleStatusChange = (value: "all" | JobStatus): void => {
         setStatus(value);
         setPage(1);
     };
@@ -442,7 +442,10 @@ export default function BusinessJobsPage(): ReactElement {
                                     <select required value={formState.status} onChange={(e): void => setFormState(s => ({ ...s, status: e.target.value as JobStatus }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
                                         <option value="pending">Pending</option>
                                         <option value="in_progress">In Progress</option>
-                                        <option value="on_hold">On Hold</option>
+                                        <option value="blocked">Blocked</option>
+                                        <option value="qc_hold">QC Hold</option>
+                                        <option value="ready">Ready for Dispatch</option>
+                                        <option value="dispatched">Dispatched</option>
                                         <option value="completed">Completed</option>
                                     </select>
                                 </div>

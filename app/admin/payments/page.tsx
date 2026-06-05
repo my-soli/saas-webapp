@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircleIcon, X, BookOpen, ExternalLink, RefreshCw, Plus, Search, Filter, CreditCard, TrendingUp, Clock, AlertCircle } from "lucide-react";
+import { AlertCircleIcon, X, BookOpen, ExternalLink, RefreshCw, Plus, Search, Filter, CreditCard, TrendingUp, Clock, AlertCircle, CloudOff, Cloud, Download } from "lucide-react";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin/admin-layout";
-import { createPayment, deletePayment, fetchPayments, updatePayment } from "@/services/payments";
+import { createPayment, deletePayment, fetchPayments, importZohoInvoices, updatePayment } from "@/services/payments";
 import {
     Payment,
     PaymentMethod,
@@ -38,8 +38,17 @@ function formatDate(value: string) {
     return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+interface JobOption {
+    id: number;
+    job_number: string;
+    job_name: string;
+    client_name?: string;
+    lpo_id?: number | null;
+}
+
 interface PaymentFormState {
-    lpo: string;
+    job_id: string;
+    job_label: string;
     amount: string;
     payment_method: PaymentMethod;
     status: PaymentStatus;
@@ -49,7 +58,8 @@ interface PaymentFormState {
 }
 
 const emptyForm: PaymentFormState = {
-    lpo: "",
+    job_id: "",
+    job_label: "",
     amount: "",
     payment_method: "mpesa",
     status: "pending",
@@ -57,6 +67,107 @@ const emptyForm: PaymentFormState = {
     reference_number: "",
     notes: "",
 };
+
+/* ─── Job search typeahead ───────────────────────────────────────────────── */
+
+function JobSearchField({
+    value,
+    label,
+    onChange,
+}: {
+    value: string;
+    label: string;
+    onChange: (id: string, label: string) => void;
+}) {
+    const [query, setQuery] = useState(label);
+    const [open, setOpen] = useState(false);
+    const [options, setOptions] = useState<JobOption[]>([]);
+    const [loading, setLoading] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+    const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => { setQuery(label); }, [label]);
+
+    useEffect(() => {
+        const close = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        };
+        document.addEventListener("mousedown", close);
+        return () => document.removeEventListener("mousedown", close);
+    }, []);
+
+    const search = (q: string) => {
+        if (debounce.current) clearTimeout(debounce.current);
+        debounce.current = setTimeout(async () => {
+            if (!q.trim()) { setOptions([]); return; }
+            setLoading(true);
+            try {
+                const res = await fetch(
+                    `/api/proxy/api/v1/jobs/?search=${encodeURIComponent(q)}&page_size=10`,
+                    { credentials: "include" }
+                );
+                const data = await res.json();
+                setOptions((data.results ?? []).map((j: { id: number; job_number: string; job_name: string; client?: { name: string }; quote?: { lpo?: { id: number } } }) => ({
+                    id: j.id,
+                    job_number: j.job_number,
+                    job_name: j.job_name,
+                    client_name: j.client?.name,
+                    lpo_id: j.quote?.lpo?.id ?? null,
+                })));
+                setOpen(true);
+            } finally {
+                setLoading(false);
+            }
+        }, 300);
+    };
+
+    return (
+        <div ref={ref} className="relative">
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                <input
+                    type="text"
+                    value={query}
+                    placeholder="Search by job #, description…"
+                    onChange={e => {
+                        setQuery(e.target.value);
+                        if (!e.target.value) onChange("", "");
+                        search(e.target.value);
+                    }}
+                    onFocus={() => { if (options.length) setOpen(true); }}
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                />
+                {loading && (
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">…</span>
+                )}
+            </div>
+            {open && options.length > 0 && (
+                <ul className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto text-sm">
+                    {options.map(opt => (
+                        <li
+                            key={opt.id}
+                            onClick={() => {
+                                const lbl = `${opt.job_number} — ${opt.job_name}`;
+                                setQuery(lbl);
+                                onChange(String(opt.id), lbl);
+                                setOpen(false);
+                            }}
+                            className="px-3 py-2.5 hover:bg-blue-50 cursor-pointer"
+                        >
+                            <span className="font-mono font-medium text-brand-blue">{opt.job_number}</span>
+                            <span className="text-gray-600"> — {opt.job_name}</span>
+                            {opt.client_name && (
+                                <span className="block text-xs text-gray-400">{opt.client_name}</span>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
+/* ─── Main page ──────────────────────────────────────────────────────────── */
 
 export default function PaymentsPage() {
     const queryClient = useQueryClient();
@@ -113,7 +224,16 @@ export default function PaymentsPage() {
 
     const openCreate = () => { setFormState(emptyForm); setEditingId(null); setFormMode("create"); };
     const openEdit = (p: Payment) => {
-        setFormState({ lpo: String(p.lpo ?? ""), amount: String(p.amount), payment_method: p.payment_method, status: p.status, payment_date: p.payment_date?.split("T")[0] ?? "", reference_number: p.reference_number ?? "", notes: p.notes ?? "" });
+        setFormState({
+            job_id: p.job != null ? String(p.job) : "",
+            job_label: p.job_number && p.job_name ? `${p.job_number} — ${p.job_name}` : (p.job_number ?? ""),
+            amount: String(p.amount),
+            payment_method: p.payment_method,
+            status: p.status,
+            payment_date: p.payment_date?.split("T")[0] ?? "",
+            reference_number: p.reference_number ?? "",
+            notes: p.notes ?? "",
+        });
         setEditingId(p.id);
         setFormMode("edit");
     };
@@ -124,7 +244,7 @@ export default function PaymentsPage() {
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const payload: Partial<Payment> = {
-            lpo: Number(formState.lpo) || undefined,
+            job: formState.job_id ? Number(formState.job_id) : null,
             amount: Number(formState.amount),
             payment_method: formState.payment_method,
             status: formState.status,
@@ -240,7 +360,7 @@ export default function PaymentsPage() {
                                             type="text"
                                             value={search}
                                             onChange={e => { setSearch(e.target.value); setPage(1); }}
-                                            placeholder="Search by reference, client, LPO..."
+                                            placeholder="Search by reference, client, job…"
                                             className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
                                         />
                                     </div>
@@ -310,11 +430,12 @@ export default function PaymentsPage() {
                                                         <tr>
                                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Date</th>
                                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Client</th>
+                                                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Job</th>
                                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Reference</th>
-                                                            <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">LPO</th>
                                                             <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Method</th>
                                                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Amount</th>
                                                             <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                                                            <th className="hidden md:table-cell px-4 py-3 text-center text-xs font-semibold text-gray-500 uppercase" title="Zoho Books sync">Zoho</th>
                                                             <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Actions</th>
                                                         </tr>
                                                     </thead>
@@ -325,14 +446,29 @@ export default function PaymentsPage() {
                                                                 <td className="px-4 py-3">
                                                                     <p className="text-sm font-medium text-gray-900">{payment.client_name || "—"}</p>
                                                                 </td>
+                                                                <td className="px-4 py-3">
+                                                                    {payment.job_number ? (
+                                                                        <div>
+                                                                            <p className="text-sm font-mono text-brand-blue">{payment.job_number}</p>
+                                                                            {payment.job_name && <p className="text-xs text-gray-400 truncate max-w-[140px]">{payment.job_name}</p>}
+                                                                        </div>
+                                                                    ) : (
+                                                                        <span className="text-sm text-gray-400">{payment.lpo_number || "—"}</span>
+                                                                    )}
+                                                                </td>
                                                                 <td className="px-4 py-3 text-sm text-gray-700 font-mono">{payment.reference_number || "—"}</td>
-                                                                <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-500">{payment.lpo_number || "—"}</td>
                                                                 <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-500">{METHOD_LABELS[payment.payment_method]}</td>
                                                                 <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right whitespace-nowrap">{formatKES(payment.amount)}</td>
                                                                 <td className="px-4 py-3">
                                                                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[payment.status]}`}>
                                                                         {payment.status}
                                                                     </span>
+                                                                </td>
+                                                                <td className="hidden md:table-cell px-4 py-3 text-center">
+                                                                    {payment.zoho_synced
+                                                                        ? <span title={`Zoho ID: ${payment.zoho_payment_id}`}><Cloud className="w-4 h-4 text-green-500 mx-auto" /></span>
+                                                                        : <span title="Not synced to Zoho"><CloudOff className="w-4 h-4 text-gray-300 mx-auto" /></span>
+                                                                    }
                                                                 </td>
                                                                 <td className="px-4 py-3 text-right">
                                                                     <div className="flex items-center justify-end gap-2">
@@ -386,10 +522,11 @@ export default function PaymentsPage() {
                             </div>
                             {[
                                 { label: "Client", value: selectedPayment.client_name || "—" },
+                                { label: "Job", value: selectedPayment.job_number ? `${selectedPayment.job_number} — ${selectedPayment.job_name ?? ""}` : (selectedPayment.lpo_number || "—") },
                                 { label: "Reference", value: selectedPayment.reference_number || "—" },
-                                { label: "LPO", value: selectedPayment.lpo_number || "—" },
                                 { label: "Method", value: METHOD_LABELS[selectedPayment.payment_method] },
                                 { label: "Date", value: formatDate(selectedPayment.payment_date) },
+                                { label: "Zoho Sync", value: selectedPayment.zoho_synced ? `Synced (${selectedPayment.zoho_payment_id})` : "Not synced" },
                                 ...(selectedPayment.notes ? [{ label: "Notes", value: selectedPayment.notes }] : []),
                             ].map(row => (
                                 <div key={row.label} className="flex justify-between py-2 border-b border-gray-100">
@@ -415,6 +552,15 @@ export default function PaymentsPage() {
                             <button onClick={() => setFormMode(null)}><X className="w-5 h-5 text-gray-500" /></button>
                         </div>
                         <form onSubmit={handleFormSubmit} className="px-6 py-5 space-y-4">
+                            {/* Job search — full width */}
+                            <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Job</label>
+                                <JobSearchField
+                                    value={formState.job_id}
+                                    label={formState.job_label}
+                                    onChange={(id, lbl) => setFormState(s => ({ ...s, job_id: id, job_label: lbl }))}
+                                />
+                            </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Amount (KES) *</label>
@@ -443,23 +589,22 @@ export default function PaymentsPage() {
                                         <option value="refunded">Refunded</option>
                                     </select>
                                 </div>
-                                <div>
+                                <div className="sm:col-span-2">
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Reference Number</label>
-                                    <input type="text" value={formState.reference_number} onChange={e => setFormState(s => ({ ...s, reference_number: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" placeholder="e.g. MPESA ref" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">LPO Number</label>
-                                    <input type="number" value={formState.lpo} onChange={e => setFormState(s => ({ ...s, lpo: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" placeholder="LPO ID" />
+                                    <input type="text" value={formState.reference_number} onChange={e => setFormState(s => ({ ...s, reference_number: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" placeholder="e.g. MPESA ref, cheque #" />
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Notes</label>
-                                <textarea rows={2} value={formState.notes} onChange={e => setFormState(s => ({ ...s, notes: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" placeholder="Optional notes..." />
+                                <textarea rows={2} value={formState.notes} onChange={e => setFormState(s => ({ ...s, notes: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue" placeholder="Optional notes…" />
                             </div>
+                            <p className="text-xs text-gray-400">
+                                Setting status to <strong>Completed</strong> will automatically sync this payment to Zoho Books if the job&apos;s LPO has been synced.
+                            </p>
                             <div className="flex justify-end gap-3 pt-2">
                                 <button type="button" onClick={() => setFormMode(null)} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
                                 <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="px-4 py-2 text-sm font-medium text-white bg-brand-blue rounded-lg hover:bg-brand-blue/90 disabled:opacity-50">
-                                    {createMutation.isPending || updateMutation.isPending ? "Saving..." : formMode === "create" ? "Record Payment" : "Save Changes"}
+                                    {createMutation.isPending || updateMutation.isPending ? "Saving…" : formMode === "create" ? "Record Payment" : "Save Changes"}
                                 </button>
                             </div>
                         </form>
@@ -493,7 +638,8 @@ const ZOHO_STATUS_STYLES: Record<string, string> = {
 };
 
 function ZohoInvoicesPanel() {
-    const { data, isLoading, error, refetch, isFetching } = useQuery<{ invoices: ZohoInvoice[] }>({
+    const queryClient = useQueryClient();
+    const { data, isLoading, error, refetch, isFetching } = useQuery<{ invoices: ZohoInvoice[]; source?: string }>({
         queryKey: ["zoho-invoices"],
         queryFn: async () => {
             const res = await fetch("/api/proxy/api/v1/zoho-invoices/", { credentials: "include" });
@@ -501,6 +647,15 @@ function ZohoInvoicesPanel() {
             return res.json();
         },
         retry: false,
+    });
+
+    const importMutation = useMutation({
+        mutationFn: importZohoInvoices,
+        onSuccess: (result) => {
+            toast.success(`Imported: ${result.created} new, ${result.updated} updated (${result.total} total)`);
+            queryClient.invalidateQueries({ queryKey: ["zoho-invoices"] });
+        },
+        onError: () => toast.error("Import from Zoho failed. Check Zoho Books configuration."),
     });
 
     if (error) {
@@ -528,6 +683,7 @@ function ZohoInvoicesPanel() {
     }
 
     const invoices = data?.invoices ?? [];
+    const isLocalData = data?.source === "local";
 
     const totalInvoiced = invoices.reduce((sum, inv) => sum + Number(inv.total), 0);
     const totalBalance = invoices.reduce((sum, inv) => sum + Number(inv.balance), 0);
@@ -562,18 +718,41 @@ function ZohoInvoicesPanel() {
             )}
 
             <div className="flex items-center justify-between">
-                <p className="text-sm text-gray-500">{invoices.length} invoice{invoices.length !== 1 ? "s" : ""} from Zoho Books</p>
-                <button onClick={() => refetch()} disabled={isFetching} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50 transition-colors bg-white shadow-sm">
-                    <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
-                    Refresh
-                </button>
+                <div className="flex items-center gap-3">
+                    <p className="text-sm text-gray-500">
+                        {invoices.length} invoice{invoices.length !== 1 ? "s" : ""}
+                        {isLocalData && <span className="ml-1.5 text-xs text-gray-400">(local cache)</span>}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => importMutation.mutate()}
+                        disabled={importMutation.isPending}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm text-white bg-brand-blue rounded-lg hover:bg-brand-blue/90 disabled:opacity-50 transition-colors shadow-sm"
+                    >
+                        <Download className={`w-3.5 h-3.5 ${importMutation.isPending ? "animate-bounce" : ""}`} />
+                        {importMutation.isPending ? "Importing…" : "Import from Zoho"}
+                    </button>
+                    <button onClick={() => refetch()} disabled={isFetching} className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-white disabled:opacity-50 transition-colors bg-white shadow-sm">
+                        <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {invoices.length === 0 ? (
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
                     <BookOpen className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-500 font-medium">No invoices yet</p>
-                    <p className="text-sm text-gray-400 mt-1">Sync a job to Zoho Books from the Control Tower to create invoices.</p>
+                    <p className="text-sm text-gray-400 mt-1 mb-4">Sync a job to Zoho Books from the Control Tower, then click <strong>Import from Zoho</strong> to pull them here.</p>
+                    <button
+                        onClick={() => importMutation.mutate()}
+                        disabled={importMutation.isPending}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-brand-blue rounded-lg hover:bg-brand-blue/90 disabled:opacity-50"
+                    >
+                        <Download className="w-4 h-4" />
+                        {importMutation.isPending ? "Importing…" : "Import from Zoho"}
+                    </button>
                 </div>
             ) : (
                 <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -595,8 +774,8 @@ function ZohoInvoicesPanel() {
                                     <tr key={inv.invoice_id} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-4 py-3 text-sm font-medium text-gray-900 font-mono">{inv.invoice_number}</td>
                                         <td className="px-4 py-3 text-sm text-gray-700">{inv.customer_name}</td>
-                                        <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-500">{inv.date}</td>
-                                        <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-500">{inv.due_date}</td>
+                                        <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-500">{inv.date || "—"}</td>
+                                        <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-500">{inv.due_date || "—"}</td>
                                         <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right whitespace-nowrap">
                                             {inv.currency_code} {Number(inv.total).toLocaleString("en-KE", { minimumFractionDigits: 2 })}
                                         </td>

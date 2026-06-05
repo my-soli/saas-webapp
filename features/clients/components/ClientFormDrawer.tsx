@@ -587,18 +587,6 @@ export default function ClientFormDrawer({
                                     />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Default Markup (%)</label>
-                                    <p className="text-xs text-gray-500 mt-0.5">Profit margin percentage on quotes</p>
-                                    <input
-                                        type="number"
-                                        value={formState.defaultMarkup}
-                                        onChange={handleInputChange("defaultMarkup")}
-                                        min="0"
-                                        step="0.01"
-                                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                                    />
-                                </div>
-                                <div>
                                     <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Risk Rating</label>
                                     <p className="text-xs text-gray-500 mt-0.5">Credit risk assessment level</p>
                                     <select

@@ -4,8 +4,11 @@ export type PaymentMethod = "cash" | "mpesa" | "bank_transfer" | "cheque" | "cre
 
 export interface Payment {
     id: number;
-    lpo: number;
+    lpo: number | null;
     lpo_number: string | null;
+    job: number | null;
+    job_number: string | null;
+    job_name: string | null;
     client_name: string | null;
     amount: number;
     payment_method: PaymentMethod;
@@ -13,6 +16,8 @@ export interface Payment {
     payment_date: string;
     reference_number: string;
     notes?: string | null;
+    zoho_synced: boolean;
+    zoho_payment_id: string;
     created_at?: string;
 }
 

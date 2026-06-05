@@ -231,7 +231,7 @@ export default function QuoteAcceptancePage() {
                                                         <p className="text-xs text-gray-400 mt-0.5">{item.customization_level_snapshot}</p>
                                                     )}
                                                     {(item as any).description && (
-                                                        <p className="text-xs text-gray-400 mt-0.5">{(item as any).description}</p>
+                                                        <p className="text-xs text-gray-400 mt-0.5 whitespace-pre-wrap">{(item as any).description}</p>
                                                     )}
                                                 </td>
                                                 <td className="py-2.5 px-2 text-right text-gray-700 align-top">{item.quantity}</td>

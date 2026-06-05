@@ -31,6 +31,15 @@ interface LeadFormState {
     follow_up_date: string;
     status: LeadStatus;
     notes: string;
+    // B2B fields
+    company: string;
+    industry: string;
+    vat_tax_id: string;
+    kra_pin: string;
+    primary_contact_name: string;
+    primary_contact_email: string;
+    primary_contact_phone: string;
+    primary_contact_role: string;
 }
 
 const initialFormState: LeadFormState = {
@@ -45,6 +54,14 @@ const initialFormState: LeadFormState = {
     follow_up_date: "",
     status: "New",
     notes: "",
+    company: "",
+    industry: "",
+    vat_tax_id: "",
+    kra_pin: "",
+    primary_contact_name: "",
+    primary_contact_email: "",
+    primary_contact_phone: "",
+    primary_contact_role: "",
 };
 
 export default function LeadFormDrawer({
@@ -112,6 +129,14 @@ export default function LeadFormDrawer({
                 follow_up_date: lead.follow_up_date || "",
                 status: lead.status as LeadStatus,
                 notes: lead.notes || "",
+                company: lead.company || "",
+                industry: lead.industry || "",
+                vat_tax_id: lead.vat_tax_id || "",
+                kra_pin: lead.kra_pin || "",
+                primary_contact_name: lead.primary_contact_name || "",
+                primary_contact_email: lead.primary_contact_email || "",
+                primary_contact_phone: lead.primary_contact_phone || "",
+                primary_contact_role: lead.primary_contact_role || "",
             });
             return;
         }
@@ -177,6 +202,16 @@ export default function LeadFormDrawer({
             preferred_client_type: formState.preferred_client_type,
             follow_up_date: formState.follow_up_date || null,
             notes: formState.notes.trim(),
+            ...(formState.preferred_client_type === "B2B" && {
+                company: formState.company.trim(),
+                industry: formState.industry.trim(),
+                vat_tax_id: formState.vat_tax_id.trim(),
+                kra_pin: formState.kra_pin.trim(),
+                primary_contact_name: formState.primary_contact_name.trim(),
+                primary_contact_email: formState.primary_contact_email.trim(),
+                primary_contact_phone: formState.primary_contact_phone.trim(),
+                primary_contact_role: formState.primary_contact_role.trim(),
+            }),
         };
 
         if (mode === "edit" && lead !== null) {
@@ -243,7 +278,7 @@ export default function LeadFormDrawer({
                             </div>
 
                             <div>
-                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone *</label>
+                                <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</label>
                                 <p className="text-xs text-gray-500 mt-0.5">Contact number with country code</p>
                                 <input
                                     type="text"
@@ -286,6 +321,104 @@ export default function LeadFormDrawer({
                             </div>
                         </div>
                     </section>
+
+                    {formState.preferred_client_type === "B2B" && (
+                        <section className="rounded-lg border border-brand-blue/30 bg-brand-blue/5 p-4">
+                            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">B2B Company Details</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                                <div className="md:col-span-2">
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Company *</label>
+                                    <p className="text-xs text-gray-500 mt-0.5">Legal company name</p>
+                                    <input
+                                        type="text"
+                                        value={formState.company}
+                                        onChange={handleInputChange("company")}
+                                        className={`mt-2 w-full rounded-md border px-3 py-2 text-sm ${fieldErrors.company ? "border-red-500" : "border-gray-300"}`}
+                                    />
+                                    {fieldErrors.company && (
+                                        <p className="text-xs text-red-600 mt-1">{fieldErrors.company}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Industry</label>
+                                    <input
+                                        type="text"
+                                        value={formState.industry}
+                                        onChange={handleInputChange("industry")}
+                                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">VAT / Tax ID</label>
+                                    <input
+                                        type="text"
+                                        value={formState.vat_tax_id}
+                                        onChange={handleInputChange("vat_tax_id")}
+                                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">KRA PIN</label>
+                                    <input
+                                        type="text"
+                                        value={formState.kra_pin}
+                                        onChange={handleInputChange("kra_pin")}
+                                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mt-4 mb-3">Primary Contact</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Name</label>
+                                    <input
+                                        type="text"
+                                        value={formState.primary_contact_name}
+                                        onChange={handleInputChange("primary_contact_name")}
+                                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</label>
+                                    <input
+                                        type="email"
+                                        value={formState.primary_contact_email}
+                                        onChange={handleInputChange("primary_contact_email")}
+                                        className={`mt-2 w-full rounded-md border px-3 py-2 text-sm ${fieldErrors.primary_contact_email ? "border-red-500" : "border-gray-300"}`}
+                                    />
+                                    {fieldErrors.primary_contact_email && (
+                                        <p className="text-xs text-red-600 mt-1">{fieldErrors.primary_contact_email}</p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</label>
+                                    <input
+                                        type="text"
+                                        value={formState.primary_contact_phone}
+                                        onChange={handleInputChange("primary_contact_phone")}
+                                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Role</label>
+                                    <input
+                                        type="text"
+                                        value={formState.primary_contact_role}
+                                        onChange={handleInputChange("primary_contact_role")}
+                                        placeholder="e.g. Procurement Manager"
+                                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                                    />
+                                </div>
+                            </div>
+                        </section>
+                    )}
 
                     <section className="rounded-lg border border-gray-200 p-4">
                         <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Lead Details</h3>

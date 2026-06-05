@@ -229,7 +229,7 @@ export interface JobAttachment {
 }
 
 export async function fetchJobAttachments(jobId: number): Promise<JobAttachment[]> {
-    const res = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/${jobId}/attachments/`, {
+    const res = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/${jobId}/attachments`, {
         credentials: "include",
         cache: "no-store",
     });
@@ -241,7 +241,7 @@ export async function uploadJobAttachments(jobId: number, files: File[]): Promis
     const csrfToken = await getCsrfToken();
     const formData = new FormData();
     files.forEach((f) => formData.append("files", f));
-    const res = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/${jobId}/attachments/`, {
+    const res = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/${jobId}/attachments`, {
         method: "POST",
         headers: csrfToken ? { "X-CSRFToken": csrfToken } : {},
         credentials: "include",

@@ -249,11 +249,9 @@ export default function AccountManagerJobsPage(): ReactElement {
                                     <JobsTable
                                         jobs={jobs}
                                         onViewDetails={(job): void => router.push(`/account-manager/jobs/${job.id}`)}
-                                        onAssign={openAssignModal}
                                         onSendReminder={handleSendReminder}
                                         onEdit={(job): void => router.push(`/account-manager/jobs/${job.id}/edit`)}
                                         onDelete={(job): void => setDeleteConfirmJobId(job.id)}
-                                        showAssignButton
                                         showReminderButton
                                         hideActionsWhenCompleted
                                         remindingJobId={remindingJobId ?? undefined}

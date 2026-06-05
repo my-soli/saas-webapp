@@ -3,9 +3,9 @@
 import { type ReactElement } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil, File as FileIcon } from "lucide-react";
 import AccountManagerLayout from "@/components/account-manager/account-manager-layout";
-import { fetchJob } from "@/services/jobs";
+import { fetchJob, fetchJobAttachments, type JobAttachment } from "@/services/jobs";
 import type { JobProduct } from "@/types/jobs";
 
 const SECTION_HEADER = "px-6 py-4 border-b border-gray-100 bg-gray-50";
@@ -16,7 +16,11 @@ const VALUE_EMPTY = "text-sm text-gray-400 italic mt-1";
 const statusStyles: Record<string, string> = {
     pending: "bg-amber-100 text-amber-700",
     in_progress: "bg-blue-100 text-blue-700",
-    on_hold: "bg-gray-100 text-gray-600",
+    on_hold: "bg-orange-100 text-orange-700",
+    blocked: "bg-red-100 text-red-700",
+    qc_hold: "bg-orange-100 text-orange-700",
+    ready: "bg-teal-100 text-teal-700",
+    dispatched: "bg-green-100 text-green-700",
     completed: "bg-green-100 text-green-700",
 };
 
@@ -56,6 +60,12 @@ export default function JobViewPage(): ReactElement {
     const { data: job, isLoading } = useQuery({
         queryKey: ["job", jobId],
         queryFn: () => fetchJob(jobId),
+        enabled: !!jobId,
+    });
+
+    const { data: attachments = [] } = useQuery({
+        queryKey: ["job-attachments", jobId],
+        queryFn: () => fetchJobAttachments(jobId),
         enabled: !!jobId,
     });
 
@@ -236,7 +246,40 @@ export default function JobViewPage(): ReactElement {
                     </section>
                 )}
 
-                {/* ── Section 5: Timeline & Delivery ── */}
+                {/* ── Section 5: Attachments ── */}
+                {attachments.length > 0 && (
+                    <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div className={SECTION_HEADER}>
+                            <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                                Attachments
+                                <span className="ml-2 text-gray-400 font-normal normal-case text-xs">
+                                    ({attachments.length} file{attachments.length !== 1 ? "s" : ""})
+                                </span>
+                            </h2>
+                        </div>
+                        <div className="p-6 space-y-2">
+                            {attachments.map((att: JobAttachment) => (
+                                <div key={att.id} className="flex items-center gap-3 rounded-lg bg-gray-50 px-4 py-2.5 border border-gray-100">
+                                    <FileIcon className="w-4 h-4 text-gray-400 shrink-0" />
+                                    <span className="flex-1 text-sm text-gray-700 truncate">{att.file_name}</span>
+                                    <span className="text-xs text-gray-400">{(att.file_size / 1024).toFixed(1)} KB</span>
+                                    {att.file_url && (
+                                        <a
+                                            href={att.file_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="shrink-0 text-xs font-semibold text-brand-blue hover:underline"
+                                        >
+                                            Download
+                                        </a>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* ── Section 6: Timeline & Delivery ── */}
                 <section className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                     <div className={SECTION_HEADER}>
                         <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Timeline & Delivery</h2>

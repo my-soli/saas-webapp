@@ -10,6 +10,7 @@ interface QuotesTableProps {
     onApprove: (quote: Quote) => void;
     onClone: (quote: Quote) => void;
     onDelete: (quote: Quote) => void;
+    onVoid?: (quote: Quote) => void;
 }
 
 const statusStyles: Record<string, string> = {
@@ -18,7 +19,9 @@ const statusStyles: Record<string, string> = {
     Costed: "bg-brand-blue/10 text-brand-blue",
     "Sent to Customer": "bg-brand-purple/10 text-brand-purple",
     Approved: "bg-brand-green/10 text-brand-green",
+    Rejected: "bg-brand-red/10 text-brand-red",
     Lost: "bg-brand-red/10 text-brand-red",
+    Void: "bg-gray-200 text-gray-500 line-through",
 };
 
 export default function QuotesTable({
@@ -30,6 +33,7 @@ export default function QuotesTable({
     onApprove,
     onClone,
     onDelete,
+    onVoid,
 }: QuotesTableProps): ReactElement {
     const formatDate = (value: string): string =>
         new Date(value).toLocaleDateString("en-US", {
@@ -129,6 +133,15 @@ export default function QuotesTable({
                                             className="text-sm font-semibold text-gray-700 hover:text-gray-900"
                                         >
                                             Clone
+                                        </button>
+                                    )}
+                                    {onVoid && quote.status !== "Void" && quote.status !== "Lost" && (
+                                        <button
+                                            type="button"
+                                            onClick={(): void => onVoid(quote)}
+                                            className="text-sm font-semibold text-gray-500 hover:text-gray-700"
+                                        >
+                                            Void
                                         </button>
                                     )}
                                     <button

@@ -260,7 +260,10 @@ export default function PTEditJobPage(): ReactElement {
                                 <select className={SELECT} value={form.status} onChange={(e): void => set("status", e.target.value as JobStatus)}>
                                     <option value="pending">Not Started</option>
                                     <option value="in_progress">In Progress</option>
-                                    <option value="on_hold">On Hold</option>
+                                    <option value="blocked">Blocked</option>
+                                    <option value="qc_hold">QC Hold</option>
+                                    <option value="ready">Ready for Dispatch</option>
+                                    <option value="dispatched">Dispatched</option>
                                     <option value="completed">Completed</option>
                                 </select>
                             </div>
@@ -331,7 +334,7 @@ export default function PTEditJobPage(): ReactElement {
                                         <select className={SELECT} value={product.user_id}
                                             onChange={(e): void => updateProduct(idx, "user_id", e.target.value ? Number(e.target.value) : "")}>
                                             <option value="">Unassigned</option>
-                                            {users.map((u) => (<option key={u.id} value={u.id}>{u.name}</option>))}
+                                            {users.map((u) => (<option key={u.id} value={u.id}>{(u.first_name + " " + u.last_name).trim() || u.username}</option>))}
                                         </select>
                                     </div>
                                     <div className="col-span-1 flex justify-center">

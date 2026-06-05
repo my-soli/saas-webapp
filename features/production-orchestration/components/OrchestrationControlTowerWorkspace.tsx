@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactElement, useMemo, useState } from "react";
+import { type ReactElement, useMemo, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -15,10 +15,22 @@ import {
     InboxIcon,
     LoaderCircleIcon,
     BellIcon,
+    ChevronDownIcon,
+    UploadIcon,
+    FileIcon,
 } from "lucide-react";
 import { fetchJobs } from "@/services/jobs";
 import { getCurrentUser } from "@/services/users";
-import { fetchControlTowerStats, resolveDependency } from "@/services/orchestration";
+import {
+    fetchControlTowerStats,
+    resolveDependency,
+    fetchMyTasks,
+    updateTask,
+    fetchComponentFiles,
+    uploadComponentFile,
+    type ComponentTask,
+    type ComponentFileSlot,
+} from "@/services/orchestration";
 import type { Job } from "@/types/jobs";
 import {
     apiJobStatusBadgeClass,
@@ -28,7 +40,7 @@ import {
     apiUserLabel,
 } from "../lib/api-job-helpers";
 
-type Tab = "overview" | "jobs";
+type Tab = "overview" | "jobs" | "work";
 
 const riskColor = (level: string) => {
     if (level === "HIGH") return "bg-brand-red/10 text-brand-red";
@@ -124,10 +136,181 @@ function JobsTable({ jobs, onNavigate, muted = false }: { jobs: Job[]; onNavigat
     );
 }
 
+const TASK_STATUS_LABELS: Record<string, string> = {
+    pending: "Pending", in_progress: "In Progress", done: "Done",
+    overdue: "Overdue", blocked: "Blocked",
+};
+const TASK_STATUS_COLORS: Record<string, string> = {
+    pending:     "bg-gray-100 text-gray-500",
+    in_progress: "bg-brand-blue/10 text-brand-blue",
+    done:        "bg-brand-green/10 text-brand-green",
+    overdue:     "bg-brand-red/10 text-brand-red",
+    blocked:     "bg-brand-orange/10 text-brand-orange",
+};
+
+function WorkTaskCard({ task, basePath }: { task: ComponentTask; basePath: string }) {
+    const queryClient = useQueryClient();
+    const [expanded, setExpanded] = useState(false);
+    const [noteDraft, setNoteDraft] = useState(task.notes ?? "");
+    const [noteSaved, setNoteSaved] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const filesQuery = useQuery({
+        queryKey: ["component-files", task.component],
+        queryFn: () => fetchComponentFiles(task.component),
+        enabled: expanded,
+        staleTime: 30_000,
+    });
+
+    const updateTaskMut = useMutation({
+        mutationFn: (payload: Partial<ComponentTask>) => updateTask(task.id, payload),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-tasks"] }),
+    });
+
+    const uploadFileMut = useMutation({
+        mutationFn: ({ slot, file }: { slot: ComponentFileSlot; file: File }) =>
+            uploadComponentFile(task.component, slot, file),
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ["component-files", task.component] }),
+    });
+
+    const handleSaveNote = () => {
+        updateTaskMut.mutate({ notes: noteDraft }, {
+            onSuccess: () => { setNoteSaved(true); setTimeout(() => setNoteSaved(false), 2000); },
+        });
+    };
+
+    return (
+        <div className="border-b border-gray-50 last:border-0">
+            <div
+                className="flex items-center gap-3 px-5 py-3.5 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => setExpanded((v) => !v)}
+            >
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-800 truncate">{task.name}</p>
+                    <p className="mt-0.5 text-xs text-gray-400 truncate">
+                        {task.component_name ?? "Component"}
+                        {task.job_number ? ` · ${task.job_number}` : ""}
+                        {task.job_name ? ` · ${task.job_name}` : ""}
+                    </p>
+                </div>
+                {task.due_by && (
+                    <span className="shrink-0 text-xs text-gray-400">Due {task.due_by}</span>
+                )}
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${TASK_STATUS_COLORS[task.status] ?? "bg-gray-100 text-gray-500"}`}>
+                    {TASK_STATUS_LABELS[task.status] ?? task.status}
+                </span>
+                <ChevronDownIcon className={`h-3.5 w-3.5 shrink-0 text-gray-300 transition-transform ${expanded ? "rotate-180" : ""}`} />
+            </div>
+
+            {expanded && (
+                <div className="px-5 pb-5 pt-2 bg-gray-50/70 border-t border-gray-100 space-y-4">
+                    {/* Status */}
+                    <div className="flex items-center gap-3">
+                        <span className="text-xs font-semibold text-gray-500 w-14 shrink-0">Status</span>
+                        <select
+                            value={task.status}
+                            onChange={(e) => updateTaskMut.mutate({ status: e.target.value as ComponentTask["status"] })}
+                            disabled={updateTaskMut.isPending}
+                            className="rounded-md border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-700 focus:border-brand-blue focus:outline-none disabled:opacity-40"
+                        >
+                            {Object.entries(TASK_STATUS_LABELS).map(([val, lbl]) => (
+                                <option key={val} value={val}>{lbl}</option>
+                            ))}
+                        </select>
+                        {task.job_id && (
+                            <Link
+                                href={`${basePath}/jobs/${task.job_id}/components/${task.component}`}
+                                className="ml-auto text-xs text-brand-blue hover:underline shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                View component ›
+                            </Link>
+                        )}
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                        <p className="text-xs font-semibold text-gray-500 mb-1.5">Note to PIC</p>
+                        <textarea
+                            value={noteDraft}
+                            onChange={(e) => { setNoteDraft(e.target.value); setNoteSaved(false); }}
+                            placeholder="Write a progress note — your PIC will be notified…"
+                            rows={3}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-blue focus:outline-none resize-none"
+                        />
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleSaveNote(); }}
+                            disabled={updateTaskMut.isPending || noteDraft === (task.notes ?? "")}
+                            className="mt-1.5 rounded-md bg-brand-blue px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
+                        >
+                            {noteSaved ? "Saved!" : updateTaskMut.isPending ? "Saving…" : "Save Note"}
+                        </button>
+                    </div>
+
+                    {/* Files */}
+                    <div>
+                        <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-gray-500">Files</p>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                                disabled={uploadFileMut.isPending}
+                                className="flex items-center gap-1 text-xs text-brand-blue hover:underline disabled:opacity-40"
+                            >
+                                <UploadIcon className="h-3 w-3" />
+                                {uploadFileMut.isPending ? "Uploading…" : "Upload proof"}
+                            </button>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                className="hidden"
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) uploadFileMut.mutate({ slot: "proof", file });
+                                    e.target.value = "";
+                                }}
+                            />
+                        </div>
+                        {filesQuery.isLoading && (
+                            <p className="text-xs text-gray-400 flex items-center gap-1.5">
+                                <LoaderCircleIcon className="h-3 w-3 animate-spin" />
+                                Loading files…
+                            </p>
+                        )}
+                        {!filesQuery.isLoading && (filesQuery.data?.length ?? 0) === 0 && (
+                            <p className="text-xs text-gray-400">No files attached to this component yet.</p>
+                        )}
+                        <div className="space-y-1 mt-1">
+                            {filesQuery.data?.map((f) => (
+                                <a
+                                    key={f.id}
+                                    href={f.file_url ?? "#"}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 hover:text-brand-blue transition-colors"
+                                >
+                                    <FileIcon className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                                    <span className="flex-1 truncate">{f.file_name}</span>
+                                    <span className="shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide bg-gray-100 text-gray-500">
+                                        {f.slot}
+                                    </span>
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
 export default function OrchestrationControlTowerWorkspace({ basePath = "/production-team" }: { basePath?: string } = {}): ReactElement {
     const router = useRouter();
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<Tab>("overview");
+    const [workTabInitialised, setWorkTabInitialised] = useState(false);
 
     const currentUserQuery = useQuery({
         queryKey: ["orchestration", "current-user"],
@@ -159,10 +342,29 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
         refetchInterval: 60_000,
     });
 
+    const myTasksQuery = useQuery({
+        queryKey: ["my-tasks"],
+        queryFn: fetchMyTasks,
+        enabled: typeof myUserId === "number" && myUserId > 0,
+        staleTime: 30_000,
+        refetchInterval: 60_000,
+    });
+    const myTasks = myTasksQuery.data ?? [];
+
     const myJobs: Job[] = myJobsQuery.data?.results ?? [];
     const myJobsCount = myJobsQuery.data?.count ?? myJobs.length;
     const activeJobs = myJobs.filter((j) => j.status !== "completed");
     const completedJobs = myJobs.filter((j) => j.status === "completed");
+
+    // Auto-switch to "My Work" tab for members with no PIC jobs but with task/component assignments
+    useMemo(() => {
+        if (!workTabInitialised && myJobsQuery.isSuccess && myTasksQuery.isSuccess) {
+            if (myJobs.length === 0 && myTasks.length > 0) {
+                setActiveTab("work");
+            }
+            setWorkTabInitialised(true);
+        }
+    }, [myJobsQuery.isSuccess, myTasksQuery.isSuccess, myJobs.length, myTasks.length, workTabInitialised]);
 
     const ctStats = ctStatsQuery.data;
     const blockedComponents = ctStats?.blocked_components ?? [];
@@ -184,9 +386,10 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
         pendingApprovals.length > 0 ||
         vendorCapacity.length > 0;
 
-    const tabs: { key: Tab; label: string; icon: ReactElement }[] = [
+    const tabs: { key: Tab; label: string; icon: ReactElement; badge?: number }[] = [
         { key: "overview", label: "Live Overview", icon: <ZapIcon className="h-4 w-4" /> },
-        { key: "jobs",     label: "Master Jobs",   icon: <BriefcaseIcon className="h-4 w-4" /> },
+        { key: "jobs",     label: "Master Jobs",   icon: <BriefcaseIcon className="h-4 w-4" />, badge: myJobsCount || undefined },
+        { key: "work",     label: "My Work",       icon: <InboxIcon className="h-4 w-4" />,    badge: myTasks.length || undefined },
     ];
 
     return (
@@ -221,9 +424,9 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
                             >
                                 {tab.icon}
                                 {tab.label}
-                                {tab.key === "jobs" && myJobsCount > 0 && (
+                                {tab.badge != null && tab.badge > 0 && (
                                     <span className="ml-1 rounded-full bg-gray-100 px-1.5 py-0 text-[10px] font-bold text-gray-500">
-                                        {myJobsCount}
+                                        {tab.badge}
                                     </span>
                                 )}
                             </button>
@@ -509,6 +712,45 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
                             </div>
                         )}
                     </>
+                )}
+
+                {/* ── MY WORK TAB ── */}
+                {activeTab === "work" && (
+                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+                        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+                            <div>
+                                <span className="text-sm font-semibold text-gray-800">My Work</span>
+                                <p className="text-xs text-gray-400 mt-0.5">Tasks assigned to you — update status, add notes, manage files</p>
+                            </div>
+                            <span className="text-xs text-gray-400">{myTasks.length} task{myTasks.length !== 1 ? "s" : ""}</span>
+                        </div>
+
+                        {myTasksQuery.isPending ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+                                <LoaderCircleIcon className="h-8 w-8 animate-spin" />
+                                <p className="mt-2 text-sm">Loading your tasks…</p>
+                            </div>
+                        ) : myTasksQuery.isError ? (
+                            <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                                <p className="text-sm text-brand-red font-semibold">Could not load tasks</p>
+                                <p className="mt-1 text-xs text-gray-400">Check your connection and try again.</p>
+                            </div>
+                        ) : myTasks.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-20">
+                                <InboxIcon className="h-10 w-10 text-gray-200" />
+                                <p className="mt-3 text-sm font-semibold text-gray-400">No tasks assigned to you</p>
+                                <p className="mt-1 text-xs text-gray-300 text-center max-w-md">
+                                    Your production lead will assign tasks here. Click a task to update its status, add notes, or upload files.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-gray-50">
+                                {myTasks.map((task) => (
+                                    <WorkTaskCard key={task.id} task={task} basePath={basePath} />
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 )}
 
                 {/* ── MASTER JOBS TAB ── */}

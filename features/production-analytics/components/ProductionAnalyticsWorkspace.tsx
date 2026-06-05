@@ -100,8 +100,20 @@ const getStatusBadgeClass = (status: string): string => {
         return "bg-brand-blue/10 text-brand-blue border-brand-blue/20";
     }
 
-    if (status === "on_hold") {
+    if (status === "on_hold" || status === "qc_hold") {
         return "bg-brand-orange/10 text-brand-orange border-brand-orange/20";
+    }
+
+    if (status === "blocked") {
+        return "bg-brand-red/10 text-brand-red border-brand-red/20";
+    }
+
+    if (status === "ready") {
+        return "bg-teal-100 text-teal-700 border-teal-200";
+    }
+
+    if (status === "dispatched") {
+        return "bg-brand-green/20 text-brand-green border-brand-green/20";
     }
 
     return "bg-brand-yellow/10 text-brand-yellow border-brand-yellow/20";

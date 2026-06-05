@@ -107,7 +107,10 @@ const jobStatusOptions: Array<{ value: "all" | JobStatus; label: string }> = [
     { value: "all", label: "All Statuses" },
     { value: "pending", label: "Pending" },
     { value: "in_progress", label: "In Progress" },
-    { value: "on_hold", label: "On Hold" },
+    { value: "blocked", label: "Blocked" },
+    { value: "qc_hold", label: "QC Hold" },
+    { value: "ready", label: "Ready for Dispatch" },
+    { value: "dispatched", label: "Dispatched" },
     { value: "completed", label: "Completed" },
 ];
 
@@ -131,8 +134,20 @@ const getStatusPillClass = (status: string): string => {
         return "bg-brand-green/10 text-brand-green";
     }
 
-    if (status === "on_hold") {
+    if (status === "on_hold" || status === "blocked") {
         return "bg-brand-red/10 text-brand-red";
+    }
+
+    if (status === "qc_hold") {
+        return "bg-brand-orange/10 text-brand-orange";
+    }
+
+    if (status === "ready") {
+        return "bg-teal-100 text-teal-700";
+    }
+
+    if (status === "dispatched") {
+        return "bg-brand-green/20 text-brand-green";
     }
 
     return "bg-gray-100 text-gray-700";
@@ -174,9 +189,11 @@ const getVendorNameFromPurchaseOrder = (purchaseOrder: PurchaseOrderListItem): s
     return "Vendor";
 };
 
-const getDeadlineLabel = (dateValue: string | null): { text: string; isOverdue: boolean } => {
-    if (!dateValue) {
-        return { text: "No deadline", isOverdue: false };
+const DONE_STATUSES = ["completed", "dispatched", "ready"];
+
+const getDeadlineLabel = (dateValue: string | null, jobStatus?: string): { text: string; isOverdue: boolean } => {
+    if (!dateValue || (jobStatus && DONE_STATUSES.includes(jobStatus))) {
+        return { text: "—", isOverdue: false };
     }
 
     const today = new Date();
@@ -262,7 +279,7 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
     // Active Jobs tab state
     const [activeSearch, setActiveSearch] = useState<string>("");
     const [activeDebouncedSearch, setActiveDebouncedSearch] = useState<string>("");
-    const [activeStatus, setActiveStatus] = useState<"all" | "pending" | "in_progress" | "on_hold" | "completed">("all");
+    const [activeStatus, setActiveStatus] = useState<"all" | JobStatus>("all");
     const [activePage, setActivePage] = useState<number>(1);
     const [activePageSize, setActivePageSize] = useState<number>(20);
     const [ptDeleteId, setPtDeleteId] = useState<number | null>(null);
@@ -882,7 +899,7 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                                                 const vendorStatus = relatedPos.length > 0
                                                     ? `Assigned to ${relatedPos.map((po: PurchaseOrderListItem): string => getVendorNameFromPurchaseOrder(po)).slice(0, 2).join(", ")}${relatedPos.length > 2 ? "..." : ""}`
                                                     : "Not Assigned";
-                                                const deadlineLabel = getDeadlineLabel(job.expected_completion);
+                                                const deadlineLabel = getDeadlineLabel(job.expected_completion, job.status);
 
                                                 return (
                                                     <tr
@@ -1229,7 +1246,10 @@ export default function ProductionMyJobsWorkspace(): ReactElement {
                                         >
                                             <option value="pending">Pending</option>
                                             <option value="in_progress">In Progress</option>
-                                            <option value="on_hold">On Hold</option>
+                                            <option value="blocked">Blocked</option>
+                                            <option value="qc_hold">QC Hold</option>
+                                            <option value="ready">Ready for Dispatch</option>
+                                            <option value="dispatched">Dispatched</option>
                                             <option value="completed">Completed</option>
                                         </select>
                                         <button

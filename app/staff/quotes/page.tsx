@@ -23,7 +23,9 @@ import {
     patchQuote,
     sendQuoteToCustomer,
     sendQuoteToPT,
+    voidQuote,
 } from "@/services/quotes";
+import VoidQuoteModal from "@/features/quotes/components/VoidQuoteModal";
 import type { CreateQuoteInput, Quote, QuoteHistoryResponse, QuoteStatus, QuotesQueryParams, QuotesResponse } from "@/types/quotes";
 
 interface QuoteEditState {
@@ -46,6 +48,7 @@ export default function QuotesPage(): ReactElement {
     const [isCreateOpen, setIsCreateOpen] = useState<boolean>(false);
     const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
     const [editState, setEditState] = useState<QuoteEditState | null>(null);
+    const [voidingQuote, setVoidingQuote] = useState<Quote | null>(null);
 
     useEffect((): (() => void) => {
         const timer = setTimeout((): void => {
@@ -198,6 +201,21 @@ export default function QuotesPage(): ReactElement {
     const handleApprove = (quote: Quote): void => { approveMutation.mutate(quote.id); };
     const handleClone = (quote: Quote): void => { cloneMutation.mutate(quote.id); };
 
+    const voidMutation = useMutation({
+        mutationFn: ({ id, reason }: { id: number; reason: string }) => voidQuote(id, reason),
+        onSuccess: (): void => {
+            toast.success("Quote voided.");
+            setVoidingQuote(null);
+            queryClient.invalidateQueries({ queryKey: ["quotes"] });
+            if (selectedQuoteId !== null) {
+                queryClient.invalidateQueries({ queryKey: ["quote", selectedQuoteId] });
+            }
+        },
+        onError: (err: Error): void => {
+            toast.error(err.message || "Unable to void quote.");
+        },
+    });
+
     const quotes = data?.results ?? [];
     const totalCount = data?.count ?? 0;
 
@@ -278,6 +296,7 @@ export default function QuotesPage(): ReactElement {
                                         onApprove={handleApprove}
                                         onClone={handleClone}
                                         onDelete={handleDelete}
+                                        onVoid={(q): void => setVoidingQuote(q)}
                                     />
                                     <QuotesPagination
                                         count={totalCount}
@@ -306,6 +325,13 @@ export default function QuotesPage(): ReactElement {
                     isLoading={isDetailLoading}
                     onClose={(): void => setSelectedQuoteId(null)}
                 />
+                {voidingQuote && (
+                    <VoidQuoteModal
+                        quoteId={voidingQuote.quote_id}
+                        onClose={(): void => setVoidingQuote(null)}
+                        onConfirm={(reason): void => voidMutation.mutate({ id: voidingQuote.id, reason })}
+                    />
+                )}
             </main>
 
             <CreateQuoteModal

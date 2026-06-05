@@ -24,10 +24,22 @@ const ROUTE_ALLOWED_ROLES: Array<{ prefix: string; roles: PortalRole[] }> = [
     { prefix: '/vendors', roles: ['vendor'] },
 ];
 
+// Maps each portal role to its staff group name (as returned by the backend)
+const ROLE_TO_GROUP: Record<PortalRole, string> = {
+    admin: 'Admin',
+    account_manager: 'Account Manager',
+    production_team: 'Production Team',
+    business_admin: 'Business Admin',
+    client: 'Client',
+    vendor: 'Vendor',
+};
+
 interface SessionData {
     authenticated: boolean;
     user?: {
         portal_role: PortalRole | null;
+        groups?: string[];
+        is_superuser?: boolean;
     };
 }
 
@@ -63,7 +75,17 @@ export async function proxy(request: NextRequest) {
         }
 
         const role = session.user?.portal_role;
-        if (!role || !matchedRoute.roles.includes(role)) {
+        const userGroups = session.user?.groups ?? [];
+        const isSuperuser = session.user?.is_superuser ?? false;
+
+        // Allow access if the user's portal_role matches, they are a superuser,
+        // or they belong to a group that maps to one of the route's allowed roles.
+        const hasAccess =
+            isSuperuser ||
+            (role && matchedRoute.roles.includes(role)) ||
+            matchedRoute.roles.some((r) => userGroups.includes(ROLE_TO_GROUP[r]));
+
+        if (!hasAccess) {
             const correctDashboard = role ? ROLE_DASHBOARD[role] : '/login';
             return NextResponse.redirect(new URL(correctDashboard, request.url));
         }

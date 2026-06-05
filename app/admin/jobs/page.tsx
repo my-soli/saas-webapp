@@ -1,84 +1,57 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircleIcon, X } from "lucide-react";
+import { AlertCircleIcon, Plus, RefreshCw, CheckCircle2, BookOpen } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import AdminLayout from "@/components/admin/admin-layout";
+import ConfirmModal from "@/features/quotes/components/ConfirmModal";
+import JobsStatsCards from "@/features/jobs/components/JobsStatsCards";
 import JobsFilters from "@/features/jobs/components/JobsFilters";
 import JobsTable from "@/features/jobs/components/JobsTable";
 import JobsPagination from "@/features/jobs/components/JobsPagination";
 import JobsSkeleton from "@/features/jobs/components/JobsSkeleton";
 import JobsEmptyState from "@/features/jobs/components/JobsEmptyState";
-import JobDetailModal from "@/features/jobs/components/JobDetailModal";
-import JobAssignModal from "@/features/jobs/components/JobAssignModal";
-import JobProgressModal from "@/features/jobs/components/JobProgressModal";
-import { fetchVendors } from "@/services/vendors";
+import AccountManagerJobAssignModal from "@/features/jobs/components/AccountManagerJobAssignModal";
 import {
-    createJob,
-    createJobVendorStage,
+    assignJobToProductionTeam,
     deleteJob,
-    fetchJob,
-    fetchJobVendorStages,
     fetchJobs,
-    updateJob,
-    updateJobVendorStage,
+    sendJobReminder,
+    syncJobToZoho,
 } from "@/services/jobs";
-import type {
-    CreateJobVendorStagePayload,
-    Job,
-    JobPriority,
-    JobStatus,
-    JobVendorStage,
-    JobsQueryParams,
-    JobsResponse,
-    UpdateJobVendorStagePayload,
-} from "@/types/jobs";
-import type { Vendor, VendorsQueryParams, VendorsResponse } from "@/types/vendors";
-import { toast } from "sonner";
+import { fetchAllUsers } from "@/services/users";
+import type { Job, JobStatus, JobsQueryParams, JobsResponse } from "@/types/jobs";
+import type { ProductionUsersResponse } from "@/types/users";
 
-interface JobFormState {
-    job_name: string;
-    job_type: string;
-    product: string;
-    quantity: string;
-    priority: JobPriority;
-    status: JobStatus;
-    expected_completion: string;
+type TabType = "active" | "completed";
+
+function formatDate(value: string | null | undefined): string {
+    if (!value) return "—";
+    return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-const emptyJobForm: JobFormState = {
-    job_name: "",
-    job_type: "print",
-    product: "",
-    quantity: "1",
-    priority: "normal",
-    status: "pending",
-    expected_completion: "",
-};
-
-export default function JobsPage(): ReactElement {
+export default function AdminJobsPage(): ReactElement {
+    const router = useRouter();
     const queryClient = useQueryClient();
+    const [activeTab, setActiveTab] = useState<TabType>("active");
     const [search, setSearch] = useState<string>("");
     const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-    const [status, setStatus] = useState<"all" | "pending" | "in_progress" | "on_hold" | "completed">("all");
+    const [status, setStatus] = useState<"all" | JobStatus>("all");
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(20);
 
     const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
-    const [deletingJobId, setDeletingJobId] = useState<number | null>(null);
-    const [isDetailOpen, setIsDetailOpen] = useState<boolean>(false);
+    const [remindingJobId, setRemindingJobId] = useState<number | null>(null);
+    const [reminderModal, setReminderModal] = useState<{ job: Job; note: string } | null>(null);
     const [isAssignOpen, setIsAssignOpen] = useState<boolean>(false);
-    const [isProgressOpen, setIsProgressOpen] = useState<boolean>(false);
-    const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
-    const [editingJob, setEditingJob] = useState<Job | null>(null);
-    const [formState, setFormState] = useState<JobFormState>(emptyJobForm);
+    const [deleteConfirmJobId, setDeleteConfirmJobId] = useState<number | null>(null);
+    const [syncingJobId, setSyncingJobId] = useState<number | null>(null);
 
     useEffect((): (() => void) => {
-        const timer = setTimeout((): void => {
-            setDebouncedSearch(search);
-        }, 500);
-
+        const timer = setTimeout((): void => setDebouncedSearch(search), 500);
         return (): void => clearTimeout(timer);
     }, [search]);
 
@@ -87,383 +60,364 @@ export default function JobsPage(): ReactElement {
             page,
             pageSize,
             search: debouncedSearch,
-            status,
+            status: status === "all" || status === "completed" ? "active" : status,
         }),
         [page, pageSize, debouncedSearch, status]
     );
 
-    const vendorQueryParams = useMemo(
-        (): VendorsQueryParams => ({
-            page: 1,
-            pageSize: 200,
-            search: "",
-            active: "true",
-        }),
+    const completedQueryParams = useMemo(
+        (): JobsQueryParams => ({ page: 1, pageSize: 100, search: "", status: "completed" }),
         []
     );
 
     const { data, isLoading, error } = useQuery({
-        queryKey: ["jobs", jobQueryParams],
+        queryKey: ["admin-jobs", jobQueryParams],
         queryFn: (): Promise<JobsResponse> => fetchJobs(jobQueryParams),
+        enabled: activeTab === "active",
     });
 
-    const vendorQuery = useQuery({
-        queryKey: ["vendors", vendorQueryParams],
-        queryFn: (): Promise<VendorsResponse> => fetchVendors(vendorQueryParams),
+    const completedQuery = useQuery({
+        queryKey: ["admin-jobs-completed"],
+        queryFn: (): Promise<JobsResponse> => fetchJobs(completedQueryParams),
+        enabled: activeTab === "completed",
     });
 
-    const jobDetailQuery = useQuery({
-        queryKey: ["job", selectedJobId],
-        queryFn: (): Promise<Job> => fetchJob(selectedJobId as number),
-        enabled: selectedJobId !== null,
-    });
-
-    const jobStagesQuery = useQuery({
-        queryKey: ["job-vendor-stages", selectedJobId],
-        queryFn: (): Promise<JobVendorStage[]> => fetchJobVendorStages(selectedJobId as number),
-        enabled: selectedJobId !== null,
-    });
-
-    const deleteMutation = useMutation({
-        mutationFn: (jobId: number): Promise<void> => deleteJob(jobId),
-        onSuccess: (): void => {
-            toast.success("Job deleted.");
-            queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        },
-        onError: (): void => {
-            toast.error("Unable to delete job. Please try again.");
-        },
-        onSettled: (): void => {
-            setDeletingJobId(null);
-        },
-    });
-
-    const createMutation = useMutation({
-        mutationFn: (payload: Partial<Job>) => createJob(payload),
-        onSuccess: (): void => {
-            toast.success("Job created.");
-            setFormMode(null);
-            queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        },
-        onError: (): void => {
-            toast.error("Unable to create job. Please try again.");
-        },
-    });
-
-    const updateMutation = useMutation({
-        mutationFn: ({ id, payload }: { id: number; payload: Partial<Job> }) => updateJob(id, payload),
-        onSuccess: (): void => {
-            toast.success("Job updated.");
-            setFormMode(null);
-            setEditingJob(null);
-            queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        },
-        onError: (): void => {
-            toast.error("Unable to update job. Please try again.");
-        },
+    const allUsersQuery = useQuery({
+        queryKey: ["all-users"],
+        queryFn: (): Promise<ProductionUsersResponse> => fetchAllUsers(),
     });
 
     const assignMutation = useMutation({
-        mutationFn: (payload: CreateJobVendorStagePayload): Promise<JobVendorStage> => createJobVendorStage(payload),
+        mutationFn: ({ jobId, userId, notes, remindDays }: {
+            jobId: number; userId: number; notes: string; remindDays: number;
+        }) =>
+            assignJobToProductionTeam(jobId, {
+                user_id: userId,
+                assignment_notes: notes,
+                remind_days_before: remindDays,
+            }),
         onSuccess: (): void => {
-            toast.success("Vendor assigned.");
-            queryClient.invalidateQueries({ queryKey: ["job-vendor-stages", selectedJobId] });
+            toast.success("Job assigned! Email and portal notification sent.");
+            queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+            queryClient.invalidateQueries({ queryKey: ["job", selectedJobId] });
             setIsAssignOpen(false);
         },
-        onError: (): void => {
-            toast.error("Unable to assign vendor. Please try again.");
-        },
+        onError: (): void => { toast.error("Unable to assign job. Please try again."); },
     });
 
-    const progressMutation = useMutation({
-        mutationFn: ({ stageId, payload }: { stageId: number; payload: UpdateJobVendorStagePayload }): Promise<JobVendorStage> =>
-            updateJobVendorStage(stageId, payload),
+    const reminderMutation = useMutation({
+        mutationFn: ({ jobId, note }: { jobId: number; note: string }) => sendJobReminder(jobId, note),
         onSuccess: (): void => {
-            toast.success("Progress updated.");
-            queryClient.invalidateQueries({ queryKey: ["job-vendor-stages", selectedJobId] });
-            setIsProgressOpen(false);
+            toast.success("Reminder sent! Email and notification delivered.");
+            setRemindingJobId(null);
         },
         onError: (): void => {
-            toast.error("Unable to update progress. Please try again.");
+            toast.error("Unable to send reminder. Please try again.");
+            setRemindingJobId(null);
         },
     });
 
-    const jobs = data?.results ?? [];
-    const totalCount = data?.count ?? 0;
-    const stages = jobStagesQuery.data ?? [];
-    const vendors = vendorQuery.data?.results ?? [];
+    const deleteJobMutation = useMutation({
+        mutationFn: (jobId: number) => deleteJob(jobId),
+        onSuccess: (): void => {
+            toast.success("Job deleted.");
+            queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+            setDeleteConfirmJobId(null);
+        },
+        onError: (): void => { toast.error("Failed to delete job. Please try again."); },
+    });
 
-    const openDetailModal = (job: Job): void => {
-        setSelectedJobId(job.id);
-        setIsDetailOpen(true);
-    };
+    const syncMutation = useMutation({
+        mutationFn: (jobId: number) => syncJobToZoho(jobId),
+        onSuccess: (result): void => {
+            setSyncingJobId(null);
+            toast.success(`Invoice ${result.zoho_invoice_number} created in Zoho Books!`);
+            queryClient.invalidateQueries({ queryKey: ["admin-jobs-completed"] });
+        },
+        onError: (err: Error): void => {
+            setSyncingJobId(null);
+            toast.error(err.message || "Zoho Books sync failed. Please try again.");
+        },
+    });
+
+    const jobs = (data?.results ?? []).filter((job) => job.status !== "completed");
+    const totalCount = jobs.length;
+    const completedJobs = completedQuery.data?.results ?? [];
+    const allUsers = allUsersQuery.data?.users ?? [];
 
     const openAssignModal = (job: Job): void => {
         setSelectedJobId(job.id);
         setIsAssignOpen(true);
     };
 
-    const openProgressModal = (job: Job): void => {
-        setSelectedJobId(job.id);
-        setIsProgressOpen(true);
+    const handleSendReminder = (job: Job): void => { setReminderModal({ job, note: "" }); };
+
+    const handleConfirmReminder = (): void => {
+        if (!reminderModal) return;
+        setRemindingJobId(reminderModal.job.id);
+        reminderMutation.mutate({ jobId: reminderModal.job.id, note: reminderModal.note });
+        setReminderModal(null);
     };
 
-    const openCreate = (): void => {
-        setFormState(emptyJobForm);
-        setEditingJob(null);
-        setFormMode("create");
+    const handleAssignSubmit = (userId: number, notes: string, remindDays: number): void => {
+        if (!selectedJobId) return;
+        assignMutation.mutate({ jobId: selectedJobId, userId, notes, remindDays });
     };
 
-    const openEdit = (job: Job): void => {
-        setFormState({
-            job_name: job.job_name,
-            job_type: job.job_type,
-            product: job.product,
-            quantity: String(job.quantity),
-            priority: job.priority,
-            status: job.status,
-            expected_completion: job.expected_completion?.split("T")[0] ?? "",
-        });
-        setEditingJob(job);
-        setFormMode("edit");
+    const handleResetFilters = (): void => { setSearch(""); setStatus("all"); setPage(1); };
+
+    const handleSyncToZoho = (job: Job): void => {
+        setSyncingJobId(job.id);
+        syncMutation.mutate(job.id);
     };
 
-    const handleFormSubmit = (e: React.FormEvent): void => {
-        e.preventDefault();
-        const payload: Partial<Job> = {
-            job_name: formState.job_name,
-            job_type: formState.job_type,
-            product: formState.product,
-            quantity: Number(formState.quantity),
-            priority: formState.priority,
-            status: formState.status,
-            expected_completion: formState.expected_completion || null,
-        };
-        if (formMode === "edit" && editingJob) {
-            updateMutation.mutate({ id: editingJob.id, payload });
-        } else {
-            createMutation.mutate(payload);
-        }
-    };
-
-    const closeModals = (): void => {
-        setIsDetailOpen(false);
-        setIsAssignOpen(false);
-        setIsProgressOpen(false);
-    };
-
-    const handleAssignSubmit = (payload: CreateJobVendorStagePayload): void => {
-        if (!selectedJobId) {
-            toast.error("Select a job before assigning a vendor.");
-            return;
-        }
-
-        assignMutation.mutate({
-            ...payload,
-            job: selectedJobId,
-        });
-    };
-
-    const handleProgressSubmit = (stageId: number, payload: UpdateJobVendorStagePayload): void => {
-        progressMutation.mutate({ stageId, payload });
-    };
-
-    const handleSearchChange = (value: string): void => {
-        setSearch(value);
-        setPage(1);
-    };
-
-    const handleStatusChange = (value: "all" | "pending" | "in_progress" | "on_hold" | "completed"): void => {
-        setStatus(value);
-        setPage(1);
-    };
-
-    const handleDelete = (job: Job): void => {
-        if (!window.confirm(`Delete job ${job.job_number ?? job.job_name}? This cannot be undone.`)) return;
-        setDeletingJobId(job.id);
-        deleteMutation.mutate(job.id);
-    };
-
-    const handleResetFilters = (): void => {
-        setSearch("");
-        setStatus("all");
-        setPage(1);
-    };
-
-    const handlePageChange = (nextPage: number): void => {
-        setPage(nextPage);
-    };
-
-    const handlePageSizeChange = (size: number): void => {
-        setPageSize(size);
-        setPage(1);
-    };
+    const tabs: { id: TabType; label: string }[] = [
+        { id: "active", label: "Active Jobs" },
+        { id: "completed", label: "Completed" },
+    ];
 
     return (
         <AdminLayout>
-            <header className="sticky top-0 z-30 border-b border-gray-200 bg-white">
-                <div className="px-4 lg:px-8 py-4">
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-3">
-                        <a href="/staff" className="hover:text-brand-blue">
-                            Staff Portal
-                        </a>
-                        <span>/</span>
-                        <span className="text-gray-900">Jobs</span>
+            <header className="border-b border-gray-200 bg-white">
+                <div className="px-4 lg:px-8 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
+                        <p className="mt-1 text-sm text-gray-600">Manage and track production jobs for your clients</p>
                     </div>
-                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
-                            <p className="mt-2 text-sm text-gray-600">Track production jobs and vendor assignments</p>
-                        </div>
+                    <button
+                        type="button"
+                        onClick={(): void => router.push("/admin/jobs/create")}
+                        className="flex items-center gap-2 rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 transition-colors"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Create Job
+                    </button>
+                </div>
+                <div className="border-t border-gray-200 px-4 lg:px-8 flex gap-4 overflow-x-auto">
+                    {tabs.map((tab) => (
                         <button
+                            key={tab.id}
                             type="button"
-                            onClick={openCreate}
-                            className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90"
+                            onClick={(): void => setActiveTab(tab.id)}
+                            className={`py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab.id
+                                ? "border-brand-blue text-brand-blue"
+                                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                            }`}
                         >
-                            + New Job
+                            {tab.label}
                         </button>
-                    </div>
+                    ))}
                 </div>
             </header>
-            <main className="bg-gray-50 min-h-screen">
-                <div className="px-4 lg:px-8 py-4 lg:py-6 space-y-6">
-                    {isLoading && <JobsSkeleton />}
 
-                    {!isLoading && (error || !data) && (
-                        <div className="bg-brand-red/10 border border-brand-red/20 rounded-lg p-6">
-                            <div className="flex items-center gap-3">
-                                <AlertCircleIcon className="h-6 w-6 text-brand-red" />
-                                <div>
-                                    <h3 className="font-semibold text-brand-red">Failed to load jobs</h3>
-                                    <p className="text-sm text-gray-600 mt-1">
-                                        Unable to fetch job data. Please try again later.
-                                    </p>
-                                </div>
+            <main className="p-4 lg:p-8 space-y-6">
+                {/* ── Active Jobs Tab ── */}
+                {activeTab === "active" && (
+                    <>
+                        <JobsStatsCards jobs={jobs} />
+
+                        <section className="rounded-lg border border-gray-200 bg-white shadow-sm">
+                            <div className="border-b border-gray-200 p-4">
+                                <JobsFilters
+                                    search={search}
+                                    status={status}
+                                    onSearchChange={setSearch}
+                                    onStatusChange={setStatus}
+                                    onReset={handleResetFilters}
+                                />
                             </div>
-                        </div>
-                    )}
 
-                    {!isLoading && data && (
-                        <>
-                            <JobsFilters
-                                search={search}
-                                status={status}
-                                onSearchChange={handleSearchChange}
-                                onStatusChange={handleStatusChange}
-                                onReset={handleResetFilters}
-                            />
+                            {isLoading && <JobsSkeleton />}
 
-                            {jobs.length > 0 ? (
+                            {error && (
+                                <div className="p-6">
+                                    <div className="rounded-lg border border-brand-red/20 bg-brand-red/5 p-4">
+                                        <div className="flex items-center gap-2">
+                                            <AlertCircleIcon className="h-4 w-4 text-brand-red" />
+                                            <p className="text-sm font-medium text-brand-red">Unable to load jobs.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {!isLoading && !error && jobs.length === 0 && (
+                                <JobsEmptyState title="No jobs found" description="There are no jobs matching your search criteria." />
+                            )}
+
+                            {!isLoading && !error && jobs.length > 0 && (
                                 <>
                                     <JobsTable
                                         jobs={jobs}
-                                        onViewDetails={openDetailModal}
-                                        onEdit={openEdit}
-                                        onAssign={openAssignModal}
-                                        onProgress={openProgressModal}
-                                        onDelete={handleDelete}
-                                        deletingJobId={deletingJobId ?? undefined}
+                                        onViewDetails={(job): void => router.push(`/admin/jobs/${job.id}`)}
+                                        onSendReminder={handleSendReminder}
+                                        onEdit={(job): void => router.push(`/admin/jobs/${job.id}/edit`)}
+                                        onDelete={(job): void => setDeleteConfirmJobId(job.id)}
+                                        showReminderButton
+                                        hideActionsWhenCompleted
+                                        remindingJobId={remindingJobId ?? undefined}
+                                        deletingJobId={deleteJobMutation.isPending ? (deleteConfirmJobId ?? undefined) : undefined}
                                     />
-                                    <JobsPagination
-                                        count={totalCount}
-                                        page={page}
-                                        pageSize={pageSize}
-                                        onPageChange={handlePageChange}
-                                        onPageSizeChange={handlePageSizeChange}
-                                    />
+                                    <div className="border-t border-gray-200 p-4">
+                                        <JobsPagination
+                                            count={totalCount}
+                                            page={page}
+                                            pageSize={pageSize}
+                                            onPageChange={setPage}
+                                            onPageSizeChange={setPageSize}
+                                        />
+                                    </div>
                                 </>
-                            ) : (
-                                <JobsEmptyState
-                                    title="No jobs found"
-                                    description="Try adjusting your filters or create a new job."
-                                />
                             )}
-                        </>
-                    )}
-                </div>
+                        </section>
+                    </>
+                )}
+
+                {/* ── Completed Jobs Tab ── */}
+                {activeTab === "completed" && (
+                    <section className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+                            <BookOpen className="w-4 h-4 text-brand-blue" />
+                            <div>
+                                <h2 className="text-sm font-semibold text-gray-900">Completed Jobs</h2>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                    Jobs completed by the production team. Zoho Books invoicing is managed from the Reconciliation tab.
+                                </p>
+                            </div>
+                        </div>
+
+                        {completedQuery.isLoading && (
+                            <div className="p-6 space-y-3">
+                                {[1, 2, 3].map((i) => (
+                                    <div key={i} className="h-14 animate-pulse bg-gray-100 rounded-lg" />
+                                ))}
+                            </div>
+                        )}
+
+                        {!completedQuery.isLoading && completedJobs.length === 0 && (
+                            <div className="p-12 text-center">
+                                <CheckCircle2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                                <p className="text-sm font-medium text-gray-500">No completed jobs yet</p>
+                                <p className="text-xs text-gray-400 mt-1">Jobs marked as completed by the production team will appear here.</p>
+                            </div>
+                        )}
+
+                        {!completedQuery.isLoading && completedJobs.length > 0 && (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="border-b border-gray-100 bg-gray-50">
+                                        <tr>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Job</th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">LPO</th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Due Date</th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Zoho Invoice</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {completedJobs.map((job: Job) => (
+                                            <tr key={job.id} className="hover:bg-gray-50/50 transition-colors">
+                                                <td className="py-3 px-4">
+                                                    <button
+                                                        type="button"
+                                                        onClick={(): void => router.push(`/admin/jobs/${job.id}`)}
+                                                        className="text-left hover:underline"
+                                                    >
+                                                        <div className="font-medium text-gray-900">{job.job_name}</div>
+                                                        <div className="text-xs text-gray-500">{job.job_number}</div>
+                                                    </button>
+                                                </td>
+                                                <td className="py-3 px-4 text-gray-700">{job.client?.name ?? "—"}</td>
+                                                <td className="py-3 px-4">
+                                                    {job.lpo_number ? (
+                                                        <span className="text-gray-700">{job.lpo_number}</span>
+                                                    ) : (
+                                                        <span className="text-gray-400 italic text-xs">No LPO</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-3 px-4 text-gray-700">{formatDate(job.expected_completion)}</td>
+                                                <td className="py-3 px-4">
+                                                    {job.zoho_synced ? (
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                                                                <CheckCircle2 className="w-3 h-3" />
+                                                                Synced
+                                                            </span>
+                                                            {job.zoho_invoice_number && (
+                                                                <span className="text-xs text-gray-500">#{job.zoho_invoice_number}</span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400 italic">Not synced</span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </section>
+                )}
             </main>
 
-            <JobDetailModal
-                open={isDetailOpen}
-                job={jobDetailQuery.data ?? null}
-                stages={stages}
-                vendorOptions={vendors}
-                isLoading={jobDetailQuery.isLoading || jobStagesQuery.isLoading}
-                onClose={(): void => setIsDetailOpen(false)}
-            />
-
-            <JobAssignModal
+            <AccountManagerJobAssignModal
                 open={isAssignOpen}
-                vendorOptions={vendors}
-                defaultStageOrder={stages.length + 1}
+                jobId={selectedJobId}
+                productionUsers={allUsers}
                 onClose={(): void => setIsAssignOpen(false)}
                 onSubmit={handleAssignSubmit}
+                isSubmitting={assignMutation.isPending}
             />
 
-            <JobProgressModal
-                open={isProgressOpen}
-                stages={stages}
-                vendorOptions={vendors}
-                onClose={(): void => setIsProgressOpen(false)}
-                onSubmit={handleProgressSubmit}
-            />
+            {deleteConfirmJobId && (
+                <ConfirmModal
+                    title="Delete Job"
+                    message="Are you sure you want to delete this job? This action cannot be undone."
+                    confirmText="Delete Job"
+                    confirmColor="red"
+                    onClose={(): void => setDeleteConfirmJobId(null)}
+                    onConfirm={(): void => { deleteJobMutation.mutate(deleteConfirmJobId); }}
+                />
+            )}
 
-            {formMode && (
+            {reminderModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-                            <h2 className="text-lg font-semibold text-gray-900">{formMode === "create" ? "New Job" : "Edit Job"}</h2>
-                            <button type="button" onClick={(): void => { setFormMode(null); setEditingJob(null); }}>
-                                <X className="w-5 h-5 text-gray-500" />
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                        <div className="px-6 py-4 border-b border-gray-200">
+                            <h2 className="text-base font-semibold text-gray-900">Send Reminder</h2>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Sending reminder for <strong>{reminderModal.job.job_name}</strong>
+                            </p>
+                        </div>
+                        <div className="px-6 py-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Note to include (optional)
+                            </label>
+                            <textarea
+                                rows={3}
+                                value={reminderModal.note}
+                                onChange={(e): void => setReminderModal(prev => prev ? { ...prev, note: e.target.value } : null)}
+                                placeholder="e.g. Client is chasing this — please update ASAP."
+                                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue resize-none"
+                            />
+                        </div>
+                        <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                            <button
+                                type="button"
+                                onClick={(): void => setReminderModal(null)}
+                                className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmReminder}
+                                disabled={reminderMutation.isPending}
+                                className="rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-50"
+                            >
+                                {reminderMutation.isPending ? "Sending..." : "Send Reminder"}
                             </button>
                         </div>
-                        <form onSubmit={handleFormSubmit} className="px-6 py-5 space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div className="col-span-2">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Job Name *</label>
-                                    <input required type="text" value={formState.job_name} onChange={(e): void => setFormState(s => ({ ...s, job_name: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="e.g. Business Cards for Acme" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Job Type *</label>
-                                    <input required type="text" value={formState.job_type} onChange={(e): void => setFormState(s => ({ ...s, job_type: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="e.g. print, digital" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Product *</label>
-                                    <input required type="text" value={formState.product} onChange={(e): void => setFormState(s => ({ ...s, product: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" placeholder="e.g. Business Cards" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Quantity *</label>
-                                    <input required type="number" min="1" value={formState.quantity} onChange={(e): void => setFormState(s => ({ ...s, quantity: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Priority *</label>
-                                    <select required value={formState.priority} onChange={(e): void => setFormState(s => ({ ...s, priority: e.target.value as JobPriority }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
-                                        <option value="normal">Normal</option>
-                                        <option value="high">High</option>
-                                        <option value="urgent">Urgent</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Status *</label>
-                                    <select required value={formState.status} onChange={(e): void => setFormState(s => ({ ...s, status: e.target.value as JobStatus }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm">
-                                        <option value="pending">Pending</option>
-                                        <option value="in_progress">In Progress</option>
-                                        <option value="on_hold">On Hold</option>
-                                        <option value="completed">Completed</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Expected Completion</label>
-                                    <input type="date" value={formState.expected_completion} onChange={(e): void => setFormState(s => ({ ...s, expected_completion: e.target.value }))} className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm" />
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-3 pt-2">
-                                <button type="button" onClick={(): void => { setFormMode(null); setEditingJob(null); }} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
-                                <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="px-4 py-2 text-sm font-medium text-white bg-brand-blue rounded-md hover:bg-brand-blue/90 disabled:opacity-50">
-                                    {createMutation.isPending || updateMutation.isPending ? "Saving..." : formMode === "create" ? "Create Job" : "Save Changes"}
-                                </button>
-                            </div>
-                        </form>
                     </div>
                 </div>
             )}

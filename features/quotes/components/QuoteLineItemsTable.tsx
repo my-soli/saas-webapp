@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import type { ReactElement } from "react";
 import { Search, Plus, Trash2, FileText, PenLine } from "lucide-react";
 import type { Product } from "@/types/products";
@@ -78,33 +78,33 @@ export default function QuoteLineItemsTable({
     return (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px]">
+                <table className="w-full" style={{ minWidth: "980px" }}>
                     <thead className="bg-gray-50 border-b border-gray-200">
                         <tr>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-8">
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: "36px" }}>
                                 #
                             </th>
-                            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                            <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ minWidth: "260px" }}>
                                 Item
                             </th>
-                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-24">
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: "80px" }}>
                                 Qty
                             </th>
-                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-32">
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: "130px" }}>
                                 Rate (KES)
                             </th>
-                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-36">
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: "150px" }}>
                                 Discount
                             </th>
                             {includeVat && (
-                                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-28">
+                                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: "120px" }}>
                                     VAT ({taxRate}%)
                                 </th>
                             )}
-                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-32">
+                            <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide" style={{ width: "120px" }}>
                                 Amount
                             </th>
-                            <th className="w-10" />
+                            <th style={{ width: "44px" }} />
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -119,143 +119,150 @@ export default function QuoteLineItemsTable({
                             </tr>
                         ) : (
                             lineItems.map((item, index) => (
-                                <tr key={item.tempId} className="hover:bg-gray-50/50">
-                                    <td className="px-4 py-3 text-xs text-gray-400 align-top pt-4">{index + 1}</td>
-                                    <td className="px-4 py-3">
-                                        {item.is_custom ? (
-                                            <div className="space-y-1">
-                                                <div className="flex items-center gap-1.5 mb-1">
-                                                    <PenLine className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                                                    <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">
-                                                        Custom product
-                                                    </span>
+                                <React.Fragment key={item.tempId}>
+                                    {/* ── Main row: name + numbers ── */}
+                                    <tr className="hover:bg-gray-50/50">
+                                        <td className="px-4 py-3 text-xs text-gray-400 align-middle">{index + 1}</td>
+                                        <td className="px-4 py-3">
+                                            {item.is_custom ? (
+                                                <div>
+                                                    <div className="flex items-center gap-1.5 mb-1">
+                                                        <PenLine className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                                        <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide">
+                                                            Custom product
+                                                        </span>
+                                                    </div>
+                                                    <textarea
+                                                        value={item.product_name}
+                                                        onChange={(e): void =>
+                                                            onUpdateItem(item.tempId, "product_name", e.target.value)
+                                                        }
+                                                        placeholder="Product name *"
+                                                        rows={2}
+                                                        style={{ minWidth: "220px" }}
+                                                        className="w-full px-3 py-2 text-sm border border-amber-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent placeholder:text-gray-400 font-medium resize-none leading-snug"
+                                                    />
                                                 </div>
-                                                <input
-                                                    type="text"
-                                                    value={item.product_name}
-                                                    onChange={(e): void =>
-                                                        onUpdateItem(item.tempId, "product_name", e.target.value)
-                                                    }
-                                                    placeholder="Product name *"
-                                                    className="w-full px-2 py-1.5 text-sm border border-amber-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent placeholder:text-gray-400 font-medium"
-                                                />
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-900">
-                                                    {item.product_name}
-                                                </p>
-                                                {item.product_sku && (
-                                                    <p className="text-xs text-gray-400 mt-0.5">
-                                                        {item.product_sku}
+                                            ) : (
+                                                <div>
+                                                    <p className="text-base font-medium text-gray-900 leading-snug">
+                                                        {item.product_name}
                                                     </p>
+                                                    {item.product_sku && (
+                                                        <p className="text-xs text-gray-400 mt-0.5">
+                                                            {item.product_sku}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-right align-middle">
+                                            <input
+                                                type="number"
+                                                value={item.quantity}
+                                                onChange={(e): void =>
+                                                    onUpdateItem(item.tempId, "quantity", Number(e.target.value))
+                                                }
+                                                min="1"
+                                                className={`${inputClass} w-20`}
+                                            />
+                                        </td>
+                                        <td className="px-4 py-3 text-right align-middle">
+                                            <div className="flex flex-col items-end gap-0.5">
+                                                <input
+                                                    type="number"
+                                                    value={item.unit_price}
+                                                    onChange={(e): void =>
+                                                        onUpdateItem(item.tempId, "unit_price", Number(e.target.value))
+                                                    }
+                                                    min="0"
+                                                    step="0.01"
+                                                    className={`${inputClass} w-28 ${item.unit_price === 0 ? "border-amber-300 bg-amber-50 focus:ring-amber-400" : ""}`}
+                                                />
+                                                {item.unit_price === 0 && (
+                                                    <span className="text-[10px] font-medium text-amber-600 leading-none">
+                                                        Set price
+                                                    </span>
                                                 )}
                                             </div>
-                                        )}
-                                        <textarea
-                                            value={item.description || ""}
-                                            onChange={(e): void =>
-                                                onUpdateItem(item.tempId, "description", e.target.value)
-                                            }
-                                            placeholder="Add a description (specs, finish, size…)"
-                                            rows={2}
-                                            className="mt-1.5 w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder:text-gray-300 resize-none text-gray-600"
-                                        />
-                                    </td>
-                                    <td className="px-4 py-3 text-right align-top pt-4">
-                                        <input
-                                            type="number"
-                                            value={item.quantity}
-                                            onChange={(e): void =>
-                                                onUpdateItem(item.tempId, "quantity", Number(e.target.value))
-                                            }
-                                            min="1"
-                                            className={`${inputClass} w-20`}
-                                        />
-                                    </td>
-                                    <td className="px-4 py-3 text-right align-top pt-4">
-                                        <div className="flex flex-col items-end gap-0.5">
-                                            <input
-                                                type="number"
-                                                value={item.unit_price}
-                                                onChange={(e): void =>
-                                                    onUpdateItem(item.tempId, "unit_price", Number(e.target.value))
-                                                }
-                                                min="0"
-                                                step="0.01"
-                                                className={`${inputClass} w-28 ${item.unit_price === 0 ? "border-amber-300 bg-amber-50 focus:ring-amber-400" : ""}`}
-                                            />
-                                            {item.unit_price === 0 && (
-                                                <span className="text-[10px] font-medium text-amber-600 leading-none">
-                                                    Set price
-                                                </span>
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 align-top pt-4">
-                                        <div className="flex items-center gap-1 justify-end">
-                                            <input
-                                                type="number"
-                                                value={item.discount_amount}
-                                                onChange={(e): void =>
-                                                    onUpdateItem(
-                                                        item.tempId,
-                                                        "discount_amount",
-                                                        Number(e.target.value)
-                                                    )
-                                                }
-                                                min="0"
-                                                step="0.01"
-                                                className={`${inputClass} w-16`}
-                                            />
-                                            <select
-                                                value={item.discount_type}
-                                                onChange={(e): void =>
-                                                    onUpdateItem(item.tempId, "discount_type", e.target.value)
-                                                }
-                                                className="px-1.5 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
-                                            >
-                                                <option value="percent">%</option>
-                                                <option value="fixed">KES</option>
-                                            </select>
-                                        </div>
-                                    </td>
-                                    {includeVat && (
-                                        <td className="px-4 py-3 align-top pt-4">
-                                            <div className="flex flex-col items-end gap-0.5">
-                                                <div className="flex items-center gap-1">
-                                                    <input
-                                                        type="number"
-                                                        value={item.vat_rate ?? taxRate}
-                                                        onChange={(e): void =>
-                                                            onUpdateItem(item.tempId, "vat_rate", Number(e.target.value))
-                                                        }
-                                                        min="0"
-                                                        max="100"
-                                                        step="0.01"
-                                                        className="w-14 px-1.5 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue text-right"
-                                                    />
-                                                    <span className="text-xs text-gray-400">%</span>
-                                                </div>
-                                                <span className="text-xs text-gray-500 tabular-nums">
-                                                    {formatCurrency(calculateLineTotal(item) * ((item.vat_rate ?? taxRate) / 100))}
-                                                </span>
+                                        </td>
+                                        <td className="px-4 py-3 align-middle">
+                                            <div className="flex items-center gap-1 justify-end">
+                                                <input
+                                                    type="number"
+                                                    value={item.discount_amount}
+                                                    onChange={(e): void =>
+                                                        onUpdateItem(item.tempId, "discount_amount", Number(e.target.value))
+                                                    }
+                                                    min="0"
+                                                    step="0.01"
+                                                    className={`${inputClass} w-16`}
+                                                />
+                                                <select
+                                                    value={item.discount_type}
+                                                    onChange={(e): void =>
+                                                        onUpdateItem(item.tempId, "discount_type", e.target.value)
+                                                    }
+                                                    className="px-1.5 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                                                >
+                                                    <option value="percent">%</option>
+                                                    <option value="fixed">KES</option>
+                                                </select>
                                             </div>
                                         </td>
-                                    )}
-                                    <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 tabular-nums align-top pt-4">
-                                        {formatCurrency(calculateLineTotal(item))}
-                                    </td>
-                                    <td className="px-4 py-3 align-top pt-4">
-                                        <button
-                                            type="button"
-                                            onClick={(): void => onRemoveItem(item.tempId)}
-                                            className="p-1 text-gray-400 hover:text-brand-red hover:bg-red-50 rounded transition-colors"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </td>
-                                </tr>
+                                        {includeVat && (
+                                            <td className="px-4 py-3 align-middle">
+                                                <div className="flex flex-col items-end gap-0.5">
+                                                    <div className="flex items-center gap-1">
+                                                        <input
+                                                            type="number"
+                                                            value={item.vat_rate ?? taxRate}
+                                                            onChange={(e): void =>
+                                                                onUpdateItem(item.tempId, "vat_rate", Number(e.target.value))
+                                                            }
+                                                            min="0"
+                                                            max="100"
+                                                            step="0.01"
+                                                            className="w-14 px-1.5 py-1 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue text-right"
+                                                        />
+                                                        <span className="text-xs text-gray-400">%</span>
+                                                    </div>
+                                                    <span className="text-xs text-gray-500 tabular-nums">
+                                                        {formatCurrency(calculateLineTotal(item) * ((item.vat_rate ?? taxRate) / 100))}
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        )}
+                                        <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900 tabular-nums align-middle">
+                                            {formatCurrency(calculateLineTotal(item))}
+                                        </td>
+                                        <td className="px-4 py-3 align-middle">
+                                            <button
+                                                type="button"
+                                                onClick={(): void => onRemoveItem(item.tempId)}
+                                                className="p-1 text-gray-400 hover:text-brand-red hover:bg-red-50 rounded transition-colors"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {/* ── Description row: spans full width ── */}
+                                    <tr className="bg-gray-50/30 border-t-0">
+                                        <td />
+                                        <td colSpan={includeVat ? 6 : 5} className="px-4 pb-3 pt-0">
+                                            <textarea
+                                                value={item.description || ""}
+                                                onChange={(e): void =>
+                                                    onUpdateItem(item.tempId, "description", e.target.value)
+                                                }
+                                                placeholder="Add a description (specs, finish, size…)"
+                                                rows={2}
+                                                className="w-full px-3 py-2 text-base border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder:text-gray-300 resize-none text-gray-700 leading-snug bg-white"
+                                            />
+                                        </td>
+                                        <td />
+                                    </tr>
+                                </React.Fragment>
                             ))
                         )}
                     </tbody>

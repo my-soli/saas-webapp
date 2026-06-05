@@ -16,6 +16,15 @@ export interface Lead {
     follow_up_date: string | null;
     status: LeadStatus | string;
     notes: string;
+    // B2B fields
+    company: string;
+    industry: string;
+    vat_tax_id: string;
+    kra_pin: string;
+    primary_contact_name: string;
+    primary_contact_email: string;
+    primary_contact_phone: string;
+    primary_contact_role: string;
     created_by: number | null;
     created_at: string;
     updated_at: string;

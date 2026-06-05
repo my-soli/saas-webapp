@@ -6,7 +6,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Paperclip, Plus, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 import AccountManagerLayout from "@/components/account-manager/account-manager-layout";
-import { fetchJob, updateJob, uploadJobAttachments } from "@/services/jobs";
+import { fetchJob, updateJob, uploadJobAttachments, fetchJobAttachments, type JobAttachment } from "@/services/jobs";
+import { uploadComponentFile } from "@/services/orchestration";
 import { fetchClients } from "@/services/clients";
 import { fetchProducts } from "@/services/products";
 import type { JobStatus, JobPriority } from "@/types/jobs";
@@ -54,6 +55,12 @@ export default function EditJobPage(): ReactElement {
     const { data: job, isLoading: jobLoading } = useQuery({
         queryKey: ["job", jobId],
         queryFn: () => fetchJob(jobId),
+        enabled: !!jobId,
+    });
+
+    const { data: existingAttachments = [] } = useQuery({
+        queryKey: ["job-attachments", jobId],
+        queryFn: () => fetchJobAttachments(jobId),
         enabled: !!jobId,
     });
 
@@ -184,7 +191,7 @@ export default function EditJobPage(): ReactElement {
                     ? form.custom_job_type.trim()
                     : form.job_type;
 
-            await updateJob(jobId, {
+            const savedJob = await updateJob(jobId, {
                 job_name: form.job_name,
                 job_type: resolvedJobType,
                 priority: form.priority,
@@ -204,12 +211,24 @@ export default function EditJobPage(): ReactElement {
                 })),
             } as unknown as Parameters<typeof updateJob>[1]);
 
-            const allFiles = [
-                ...form.products.flatMap((p) => p.attachments),
-                ...jobAttachments,
-            ];
-            if (allFiles.length > 0) {
-                await uploadJobAttachments(jobId, allFiles);
+            // Job-level attachments (general files)
+            if (jobAttachments.length > 0) {
+                await uploadJobAttachments(jobId, jobAttachments);
+                queryClient.invalidateQueries({ queryKey: ["job-attachments", jobId] });
+            }
+
+            // Per-product attachments → component artwork files (visible in Control Tower)
+            const returnedProducts = savedJob.job_products ?? [];
+            for (const row of validProducts) {
+                if (row.attachments.length === 0) continue;
+                const compId = row.job_product_id
+                    ?? returnedProducts.find((rp) => rp.product_name === row.name)?.id;
+                if (compId) {
+                    for (const file of row.attachments) {
+                        await uploadComponentFile(compId, "artwork", file);
+                    }
+                    queryClient.invalidateQueries({ queryKey: ["component-files", compId] });
+                }
             }
 
             queryClient.invalidateQueries({ queryKey: ["account-manager-jobs"] });
@@ -334,7 +353,10 @@ export default function EditJobPage(): ReactElement {
                                 <select className={SELECT} value={form.status} onChange={(e): void => set("status", e.target.value as JobStatus)}>
                                     <option value="pending">Not Started</option>
                                     <option value="in_progress">In Progress</option>
-                                    <option value="on_hold">On Hold</option>
+                                    <option value="blocked">Blocked</option>
+                                    <option value="qc_hold">QC Hold</option>
+                                    <option value="ready">Ready for Dispatch</option>
+                                    <option value="dispatched">Dispatched</option>
                                     <option value="completed">Completed</option>
                                 </select>
                             </div>
@@ -495,6 +517,29 @@ export default function EditJobPage(): ReactElement {
                             <p className="text-xs text-gray-500 mt-0.5">Artworks, briefs, or any other job-related files — optional</p>
                         </div>
                         <div className="p-6 space-y-3">
+                            {/* Previously uploaded attachments */}
+                            {existingAttachments.length > 0 && (
+                                <div className="space-y-1.5 pb-3 border-b border-gray-100">
+                                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Uploaded files</p>
+                                    {existingAttachments.map((att: JobAttachment) => (
+                                        <div key={att.id} className="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2 border border-gray-100">
+                                            <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                                            <span className="flex-1 text-sm text-gray-700 truncate">{att.file_name}</span>
+                                            <span className="text-xs text-gray-400">{(att.file_size / 1024).toFixed(1)} KB</span>
+                                            {att.file_url && (
+                                                <a
+                                                    href={att.file_url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="shrink-0 text-xs font-semibold text-brand-blue hover:underline"
+                                                >
+                                                    Download
+                                                </a>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                             {/* Input is a sibling (not child) of the drop zone to avoid click-bubbling loop */}
                             <input
                                 ref={jobFileInputRef}

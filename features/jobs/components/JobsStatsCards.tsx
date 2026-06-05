@@ -26,7 +26,8 @@ function calculateJobStats(jobs: Job[]): JobStats {
                 stats.inProgress++;
             }
 
-            if (job.expected_completion && job.status !== "completed") {
+            const doneStatuses = ["completed", "dispatched", "ready"];
+            if (job.expected_completion && !doneStatuses.includes(job.status)) {
                 const dueDate = new Date(job.expected_completion);
                 if (dueDate < now) {
                     stats.overdue++;

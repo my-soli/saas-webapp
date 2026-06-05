@@ -24,6 +24,7 @@ import {
 import type {
     CreateJobVendorStagePayload,
     Job,
+    JobStatus,
     JobVendorStage,
     JobsQueryParams,
     JobsResponse,
@@ -36,7 +37,7 @@ export default function JobsPage(): ReactElement {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState<string>("");
     const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-    const [status, setStatus] = useState<"all" | "pending" | "in_progress" | "on_hold" | "completed">("all");
+    const [status, setStatus] = useState<"all" | JobStatus>("all");
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(20);
 
@@ -167,7 +168,7 @@ export default function JobsPage(): ReactElement {
         setPage(1);
     };
 
-    const handleStatusChange = (value: "all" | "pending" | "in_progress" | "on_hold" | "completed"): void => {
+    const handleStatusChange = (value: "all" | JobStatus): void => {
         setStatus(value);
         setPage(1);
     };

@@ -151,14 +151,8 @@ export default function AdminQuotesPage() {
         router.push(`/admin/quotes/create?edit=${quoteId}`);
     };
 
-    const handleConfirmClone = async () => {
-        if (cloneConfirmQuoteId) {
-            try {
-                await cloneMutation.mutateAsync(cloneConfirmQuoteId);
-            } catch {
-                toast.error("Failed to clone quote.");
-            }
-        }
+    const handleConfirmClone = () => {
+        if (cloneConfirmQuoteId) cloneMutation.mutate(cloneConfirmQuoteId);
     };
 
     const handleSendToPT = (quoteId: number) => setSelectPTModalQuoteId(quoteId);
@@ -193,7 +187,7 @@ export default function AdminQuotesPage() {
         const found = quotes.find((q) => q.id === quoteId);
         if (!found) return;
         try {
-            const detail = await fetchMultiProductQuoteDetail(found.quote_id);
+            const detail = await fetchMultiProductQuoteDetail(String(found.id));
             setConvertToJobQuote(detail);
         } catch {
             setConvertToJobQuote(found);
@@ -319,6 +313,7 @@ export default function AdminQuotesPage() {
                 onMarkLost={handleMarkLost}
                 onConvertToJob={handleConvertToJob}
                 onDownloadPdf={handleDownloadPdf}
+                onEdit={handleEdit}
             />
 
             {selectPTModalQuoteId && (

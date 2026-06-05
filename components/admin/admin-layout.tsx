@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import AdminSidebar from "./admin-sidebar";
 import ProductionLayout from "@/components/production/production-layout";
 import { checkSession } from "@/lib/api/auth";
@@ -13,6 +14,7 @@ interface AdminLayoutProps {
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
     const [drawerOpen, setDrawerOpen] = useState(false);
+    const pathname = usePathname();
     const { data: session } = useQuery({
         queryKey: ["staff-session"],
         queryFn: checkSession,
@@ -20,7 +22,12 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         retry: false,
     });
 
-    if (session?.user?.portal_role === "production_team") {
+    const isProductionTeamUser =
+        session?.user?.portal_role === "production_team" ||
+        (pathname.startsWith("/production-team") &&
+            session?.user?.groups?.includes("Production Team"));
+
+    if (isProductionTeamUser) {
         return <ProductionLayout>{children}</ProductionLayout>;
     }
 

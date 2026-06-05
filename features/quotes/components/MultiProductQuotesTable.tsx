@@ -267,17 +267,19 @@ export default function MultiProductQuotesTable({
                                     <Download className="w-4 h-4" />
                                     Download
                                 </button>
-                                <button
-                                    onClick={(): void => {
-                                        onClone(quote.id);
-                                        setOpenMenuId(null);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                    type="button"
-                                >
-                                    <Copy className="w-4 h-4" />
-                                    Clone
-                                </button>
+                                {quote.status === "Approved" && (
+                                    <button
+                                        onClick={(): void => {
+                                            onClone(quote.id);
+                                            setOpenMenuId(null);
+                                        }}
+                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                        type="button"
+                                    >
+                                        <Copy className="w-4 h-4" />
+                                        Clone
+                                    </button>
+                                )}
                                 <button
                                     onClick={(): void => {
                                         onDelete(quote.id);

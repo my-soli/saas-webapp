@@ -27,7 +27,7 @@ export const complianceDocSchema = z.object({
 const baseClientSchema = z.object({
     client_type: z.enum(["B2B", "B2C"]),
     name: z.string().min(1, "Contact name is required"),
-    phone: z.string().min(1, "Phone number is required"),
+    phone: z.string().optional(),
     email: z.string().email("Invalid email address").optional().or(z.literal("")),
     status: z.enum(["Active", "Dormant", "Inactive"]),
     preferred_channel: z.enum(["Email", "Phone", "WhatsApp", "In-Person"]),

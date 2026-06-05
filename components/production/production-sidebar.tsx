@@ -26,6 +26,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { logoutUserSession } from "@/lib/api/auth";
 import { fetchNotifications } from "@/lib/api/notifications";
+import PortalSwitcher from "@/components/shared/PortalSwitcher";
 
 interface MenuItem {
     label: string;
@@ -183,19 +184,22 @@ export default function ProductionSidebar({ isDrawerOpen, onClose }: ProductionS
                 ))}
             </nav>
 
-            <div className="px-4 py-4 border-t border-white/10">
-                <button
-                    onClick={handleLogout}
-                    disabled={loggingOut}
-                    className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-white hover:bg-white/10 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                    {loggingOut ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                        <LogOut className="w-5 h-5" />
-                    )}
-                    <span>{loggingOut ? "Logging out…" : "Logout"}</span>
-                </button>
+            <div className="border-t border-white/10 pt-2">
+                <PortalSwitcher current="Production Team" />
+                <div className="px-4 pb-4">
+                    <button
+                        onClick={handleLogout}
+                        disabled={loggingOut}
+                        className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-white hover:bg-white/10 rounded transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        {loggingOut ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <LogOut className="w-5 h-5" />
+                        )}
+                        <span>{loggingOut ? "Logging out…" : "Logout"}</span>
+                    </button>
+                </div>
             </div>
         </aside>
     );

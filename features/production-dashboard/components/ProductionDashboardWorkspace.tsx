@@ -33,8 +33,11 @@ const formatDate = (value: string | null): string => {
 
 const getStatusPillClass = (status: string): string => {
     if (status === "completed") return "bg-brand-green/10 text-brand-green";
+    if (status === "dispatched") return "bg-brand-green/20 text-brand-green";
+    if (status === "ready") return "bg-teal-100 text-teal-700";
     if (status === "in_progress") return "bg-brand-blue/10 text-brand-blue";
-    if (status === "on_hold") return "bg-brand-orange/10 text-brand-orange";
+    if (status === "qc_hold" || status === "on_hold") return "bg-brand-orange/10 text-brand-orange";
+    if (status === "blocked") return "bg-brand-red/10 text-brand-red";
     return "bg-brand-yellow/15 text-brand-black";
 };
 
@@ -47,8 +50,12 @@ interface DeadlineState {
     isDueToday: boolean;
 }
 
-const getDeadlineState = (dateStr: string | null): DeadlineState => {
-    if (!dateStr) return { label: "", isOverdue: false, isDueToday: false };
+const DONE_STATUSES = ["completed", "dispatched", "ready"];
+
+const getDeadlineState = (dateStr: string | null, jobStatus?: string): DeadlineState => {
+    if (!dateStr || (jobStatus && DONE_STATUSES.includes(jobStatus))) {
+        return { label: "", isOverdue: false, isDueToday: false };
+    }
     const today = new Date();
     const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const d = new Date(dateStr);
@@ -325,7 +332,7 @@ export default function ProductionDashboardWorkspace(): ReactElement {
                                         </tr>
                                     ) : (
                                         recentJobs.map((job: Job): ReactElement => {
-                                            const dl = getDeadlineState(job.expected_completion);
+                                            const dl = getDeadlineState(job.expected_completion, job.status);
                                             return (
                                                 <tr
                                                     key={job.id}

@@ -74,7 +74,7 @@ export default function AccountManagerJobAssignModal({
                         >
                             <option value="">Select team member...</option>
                             {productionUsers.map((u: ProductionUser): ReactElement => (
-                                <option key={u.id} value={u.id}>{u.name}</option>
+                                <option key={u.id} value={u.id}>{(u.first_name + " " + u.last_name).trim() || u.username}</option>
                             ))}
                         </select>
                     </div>

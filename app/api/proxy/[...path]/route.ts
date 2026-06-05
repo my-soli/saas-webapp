@@ -36,6 +36,8 @@ async function handler(
 ): Promise<NextResponse> {
     try {
         const { path } = await params;
+        // path.join('/') already excludes any trailing empty segment Next.js strips.
+        // Always append a trailing slash so Django's APPEND_SLASH works correctly.
         const targetPath = path.join('/');
         const targetUrl = `${DJANGO_API}/${targetPath}/${request.nextUrl.search}`;
 
@@ -83,27 +85,23 @@ async function handler(
             forwardHeaders['Origin'] = DJANGO_API;
         }
 
-        const isFormData = contentType?.includes('multipart/form-data');
-        let body: BodyInit | undefined;
+        let body: BodyInit | null | undefined;
 
         if (isMutation) {
-            if (isFormData) {
-                // Use ArrayBuffer + keep the original Content-Type (which includes the multipart boundary).
-                // Relying on Blob type propagation in undici is unreliable and drops the boundary,
-                // causing Django's multipart parser to reject files as "No file was submitted."
-                body = await request.arrayBuffer();
-                // Content-Type is already in forwardHeaders from request.headers.get('content-type') above
-            } else {
-                body = await request.text();
-            }
+            // Buffer the full body so Node.js fetch sends Content-Length (not chunked TE).
+            // Chunked TE causes Django's MultiPartParser to see an empty request.data/FILES
+            // because the raw chunk markers interfere with multipart boundary parsing.
+            body = await request.arrayBuffer();
         }
 
-        const djangoResponse = await fetch(targetUrl, {
+        const fetchOptions: RequestInit = {
             method: request.method,
             headers: forwardHeaders,
-            body,
+            body: body as BodyInit | undefined,
             redirect: 'manual',
-        });
+        };
+
+        const djangoResponse = await fetch(targetUrl, fetchOptions);
 
         // If Django returned a redirect (e.g. SECURE_SSL_REDIRECT), surface it as 502 with a clear message
         if (djangoResponse.status >= 300 && djangoResponse.status < 400) {

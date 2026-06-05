@@ -13,6 +13,10 @@ export function apiJobStatusLabel(status: string): string {
         pending: "Pending",
         in_progress: "In production",
         on_hold: "On hold",
+        blocked: "Blocked",
+        qc_hold: "QC Hold",
+        ready: "Ready for Dispatch",
+        dispatched: "Dispatched",
         completed: "Complete",
     };
     return map[status] ?? status;
@@ -20,18 +24,25 @@ export function apiJobStatusLabel(status: string): string {
 
 export function apiJobStatusBadgeClass(status: string): string {
     if (status === "completed") return "bg-brand-green/10 text-brand-green";
+    if (status === "dispatched") return "bg-brand-green/20 text-brand-green";
+    if (status === "ready") return "bg-teal-100 text-teal-700";
     if (status === "in_progress") return "bg-brand-blue/10 text-brand-blue";
+    if (status === "qc_hold") return "bg-brand-orange/10 text-brand-orange";
+    if (status === "blocked") return "bg-brand-red/10 text-brand-red";
     if (status === "on_hold") return "bg-brand-orange/10 text-brand-orange";
     return "bg-gray-100 text-gray-600";
 }
 
 export function apiProgressPct(job: Job): number {
-    if (job.status === "completed") return 100;
+    if (job.status === "completed" || job.status === "dispatched") return 100;
+    if (job.status === "ready") return 90;
+    if (job.status === "qc_hold") return 65;
     if (job.status === "in_progress") {
         const n = job.job_products?.length ?? 0;
         return Math.min(85, 35 + n * 8);
     }
-    if (job.status === "on_hold") return 15;
+    if (job.status === "blocked") return 35;
+    if (job.status === "on_hold") return 20;
     return 25;
 }
 

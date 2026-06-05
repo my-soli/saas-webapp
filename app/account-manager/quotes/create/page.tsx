@@ -150,7 +150,7 @@ function CreateQuotePageContent() {
     const products = productsData?.results || [];
 
     const displayUserName = currentUser
-        ? currentUser.name || currentUser.email
+        ? (currentUser.first_name + " " + currentUser.last_name).trim() || currentUser.email
         : "Loading...";
 
     const isWithinEditWindow = (() => {
@@ -359,6 +359,14 @@ function CreateQuotePageContent() {
         return subtotal + tax + shipping + adjustment;
     };
 
+    const resolveDisplayName = (): string => {
+        const client = clients.find(c => c.id === selectedClientId);
+        if (client) return (client.client_type === "B2B" && client.company) ? client.company : client.name;
+        const lead = leads.find(l => l.id === selectedLeadId);
+        if (!lead) return "Valued Customer";
+        return (lead.preferred_client_type === "B2B" && lead.company) ? lead.company : lead.name;
+    };
+
     const handleCustomerChange = (type: "client" | "lead", id: number | null): void => {
         setClientType(type);
         if (type === "client") {
@@ -454,9 +462,7 @@ function CreateQuotePageContent() {
             return;
         }
 
-        const clientLabel = clients.find(c => c.id === selectedClientId)?.name
-            || leads.find(l => l.id === selectedLeadId)?.name
-            || "Valued Customer";
+        const clientLabel = resolveDisplayName();
         const quoteRef = existingQuote?.quote_id || savedQuoteDisplayId || "";
         const refLabel = quoteRef ? ` *${quoteRef}*` : referenceNumber ? ` (Ref: ${referenceNumber})` : "";
 
@@ -541,10 +547,10 @@ function CreateQuotePageContent() {
                     onSendToPT={(): void => { handleSubmit("send_pt"); }}
                     onEmailClient={(): void => { handleSubmit("send_customer"); }}
                     onWhatsApp={handleWhatsApp}
-                    clientName={
-                        clients.find(c => c.id === selectedClientId)?.name ||
-                        leads.find(l => l.id === selectedLeadId)?.name
-                    }
+                    clientName={(() => {
+                        const name = resolveDisplayName();
+                        return name === "Valued Customer" ? undefined : name;
+                    })()}
                 />
 
                 <div className="max-w-[1400px] mx-auto px-4 lg:px-6 py-4 lg:py-6">
@@ -672,9 +678,7 @@ function CreateQuotePageContent() {
                         <div className="flex gap-2 flex-wrap">
                             <button
                                 onClick={(): void => {
-                                    const clientLabel = clients.find(c => c.id === selectedClientId)?.name
-                                        || leads.find(l => l.id === selectedLeadId)?.name
-                                        || "Valued Customer";
+                                    const clientLabel = resolveDisplayName();
                                     const quoteRef = existingQuote?.quote_id || savedQuoteDisplayId || "";
                                     const refLabel = quoteRef ? ` *${quoteRef}*` : "";
                                     const msg = `Hello ${clientLabel},\n\nPlease find your quote${refLabel} from Print Duka Ltd.\n\nKindly review and approve your quote here:\n${quoteLink}\n\nThank you!`;

@@ -97,3 +97,16 @@ export async function deletePayment(paymentId: number): Promise<void> {
         throw new Error(`Failed to delete payment: ${response.status} ${errorText}`);
     }
 }
+
+export async function importZohoInvoices(): Promise<{ created: number; updated: number; total: number }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/zoho-invoices/import/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+    });
+    if (!response.ok) {
+        const errorText = await response.text().catch(() => "Unknown error");
+        throw new Error(`Import failed: ${response.status} ${errorText}`);
+    }
+    return response.json();
+}
