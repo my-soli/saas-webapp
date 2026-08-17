@@ -258,3 +258,78 @@ export async function fetchClientStats(): Promise<ClientStatsResponse> {
         total_revenue: totalRevenue,
     };
 }
+
+export async function sendClientPortalInvite(clientId: number): Promise<{ detail: string; email_sent: boolean }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/${clientId}/invite/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+    });
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to send invite: ${response.status} ${errorText}`);
+    }
+    return response.json();
+}
+
+export interface PendingPortalEntry {
+    client_id: number;
+    client_name: string;
+    email: string;
+    email_verified: boolean;
+    portal_tier: string;
+    registered_at: string;
+    status: "pending_approval" | "awaiting_email_verification";
+}
+
+export async function fetchPendingPortals(): Promise<PendingPortalEntry[]> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/pending_portals/`, {
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+    });
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to fetch pending portals: ${response.status} ${errorText}`);
+    }
+    return response.json();
+}
+
+export async function approvePortal(clientId: number): Promise<{ detail: string }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/${clientId}/approve_portal/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+    });
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to approve portal: ${response.status} ${errorText}`);
+    }
+    return response.json();
+}
+
+export async function resendVerificationEmail(clientId: number): Promise<{ detail: string }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/${clientId}/resend_verification/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+    });
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to resend verification email: ${response.status} ${errorText}`);
+    }
+    return response.json();
+}
+
+export async function rejectPortal(clientId: number, reason?: string): Promise<{ detail: string }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/clients/${clientId}/reject_portal/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason || "" }),
+        cache: "no-store",
+    });
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to reject portal: ${response.status} ${errorText}`);
+    }
+    return response.json();
+}

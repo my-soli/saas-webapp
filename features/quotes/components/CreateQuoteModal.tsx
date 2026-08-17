@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
-import { X, Plus, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { X, Plus, Trash2, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import type { PaymentTerms, CreateQuoteInput, CreateQuoteLineItemInput } from "@/types/quotes";
+import type { PaymentTerms, CreateQuoteInput } from "@/types/quotes";
 import type { Client } from "@/types/clients";
 import type { Lead } from "@/types/leads";
 import type { Product } from "@/types/products";
 import { fetchClients } from "@/services/clients";
+import { fetchLeads } from "@/services/leads";
 import { fetchProducts } from "@/services/products";
 
 interface CreateQuoteModalProps {
@@ -32,8 +33,27 @@ export default function CreateQuoteModal({
     isSubmitting,
 }: CreateQuoteModalProps) {
     const [clientType, setClientType] = useState<"client" | "lead">("client");
+
+    // Client combobox
+    const [clientSearch, setClientSearch] = useState("");
+    const [debouncedClientSearch, setDebouncedClientSearch] = useState("");
     const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+    const [selectedClientName, setSelectedClientName] = useState("");
+    const [showClientDropdown, setShowClientDropdown] = useState(false);
+    const clientInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const t = setTimeout(() => setDebouncedClientSearch(clientSearch), 300);
+        return () => clearTimeout(t);
+    }, [clientSearch]);
+
+    // Lead combobox
+    const [leadSearch, setLeadSearch] = useState("");
     const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
+    const [selectedLeadName, setSelectedLeadName] = useState("");
+    const [showLeadDropdown, setShowLeadDropdown] = useState(false);
+    const leadInputRef = useRef<HTMLInputElement>(null);
+
     const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split("T")[0]);
     const [validUntil, setValidUntil] = useState(
         new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
@@ -48,17 +68,45 @@ export default function CreateQuoteModal({
     const [customTerms, setCustomTerms] = useState("");
     const [lineItems, setLineItems] = useState<LineItem[]>([]);
 
-    const { data: clientsData } = useQuery({
-        queryKey: ["clients", 1, 50, ""],
+    // Reset form when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setClientType("client");
+            setClientSearch("");
+            setDebouncedClientSearch("");
+            setSelectedClientId(null);
+            setSelectedClientName("");
+            setLeadSearch("");
+            setSelectedLeadId(null);
+            setSelectedLeadName("");
+            setLineItems([]);
+        }
+    }, [isOpen]);
+
+    const { data: clientsData, isFetching: clientsFetching } = useQuery({
+        queryKey: ["clients-search", debouncedClientSearch],
         queryFn: () =>
             fetchClients({
                 page: 1,
-                pageSize: 50,
-                search: "",
+                pageSize: 30,
+                search: debouncedClientSearch,
                 status: "all",
                 clientType: "all",
             }),
         enabled: isOpen,
+    });
+
+    const { data: leadsData } = useQuery({
+        queryKey: ["leads-search", leadSearch],
+        queryFn: () =>
+            fetchLeads({
+                page: 1,
+                pageSize: 20,
+                search: leadSearch,
+                status: "all",
+                source: "all",
+            }),
+        enabled: isOpen && clientType === "lead",
     });
 
     const { data: productsData } = useQuery({
@@ -77,7 +125,22 @@ export default function CreateQuoteModal({
     });
 
     const clients = clientsData?.results || [];
+    const leads = leadsData?.results || [];
     const products = productsData?.results || [];
+
+    const selectClient = (client: Client) => {
+        setSelectedClientId(client.id);
+        setSelectedClientName(client.company || client.name);
+        setClientSearch(client.company || client.name);
+        setShowClientDropdown(false);
+    };
+
+    const selectLead = (lead: Lead) => {
+        setSelectedLeadId(lead.id);
+        setSelectedLeadName(lead.name);
+        setLeadSearch(lead.name);
+        setShowLeadDropdown(false);
+    };
 
     const addLineItem = () => {
         setLineItems([
@@ -214,7 +277,12 @@ export default function CreateQuoteModal({
                                         type="radio"
                                         value="client"
                                         checked={clientType === "client"}
-                                        onChange={(e) => setClientType(e.target.value as "client" | "lead")}
+                                        onChange={(e) => {
+                                            setClientType(e.target.value as "client" | "lead");
+                                            setSelectedLeadId(null);
+                                            setSelectedLeadName("");
+                                            setLeadSearch("");
+                                        }}
                                         className="text-brand-blue focus:ring-brand-blue"
                                     />
                                     <span className="text-sm text-gray-700">Existing Client</span>
@@ -224,7 +292,12 @@ export default function CreateQuoteModal({
                                         type="radio"
                                         value="lead"
                                         checked={clientType === "lead"}
-                                        onChange={(e) => setClientType(e.target.value as "client" | "lead")}
+                                        onChange={(e) => {
+                                            setClientType(e.target.value as "client" | "lead");
+                                            setSelectedClientId(null);
+                                            setSelectedClientName("");
+                                            setClientSearch("");
+                                        }}
                                         className="text-brand-blue focus:ring-brand-blue"
                                     />
                                     <span className="text-sm text-gray-700">Lead</span>
@@ -232,25 +305,115 @@ export default function CreateQuoteModal({
                             </div>
 
                             {clientType === "client" ? (
-                                <select
-                                    value={selectedClientId || ""}
-                                    onChange={(e) => setSelectedClientId(Number(e.target.value) || null)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
-                                    required
-                                >
-                                    <option value="">Select a client</option>
-                                    {clients.map((client: Client) => (
-                                        <option key={client.id} value={client.id}>
-                                            {client.company || client.name} ({client.client_id})
-                                        </option>
-                                    ))}
-                                </select>
+                                <div className="relative">
+                                    <div className="relative">
+                                        <input
+                                            ref={clientInputRef}
+                                            type="text"
+                                            value={clientSearch}
+                                            onChange={(e) => {
+                                                setClientSearch(e.target.value);
+                                                setSelectedClientId(null);
+                                                setSelectedClientName("");
+                                                setShowClientDropdown(true);
+                                            }}
+                                            onFocus={() => setShowClientDropdown(true)}
+                                            onBlur={() => setTimeout(() => setShowClientDropdown(false), 150)}
+                                            placeholder="Search by name, company, phone…"
+                                            className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue text-sm"
+                                            autoComplete="off"
+                                        />
+                                        {clientsFetching && !selectedClientId
+                                            ? <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">…</span>
+                                            : <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        }
+                                    </div>
+                                    {selectedClientId && (
+                                        <p className="text-xs text-green-600 mt-1">
+                                            ✓ {selectedClientName} selected
+                                        </p>
+                                    )}
+                                    {showClientDropdown && clients.length > 0 && (
+                                        <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                                            {clients.map((client: Client) => (
+                                                <li
+                                                    key={client.id}
+                                                    onMouseDown={() => selectClient(client)}
+                                                    className="px-3 py-2 hover:bg-brand-blue/10 cursor-pointer text-sm"
+                                                >
+                                                    <span className="font-medium">
+                                                        {client.company || client.name}
+                                                    </span>
+                                                    {client.company && client.name !== client.company && (
+                                                        <span className="text-gray-500 ml-1">— {client.name}</span>
+                                                    )}
+                                                    <span className="text-gray-400 ml-2 text-xs">
+                                                        {client.client_id}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                    {showClientDropdown && clientSearch.length > 0 && clients.length === 0 && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-sm text-gray-500">
+                                            No clients found
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
-                                <input
-                                    type="text"
-                                    placeholder="Lead name or ID"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
-                                />
+                                <div className="relative">
+                                    <div className="relative">
+                                        <input
+                                            ref={leadInputRef}
+                                            type="text"
+                                            value={leadSearch}
+                                            onChange={(e) => {
+                                                setLeadSearch(e.target.value);
+                                                setSelectedLeadId(null);
+                                                setSelectedLeadName("");
+                                                setShowLeadDropdown(true);
+                                            }}
+                                            onFocus={() => setShowLeadDropdown(true)}
+                                            onBlur={() => setTimeout(() => setShowLeadDropdown(false), 150)}
+                                            placeholder="Search by lead name, email or phone..."
+                                            className="w-full px-3 py-2 pr-8 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue text-sm"
+                                            autoComplete="off"
+                                        />
+                                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                    </div>
+                                    {selectedLeadId && (
+                                        <p className="text-xs text-green-600 mt-1">
+                                            ✓ {selectedLeadName} selected
+                                        </p>
+                                    )}
+                                    {showLeadDropdown && leads.length > 0 && (
+                                        <ul className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                                            {leads.map((lead: Lead) => (
+                                                <li
+                                                    key={lead.id}
+                                                    onMouseDown={() => selectLead(lead)}
+                                                    className="px-3 py-2 hover:bg-brand-blue/10 cursor-pointer text-sm"
+                                                >
+                                                    <span className="font-medium">{lead.name}</span>
+                                                    {lead.company && (
+                                                        <span className="text-gray-500 ml-1">— {lead.company}</span>
+                                                    )}
+                                                    {lead.email && (
+                                                        <span className="text-gray-400 ml-2 text-xs">{lead.email}</span>
+                                                    )}
+                                                    <span className="text-gray-400 ml-2 text-xs">
+                                                        {lead.lead_id}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                    {showLeadDropdown && leadSearch.length > 0 && leads.length === 0 && (
+                                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-sm text-gray-500">
+                                            No leads found
+                                        </div>
+                                    )}
+                                </div>
                             )}
                         </div>
 
@@ -482,7 +645,7 @@ export default function CreateQuoteModal({
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Custom Terms & Conditions
+                            Custom Terms &amp; Conditions
                         </label>
                         <textarea
                             value={customTerms}

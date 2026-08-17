@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircleIcon, Plus, RefreshCw, CheckCircle2, BookOpen } from "lucide-react";
+import { AlertCircleIcon, Plus, RefreshCw, CheckCircle2, BookOpen, SearchIcon, XIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin/admin-layout";
@@ -42,6 +42,8 @@ export default function AdminJobsPage(): ReactElement {
     const [status, setStatus] = useState<"all" | JobStatus>("all");
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(20);
+    const [completedSearch, setCompletedSearch] = useState<string>("");
+    const [debouncedCompletedSearch, setDebouncedCompletedSearch] = useState<string>("");
 
     const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
     const [remindingJobId, setRemindingJobId] = useState<number | null>(null);
@@ -55,6 +57,11 @@ export default function AdminJobsPage(): ReactElement {
         return (): void => clearTimeout(timer);
     }, [search]);
 
+    useEffect((): (() => void) => {
+        const timer = setTimeout((): void => setDebouncedCompletedSearch(completedSearch), 500);
+        return (): void => clearTimeout(timer);
+    }, [completedSearch]);
+
     const jobQueryParams = useMemo(
         (): JobsQueryParams => ({
             page,
@@ -66,8 +73,8 @@ export default function AdminJobsPage(): ReactElement {
     );
 
     const completedQueryParams = useMemo(
-        (): JobsQueryParams => ({ page: 1, pageSize: 100, search: "", status: "completed" }),
-        []
+        (): JobsQueryParams => ({ page: 1, pageSize: 100, search: debouncedCompletedSearch, status: "completed" }),
+        [debouncedCompletedSearch]
     );
 
     const { data, isLoading, error } = useQuery({
@@ -77,7 +84,7 @@ export default function AdminJobsPage(): ReactElement {
     });
 
     const completedQuery = useQuery({
-        queryKey: ["admin-jobs-completed"],
+        queryKey: ["admin-jobs-completed", completedQueryParams],
         queryFn: (): Promise<JobsResponse> => fetchJobs(completedQueryParams),
         enabled: activeTab === "completed",
     });
@@ -132,7 +139,7 @@ export default function AdminJobsPage(): ReactElement {
         onSuccess: (result): void => {
             setSyncingJobId(null);
             toast.success(`Invoice ${result.zoho_invoice_number} created in Zoho Books!`);
-            queryClient.invalidateQueries({ queryKey: ["admin-jobs-completed"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-jobs-completed"], exact: false });
         },
         onError: (err: Error): void => {
             setSyncingJobId(null);
@@ -275,13 +282,34 @@ export default function AdminJobsPage(): ReactElement {
                 {/* ── Completed Jobs Tab ── */}
                 {activeTab === "completed" && (
                     <section className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
-                            <BookOpen className="w-4 h-4 text-brand-blue" />
-                            <div>
-                                <h2 className="text-sm font-semibold text-gray-900">Completed Jobs</h2>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                    Jobs completed by the production team. Zoho Books invoicing is managed from the Reconciliation tab.
-                                </p>
+                        <div className="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <BookOpen className="w-4 h-4 text-brand-blue shrink-0" />
+                                <div className="min-w-0">
+                                    <h2 className="text-sm font-semibold text-gray-900">Completed Jobs</h2>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                        Jobs completed by the production team. Zoho Books invoicing is managed from the Reconciliation tab.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="relative w-full sm:w-64 shrink-0">
+                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    value={completedSearch}
+                                    onChange={(e): void => setCompletedSearch(e.target.value)}
+                                    placeholder="Search completed jobs…"
+                                    className="w-full rounded-md border border-gray-300 pl-9 pr-8 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent"
+                                />
+                                {completedSearch && (
+                                    <button
+                                        type="button"
+                                        onClick={(): void => setCompletedSearch("")}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        <XIcon className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
                             </div>
                         </div>
 

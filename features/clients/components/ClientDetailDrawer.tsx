@@ -1,6 +1,12 @@
+"use client";
+
+import { useState } from "react";
 import type { ReactElement } from "react";
+import { Send, CheckCircle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import type { BrandAsset, Client, ClientContact, ComplianceDocument } from "@/types/clients";
 import type { MultiProductQuote } from "@/types/quotes";
+import { sendClientPortalInvite } from "@/services/clients";
 
 interface ClientDetailDrawerProps {
     client: Client | null;
@@ -35,8 +41,25 @@ export default function ClientDetailDrawer({
     onClose,
     onEdit,
 }: ClientDetailDrawerProps): ReactElement | null {
+    const [inviting, setInviting] = useState(false);
+    const [inviteSent, setInviteSent] = useState(false);
+
     if (!isOpen) {
         return null;
+    }
+
+    async function handleSendInvite(): Promise<void> {
+        if (!client) return;
+        setInviting(true);
+        try {
+            const result = await sendClientPortalInvite(client.id);
+            setInviteSent(true);
+            toast.success(result.email_sent ? "Portal invite sent successfully!" : "Invite prepared — email delivery failed, share link manually.");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to send invite");
+        } finally {
+            setInviting(false);
+        }
     }
 
     const formatDate = (value: string | null | undefined): string => {
@@ -101,13 +124,32 @@ export default function ClientDetailDrawer({
                             <section className="rounded-lg border border-gray-200 p-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Summary</h3>
-                                    <button
-                                        type="button"
-                                        onClick={(): void => onEdit(client)}
-                                        className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                                    >
-                                        Edit Client
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        {client.email && (
+                                            <button
+                                                type="button"
+                                                onClick={handleSendInvite}
+                                                disabled={inviting || inviteSent}
+                                                className="inline-flex items-center gap-1.5 rounded-md border border-brand-blue bg-brand-blue px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                {inviting ? (
+                                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                                ) : inviteSent ? (
+                                                    <CheckCircle className="w-3 h-3" />
+                                                ) : (
+                                                    <Send className="w-3 h-3" />
+                                                )}
+                                                {inviteSent ? "Invite Sent" : "Send Portal Invite"}
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={(): void => onEdit(client)}
+                                            className="rounded-md border border-gray-300 px-3 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                                        >
+                                            Edit Client
+                                        </button>
+                                    </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
                                     <Field label="Client ID" value={client.client_id} />

@@ -8,10 +8,11 @@ interface ConversionFunnelProps {
 }
 
 export default function ConversionFunnel({ data }: ConversionFunnelProps) {
-    const leadToClient = data.lead_to_client ?? 0;
-    const quoteToOrder = data.quote_to_order ?? 0;
+    const leadToClient = data.lead_conversion_rate ?? 0;
+    const quoteToOrder = data.quote_approval_rate ?? 0;
     const totalLeads = data.total_leads ?? 0;
-    const convertedClients = data.converted_clients ?? 0;
+    const convertedLeads = data.converted_leads ?? 0;
+    const approvedQuotes = data.approved_quotes ?? 0;
 
     const funnelData = [
         {
@@ -21,12 +22,12 @@ export default function ConversionFunnel({ data }: ConversionFunnelProps) {
         },
         {
             stage: "Converted Clients",
-            count: convertedClients,
+            count: convertedLeads,
             color: "#009444",
         },
         {
-            stage: "Quote to Order",
-            count: Math.round(convertedClients * (quoteToOrder / 100)),
+            stage: "Approved Quotes",
+            count: approvedQuotes,
             color: "#F6B619",
         },
     ];
@@ -68,7 +69,7 @@ export default function ConversionFunnel({ data }: ConversionFunnelProps) {
             </ResponsiveContainer>
             <div className="mt-4 grid grid-cols-2 gap-4 pt-4 border-t border-gray-200">
                 <div>
-                    <div className="text-xs text-gray-600">Quote Conversion</div>
+                    <div className="text-xs text-gray-600">Quote Approval Rate</div>
                     <div className="text-lg font-semibold text-gray-900">{quoteToOrder.toFixed(1)}%</div>
                 </div>
                 <div>

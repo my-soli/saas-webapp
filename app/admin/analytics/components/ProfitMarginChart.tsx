@@ -8,9 +8,13 @@ interface ProfitMarginChartProps {
 }
 
 export default function ProfitMarginChart({ data }: ProfitMarginChartProps) {
+    const totalRevenue = data.total_revenue ?? 0;
+    const totalCost = data.total_cost ?? 0;
+    const grossProfit = totalRevenue - totalCost;
+
     const chartData = [
-        { name: "Profit", value: data.gross_profit },
-        { name: "Cost", value: data.total_cost },
+        { name: "Profit", value: grossProfit },
+        { name: "Cost", value: totalCost },
     ];
 
     const COLORS = ["#009444", "#f1f5f9"];

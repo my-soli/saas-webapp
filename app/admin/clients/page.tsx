@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import type { QueryKey } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircleIcon } from "lucide-react";
+import { AlertCircleIcon, CheckCircle, Clock, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin/admin-layout";
 import ClientDetailDrawer from "@/features/clients/components/ClientDetailDrawer";
@@ -13,15 +13,22 @@ import ClientsFilters from "@/features/clients/components/ClientsFilters";
 import ClientsPagination from "@/features/clients/components/ClientsPagination";
 import ClientsTable from "@/features/clients/components/ClientsTable";
 import {
+    approvePortal,
     createClient,
     deleteClient,
     fetchClient,
     fetchClientBrandAssets,
     fetchClientComplianceDocuments,
     fetchClientContacts,
+    fetchClientQuotes,
     fetchClients,
+    fetchPendingPortals,
+    rejectPortal,
+    resendVerificationEmail,
     updateClient,
 } from "@/services/clients";
+import type { PendingPortalEntry } from "@/services/clients";
+import type { MultiProductQuote } from "@/types/quotes";
 import type {
     BrandAsset,
     Client,
@@ -105,6 +112,51 @@ export default function ClientsPage(): ReactElement {
         queryKey: ["client-compliance-documents", selectedClientId],
         queryFn: (): Promise<ComplianceDocument[]> => fetchClientComplianceDocuments(selectedClientId as number),
         enabled: selectedClientId !== null,
+    });
+
+    const { data: clientQuotes, isLoading: isClientQuotesLoading } = useQuery({
+        queryKey: ["client-quotes", selectedClientId],
+        queryFn: (): Promise<MultiProductQuote[]> => fetchClientQuotes(selectedClientId as number),
+        enabled: selectedClientId !== null,
+    });
+
+    const { data: pendingPortals, isLoading: isPendingPortalsLoading, refetch: refetchPendingPortals } = useQuery({
+        queryKey: ["pending-portals"],
+        queryFn: (): Promise<PendingPortalEntry[]> => fetchPendingPortals(),
+        refetchInterval: 60_000,
+    });
+
+    const approveMutation = useMutation({
+        mutationFn: (clientId: number): Promise<{ detail: string }> => approvePortal(clientId),
+        onSuccess: (_data, clientId): void => {
+            toast.success("Portal access approved.");
+            void refetchPendingPortals();
+            queryClient.invalidateQueries({ queryKey: ["client", clientId] });
+        },
+        onError: (errorValue: unknown): void => {
+            toast.error(extractMutationMessage(errorValue, "Unable to approve portal."));
+        },
+    });
+
+    const rejectMutation = useMutation({
+        mutationFn: ({ clientId, reason }: { clientId: number; reason: string }): Promise<{ detail: string }> => rejectPortal(clientId, reason),
+        onSuccess: (): void => {
+            toast.success("Portal registration rejected.");
+            void refetchPendingPortals();
+        },
+        onError: (errorValue: unknown): void => {
+            toast.error(extractMutationMessage(errorValue, "Unable to reject portal."));
+        },
+    });
+
+    const resendVerificationMutation = useMutation({
+        mutationFn: (clientId: number): Promise<{ detail: string }> => resendVerificationEmail(clientId),
+        onSuccess: (data): void => {
+            toast.success(data.detail);
+        },
+        onError: (errorValue: unknown): void => {
+            toast.error(extractMutationMessage(errorValue, "Failed to resend verification email."));
+        },
     });
 
     const updateClientsInCache = (updater: (client: Client) => Client | null): void => {
@@ -324,7 +376,8 @@ export default function ClientsPage(): ReactElement {
 
     const clients = data?.results ?? [];
     const totalCount = data?.count ?? 0;
-    const isRelationsLoading = isContactsLoading || isBrandAssetsLoading || isComplianceDocumentsLoading;
+    const isRelationsLoading = isContactsLoading || isBrandAssetsLoading || isComplianceDocumentsLoading || isClientQuotesLoading;
+    const pendingList: PendingPortalEntry[] = pendingPortals ?? [];
 
     return (
         <AdminLayout>
@@ -368,6 +421,91 @@ export default function ClientsPage(): ReactElement {
                                 </div>
                             </div>
                         </div>
+                    )}
+
+                    {/* Pending Portal Registrations */}
+                    {(isPendingPortalsLoading || pendingList.length > 0) && (
+                        <section className="rounded-xl border border-amber-200 bg-amber-50">
+                            <div className="flex items-center gap-2 px-4 lg:px-6 py-3 border-b border-amber-200">
+                                <Clock className="h-4 w-4 text-amber-600" />
+                                <h2 className="text-sm font-semibold text-amber-800">
+                                    Pending Portal Registrations
+                                    {!isPendingPortalsLoading && (
+                                        <span className="ml-2 inline-flex items-center justify-center rounded-full bg-amber-600 text-white text-xs px-1.5 py-0.5 font-bold">
+                                            {pendingList.length}
+                                        </span>
+                                    )}
+                                </h2>
+                            </div>
+                            {isPendingPortalsLoading ? (
+                                <div className="px-4 lg:px-6 py-4 space-y-2">
+                                    {[1, 2].map((i) => (
+                                        <div key={i} className="h-10 bg-amber-100 rounded animate-pulse" />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-amber-100">
+                                    {pendingList.map((entry) => (
+                                        <div key={entry.client_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 lg:px-6 py-3">
+                                            <div className="flex items-start gap-3 min-w-0">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium text-gray-900 truncate">{entry.client_name}</p>
+                                                    <p className="text-xs text-gray-500 truncate">{entry.email}</p>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    {entry.email_verified ? (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                                                            <CheckCircle className="h-3 w-3" />
+                                                            Email verified
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                                                            <Clock className="h-3 w-3" />
+                                                            Awaiting verification
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                {!entry.email_verified && (
+                                                    <button
+                                                        type="button"
+                                                        disabled={resendVerificationMutation.isPending}
+                                                        onClick={(): void => { resendVerificationMutation.mutate(entry.client_id); }}
+                                                        className="inline-flex items-center gap-1 rounded-md border border-amber-300 px-3 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                    >
+                                                        <Clock className="h-3 w-3" />
+                                                        Resend Email
+                                                    </button>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    disabled={!entry.email_verified || approveMutation.isPending}
+                                                    onClick={(): void => { approveMutation.mutate(entry.client_id); }}
+                                                    className="inline-flex items-center gap-1 rounded-md bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    <CheckCircle className="h-3 w-3" />
+                                                    Approve
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    disabled={rejectMutation.isPending}
+                                                    onClick={(): void => {
+                                                        const reason = window.prompt(`Reason for rejecting ${entry.client_name}'s portal access (optional):`);
+                                                        if (reason === null) return;
+                                                        rejectMutation.mutate({ clientId: entry.client_id, reason: reason ?? "" });
+                                                    }}
+                                                    className="inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                >
+                                                    <XCircle className="h-3 w-3" />
+                                                    Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
                     )}
 
                     {!error && (
@@ -440,6 +578,7 @@ export default function ClientsPage(): ReactElement {
                 contacts={contacts ?? []}
                 brandAssets={brandAssets ?? []}
                 complianceDocuments={complianceDocuments ?? []}
+                quotes={clientQuotes ?? []}
                 isOpen={selectedClientId !== null}
                 isLoading={isSelectedClientLoading}
                 isLoadingRelations={isRelationsLoading}

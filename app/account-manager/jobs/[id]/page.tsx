@@ -2,10 +2,12 @@
 
 import { type ReactElement } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Pencil, File as FileIcon } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Pencil, File as FileIcon, RefreshCw, LoaderCircle } from "lucide-react";
+import { toast } from "sonner";
 import AccountManagerLayout from "@/components/account-manager/account-manager-layout";
 import { fetchJob, fetchJobAttachments, type JobAttachment } from "@/services/jobs";
+import { syncQuoteToJob } from "@/services/quotes";
 import type { JobProduct } from "@/types/jobs";
 
 const SECTION_HEADER = "px-6 py-4 border-b border-gray-100 bg-gray-50";
@@ -56,11 +58,26 @@ export default function JobViewPage(): ReactElement {
     const router = useRouter();
     const params = useParams();
     const jobId = Number(params.id);
+    const queryClient = useQueryClient();
 
     const { data: job, isLoading } = useQuery({
         queryKey: ["job", jobId],
         queryFn: () => fetchJob(jobId),
         enabled: !!jobId,
+    });
+
+    const syncQuoteMut = useMutation({
+        mutationFn: (quoteId: number) => syncQuoteToJob(quoteId),
+        onSuccess: (result) => {
+            const parts: string[] = [`New total: KES ${result.new_total.toLocaleString()}`];
+            if (result.components_created > 0) parts.push(`${result.components_created} new component(s) added`);
+            if (result.components_updated > 0) parts.push(`${result.components_updated} component(s) updated`);
+            if (result.zoho_updated) parts.push("Zoho invoice updated");
+            if (result.zoho_reset) parts.push("Zoho sync reset — re-sync needed");
+            toast.success("Quote changes pushed to job", { description: parts.join(" · ") });
+            queryClient.invalidateQueries({ queryKey: ["job", jobId] });
+        },
+        onError: (err: Error) => toast.error(err.message || "Failed to sync quote changes"),
     });
 
     const { data: attachments = [] } = useQuery({
@@ -125,14 +142,34 @@ export default function JobViewPage(): ReactElement {
                             <h1 className="text-lg font-semibold text-gray-900 leading-tight">{job.job_name}</h1>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => router.push(`/account-manager/jobs/${jobId}/edit`)}
-                        className="flex items-center gap-2 rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 transition-colors"
-                    >
-                        <Pencil className="w-4 h-4" />
-                        Edit Job
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {job.quote != null && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (!window.confirm("Pull the latest quantities and totals from the quote into this job and LPO?\n\nThis will overwrite component quantities and recalculate the invoice amount.")) return;
+                                    syncQuoteMut.mutate(job.quote as number);
+                                }}
+                                disabled={syncQuoteMut.isPending}
+                                className="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                                title="Pull latest quantities and totals from the linked quote"
+                            >
+                                {syncQuoteMut.isPending
+                                    ? <LoaderCircle className="w-4 h-4 animate-spin" />
+                                    : <RefreshCw className="w-4 h-4" />
+                                }
+                                Pull from Quote
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => router.push(`/account-manager/jobs/${jobId}/edit`)}
+                            className="flex items-center gap-2 rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 transition-colors"
+                        >
+                            <Pencil className="w-4 h-4" />
+                            Edit Job
+                        </button>
+                    </div>
                 </div>
             </header>
 

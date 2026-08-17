@@ -24,12 +24,21 @@ import {
     Scale,
     ClipboardCheck,
     Activity,
+    Bike,
     Bell,
     Mail,
     Download,
+    Cog,
+    Receipt,
+    Percent,
+    Wallet,
+    Banknote,
+    Globe,
+    Megaphone,
 } from "lucide-react";
 import { logoutUserSession } from "@/lib/api/auth";
 import PortalSwitcher from "@/components/shared/PortalSwitcher";
+import { useBranding } from "@/components/providers";
 
 interface MenuItem {
     label: string;
@@ -65,8 +74,21 @@ const menuSections: MenuSection[] = [
             { label: "Jobs", href: "/admin/jobs", icon: Layers },
             { label: "Control Tower", href: "/admin/orchestration", icon: Zap },
             { label: "Dispatch", href: "/admin/dispatch", icon: PackageCheck },
+            { label: "Riders", href: "/admin/riders", icon: Bike },
             { label: "Reconciliation", href: "/admin/reconciliation", icon: Scale },
             { label: "QC Templates", href: "/admin/qc-templates", icon: ClipboardCheck },
+            { label: "Production Planning", href: "/admin/production-planning", icon: Cog },
+        ],
+    },
+    {
+        title: "FINANCIAL",
+        items: [
+            { label: "Invoices", href: "/admin/financial", icon: Receipt },
+            { label: "eTIMS Settings", href: "/admin/financial/etims-settings", icon: Settings },
+            { label: "Tax Settings", href: "/admin/financial/tax-settings", icon: Percent },
+            { label: "Expenses", href: "/admin/financial/expenses", icon: Wallet },
+            { label: "Vendor Payments", href: "/admin/financial/vendor-payments", icon: Banknote },
+            { label: "Customer Statements", href: "/admin/financial/statements", icon: FileText },
         ],
     },
     {
@@ -82,7 +104,9 @@ const menuSections: MenuSection[] = [
         title: "ADMINISTRATION",
         items: [
             { label: "Users", href: "/admin/users", icon: Users },
+            { label: "Tenants", href: "/admin/tenants", icon: Globe },
             { label: "Subscription Plans", href: "/admin/subscription-plans", icon: BadgeDollarSign },
+            { label: "Announcements", href: "/admin/announcements", icon: Megaphone },
             { label: "Activities", href: "/admin/activities", icon: Activity },
             { label: "Notifications", href: "/admin/notifications", icon: Bell },
             { label: "Email Log", href: "/admin/email-log", icon: Mail },
@@ -103,6 +127,7 @@ export default function AdminSidebar({ isDrawerOpen, onClose }: AdminSidebarProp
     const pathname = usePathname();
     const [loggingOut, setLoggingOut] = useState(false);
     const sidebarRef = useRef<HTMLElement>(null);
+    const branding = useBranding();
 
     useEffect(() => {
         const el = sidebarRef.current;
@@ -150,8 +175,8 @@ export default function AdminSidebar({ isDrawerOpen, onClose }: AdminSidebarProp
         >
             <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
                 <Image
-                    src="/logo/pd.png"
-                    alt="PrintDuka"
+                    src={branding?.logo_url || "/logo/pd.png"}
+                    alt={branding?.name || "PrintDuka"}
                     width={50}
                     height={16}
                     className="w-20 h-auto"

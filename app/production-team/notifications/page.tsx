@@ -120,14 +120,38 @@ export default function ProductionNotificationsPage(): ReactElement {
         markAllReadMutation.mutate(unreadIds);
     };
 
+    const PT_QUICK_FILTERS = [
+        { label: "All", value: "" },
+        { label: "Sent to PT", value: "quote_sent_pt" },
+        { label: "Costed", value: "quote_pt_approved" },
+        { label: "Job Completed", value: "job_completed" },
+        { label: "Assigned to Me", value: "job_assigned" },
+    ];
+
     return (
         <AdminLayout>
             <header className="border-b border-gray-200 bg-white">
                 <div className="px-4 lg:px-8 py-4">
-                    <h1 className="text-2xl font-bold text-gray-900">Production Team Notifications</h1>
-                    <p className="mt-2 text-sm text-gray-600">
-                        Notifications from the existing production notification stream.
+                    <h1 className="text-2xl font-bold text-gray-900">My Notifications</h1>
+                    <p className="mt-1 text-sm text-gray-500">
+                        Production-relevant notifications for your team.
                     </p>
+                    {/* Quick filter chips */}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        {PT_QUICK_FILTERS.map(f => (
+                            <button
+                                key={f.value}
+                                onClick={() => setNotificationType(f.value)}
+                                className={`rounded-full px-3 py-1 text-xs font-semibold border transition-colors ${
+                                    notificationType === f.value
+                                        ? "bg-brand-blue text-white border-brand-blue"
+                                        : "bg-white text-gray-600 border-gray-300 hover:border-brand-blue hover:text-brand-blue"
+                                }`}
+                            >
+                                {f.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </header>
 
@@ -146,18 +170,16 @@ export default function ProductionNotificationsPage(): ReactElement {
                                 />
                             </div>
 
-                            <select
+                                            <select
                                 value={notificationType}
                                 onChange={handleTypeChange}
                                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-blue"
                             >
                                 <option value="">All Types</option>
-                                <option value="lead_created">Lead Created</option>
-                                <option value="quote_reminder">Quote Reminder</option>
-                                <option value="quote_approved">Quote Approved</option>
-                                <option value="quote_sent_pt">Sent to Production Team</option>
-                                <option value="quote_pt_approved">Costed by Production Team</option>
+                                <option value="quote_sent_pt">Sent to Production</option>
+                                <option value="quote_pt_approved">Costed by PT</option>
                                 <option value="job_completed">Job Completed</option>
+                                <option value="job_assigned">Job Assigned</option>
                                 <option value="general">General</option>
                             </select>
 

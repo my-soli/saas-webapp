@@ -66,6 +66,11 @@ interface BriefData {
     adjustment_response: string;
     adjustment_responded_at: string | null;
     adjustment_responded_by: string | null;
+    vendor_proposed_price: string;
+    price_review_status: "pending" | "accepted" | "countered" | "";
+    price_counter_offer: string;
+    price_review_note: string;
+    price_reviewed_at: string | null;
     component: BriefComponent;
     updates: { note: string; created_at: string }[];
     proofs: BriefProof[];
@@ -430,18 +435,13 @@ export default function VendorBriefPage(): ReactElement {
 
                     return (
                         <>
-                            {/* ── Job Reference ── */}
+                            {/* ── Brief Header ── */}
                             <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "14px 20px", marginBottom: 16 }}>
-                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                                     <div>
-                                        <div style={{ fontSize: 10, fontWeight: 700, color: "#2563eb", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>Job Reference</div>
-                                        <div style={{ fontSize: 16, fontWeight: 700, color: "#1e3a5f" }}>{comp.job_name}</div>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-                                            <span style={{ fontSize: 12, color: "#6b7280" }}>{comp.job_number}</span>
-                                            <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: statusStyle.bg, color: statusStyle.color }}>
-                                                {STATUS_LABELS[comp.status] || comp.status}
-                                            </span>
-                                        </div>
+                                        <div style={{ fontSize: 10, fontWeight: 700, color: "#2563eb", letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 4 }}>Your Brief</div>
+                                        <div style={{ fontSize: 16, fontWeight: 700, color: "#1e3a5f" }}>{comp.product_name}</div>
+                                        <div style={{ fontSize: 12, color: "#6b7280", marginTop: 3 }}>Assigned to: {comp.vendor_name}</div>
                                     </div>
                                     <div style={{ background: priority.bg, color: priority.color, border: `1px solid ${priority.border}`, fontSize: 11, fontWeight: 700, padding: "4px 12px", borderRadius: 20, whiteSpace: "nowrap", flexShrink: 0 }}>
                                         {priority.label}
@@ -521,6 +521,53 @@ export default function VendorBriefPage(): ReactElement {
                                                     <div style={{ fontSize: 13, color: "#1f2937", whiteSpace: "pre-line" }}>{data.adjustment_response}</div>
                                                     {data.adjustment_responded_by && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>{data.adjustment_responded_by}</div>}
                                                 </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── Price Proposal Status ── */}
+                            {data.price_review_status && (
+                                <div style={{ background: "#fff", border: `1px solid ${data.price_review_status === "accepted" ? "#bbf7d0" : data.price_review_status === "countered" ? "#fed7aa" : "#bfdbfe"}`, borderRadius: 10, padding: "14px 20px", marginBottom: 16 }}>
+                                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                                <div style={{ fontSize: 14, fontWeight: 600, color: data.price_review_status === "accepted" ? "#15803d" : data.price_review_status === "countered" ? "#92400e" : "#1d4ed8" }}>
+                                                    {data.price_review_status === "accepted" ? "Price accepted" : data.price_review_status === "countered" ? "Counter offer received" : "Price proposal submitted"}
+                                                </div>
+                                                <span style={{
+                                                    fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
+                                                    padding: "2px 8px", borderRadius: 20,
+                                                    background: data.price_review_status === "accepted" ? "#dcfce7" : data.price_review_status === "countered" ? "#fff7ed" : "#dbeafe",
+                                                    color: data.price_review_status === "accepted" ? "#15803d" : data.price_review_status === "countered" ? "#92400e" : "#1d4ed8",
+                                                }}>
+                                                    {data.price_review_status}
+                                                </span>
+                                            </div>
+                                            <div style={{ display: "flex", gap: 24, marginTop: 10, flexWrap: "wrap" }}>
+                                                <div>
+                                                    <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1 }}>Your Proposed Price</div>
+                                                    <div style={{ fontSize: 14, fontWeight: 700, color: "#1f2937", marginTop: 2 }}>{data.vendor_proposed_price}</div>
+                                                </div>
+                                                {data.price_counter_offer && (
+                                                    <div>
+                                                        <div style={{ fontSize: 10, fontWeight: 700, color: "#d97706", textTransform: "uppercase", letterSpacing: 1 }}>Counter Offer</div>
+                                                        <div style={{ fontSize: 14, fontWeight: 700, color: "#92400e", marginTop: 2 }}>{data.price_counter_offer}</div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {data.price_review_note && (
+                                                <div style={{ marginTop: 10, background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 14px" }}>
+                                                    <div style={{ fontSize: 10, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
+                                                        Note from Production Team
+                                                        {data.price_reviewed_at && <span style={{ fontWeight: 400, marginLeft: 8, color: "#9ca3af", textTransform: "none", letterSpacing: 0 }}>· {fmtDateTime(data.price_reviewed_at)}</span>}
+                                                    </div>
+                                                    <div style={{ fontSize: 13, color: "#374151" }}>{data.price_review_note}</div>
+                                                </div>
+                                            )}
+                                            {data.price_review_status === "countered" && (
+                                                <p style={{ fontSize: 12, color: "#92400e", marginTop: 8 }}>To submit a revised price, use the &ldquo;Your Quoted Price&rdquo; field in Send an Update below.</p>
                                             )}
                                         </div>
                                     </div>
@@ -712,19 +759,12 @@ export default function VendorBriefPage(): ReactElement {
                                     ["SLA Deadline",      comp.sla_deadline ? fmtDate(comp.sla_deadline) : "TBD"],
                                     ["Notes / Proof",     comp.notes || "—"],
                                     ...(comp.brief_quoted_price ? [["Your Quoted Price", comp.brief_quoted_price]] : []),
-                                    ...(comp.brief_lpo_ref ? [["LPO Reference", comp.brief_lpo_ref]] : []),
                                 ] as [string, string][]).map(([label, value], i, arr) => (
                                     <div key={label} style={{ display: "flex", borderBottom: i < arr.length - 1 ? "1px solid #f3f4f6" : undefined, background: i % 2 === 0 ? "#fafafa" : "#fff" }}>
                                         <div style={{ width: "38%", padding: "11px 20px", fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: 0.8 }}>{label}</div>
                                         <div style={{ flex: 1, padding: "11px 20px", fontSize: 14, color: label === "Quantity" || label === "Your Quoted Price" ? "#1e3a5f" : "#374151", fontWeight: label === "Quantity" || label === "Your Quoted Price" ? 700 : 400 }}>{value}</div>
                                     </div>
                                 ))}
-                                {comp.job_instructions && (
-                                    <div style={{ background: "#eff6ff", borderTop: "1px solid #bfdbfe", padding: "12px 20px" }}>
-                                        <div style={{ fontSize: 10, fontWeight: 700, color: "#2563eb", letterSpacing: 1.2, textTransform: "uppercase", marginBottom: 6 }}>General Job Instructions</div>
-                                        <div style={{ fontSize: 13, color: "#1e3a5f", whiteSpace: "pre-line", lineHeight: 1.6 }}>{comp.job_instructions}</div>
-                                    </div>
-                                )}
                             </div>
 
                             {/* ── Files & Assets ── */}
@@ -763,7 +803,7 @@ export default function VendorBriefPage(): ReactElement {
                                                 {ba.description && <div style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{ba.description}</div>}
                                             </div>
                                             <button
-                                                onClick={() => downloadFile(ba.file_url, ba.attachment_name)}
+                                                onClick={() => downloadFile(`${apiBase}brief-attachment/${ba.id}/`, ba.attachment_name)}
                                                 style={{ background: "#15803d", color: "#fff", fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 6, border: "none", cursor: "pointer", flexShrink: 0, marginLeft: 12 }}
                                             >
                                                 Download

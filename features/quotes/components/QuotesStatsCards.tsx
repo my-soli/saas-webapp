@@ -20,7 +20,7 @@ export default function QuotesStatsCards({ stats }: QuotesStatsCardsProps) {
                     Total Quotes
                 </p>
                 <p className="text-3xl font-bold text-gray-900">{stats.total_quotes}</p>
-                <p className="text-xs text-gray-400 mt-1">All active quotes</p>
+                <p className="text-xs text-gray-400 mt-1">All quotes (all statuses)</p>
             </div>
 
             <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow">

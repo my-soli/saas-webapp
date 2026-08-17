@@ -23,6 +23,7 @@ import {
     sendQuoteToCustomer,
     markQuoteLost,
     convertQuoteToJob,
+    generateInvoiceFromQuote,
     deleteQuote,
     fetchMultiProductQuoteDetail,
 } from "@/services/quotes";
@@ -37,6 +38,7 @@ export default function MultiProductQuotesPage() {
     const [markLostModalQuoteId, setMarkLostModalQuoteId] = useState<number | null>(null);
     const [cloneConfirmQuoteId, setCloneConfirmQuoteId] = useState<number | null>(null);
     const [convertToJobQuote, setConvertToJobQuote] = useState<MultiProductQuote | null>(null);
+    const [generateInvoiceQuoteId, setGenerateInvoiceQuoteId] = useState<number | null>(null);
     const [deleteConfirmQuoteId, setDeleteConfirmQuoteId] = useState<number | null>(null);
     const queryClient = useQueryClient();
 
@@ -112,6 +114,17 @@ export default function MultiProductQuotesPage() {
             setSelectedQuote(null);
             setConvertToJobQuote(null);
         },
+    });
+
+    const generateInvoiceMutation = useMutation({
+        mutationFn: generateInvoiceFromQuote,
+        onSuccess: (data) => {
+            toast.success(`Invoice ${data.invoice_number} generated — see it in Financial > Invoices.`);
+            queryClient.invalidateQueries({ queryKey: ["financial-invoices"] });
+            setSelectedQuote(null);
+            setGenerateInvoiceQuoteId(null);
+        },
+        onError: (error: Error) => toast.error(error.message || "Failed to generate invoice."),
     });
 
     const deleteMutation = useMutation({
@@ -208,9 +221,15 @@ export default function MultiProductQuotesPage() {
             try {
                 await convertToJobMutation.mutateAsync({ quoteId: convertToJobQuote.id, ownerUserId, assignments });
             } catch (error) {
-                toast.error("Failed to convert quote to job. Please try again.");
+                toast.error(error instanceof Error ? error.message : "Failed to convert quote to job. Please try again.");
             }
         }
+    };
+
+    const handleGenerateInvoice = (quoteId: number) => setGenerateInvoiceQuoteId(quoteId);
+
+    const handleConfirmGenerateInvoice = () => {
+        if (generateInvoiceQuoteId) generateInvoiceMutation.mutate(generateInvoiceQuoteId);
     };
 
     const handleDelete = (quoteId: number) => {
@@ -333,6 +352,7 @@ export default function MultiProductQuotesPage() {
                 isSendingToCustomer={sendToCustomerMutation.isPending}
                 onMarkLost={handleMarkLost}
                 onConvertToJob={handleConvertToJob}
+                onGenerateInvoice={handleGenerateInvoice}
                 onDownloadPdf={handleDownloadPdf}
                 onEdit={handleEdit}
             />
@@ -370,6 +390,17 @@ export default function MultiProductQuotesPage() {
                     onClose={() => setConvertToJobQuote(null)}
                     onConfirm={handleConfirmConvertToJob}
                     isLoading={convertToJobMutation.isPending}
+                />
+            )}
+
+            {generateInvoiceQuoteId && (
+                <ConfirmModal
+                    title="Generate Invoice"
+                    message="Generate an invoice for this quote? This creates a draft invoice in Financial > Invoices that you can review before sending."
+                    confirmText={generateInvoiceMutation.isPending ? "Generating…" : "Generate Invoice"}
+                    confirmColor="blue"
+                    onClose={() => setGenerateInvoiceQuoteId(null)}
+                    onConfirm={handleConfirmGenerateInvoice}
                 />
             )}
 

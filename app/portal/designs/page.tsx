@@ -1,15 +1,21 @@
 "use client";
 
-import { useState, useRef, useCallback, type ReactElement, type ChangeEvent } from "react";
+import {
+    useState, useRef, useCallback, type ReactElement, type ChangeEvent,
+} from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
     FolderOpen, Upload, Trash2, Download, FileImage, FileText,
     File as FileIcon, AlertCircle, X, Plus, ChevronRight,
-    Image as ImageIcon, Pencil,
+    Image as ImageIcon, Pencil, Share2, Check,
 } from "lucide-react";
-import { fetchDesigns, uploadDesign, deleteDesign } from "@/services/client-portal-extras";
-import type { DesignFile, DesignCategory } from "@/types/client-portal-extras";
+import {
+    fetchDesigns, uploadDesign, deleteDesign,
+    fetchDesignProjects, createDesignProject, updateDesignProject, deleteDesignProject,
+    fetchStaffForShare, shareDesignFiles,
+} from "@/services/client-portal-extras";
+import type { DesignFile, DesignCategory, DesignProject, StaffMember } from "@/types/client-portal-extras";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -34,7 +40,7 @@ const CATEGORY_OPTIONS: { value: DesignCategory; label: string }[] = [
 const CATEGORY_TABS = [
     { value: "all",      label: "All" },
     { value: "logo",     label: "Logo" },
-    { value: "artwork",  label: "Artwork / Illustration" },
+    { value: "artwork",  label: "Artwork" },
     { value: "photo",    label: "Photo" },
     { value: "document", label: "Document" },
     { value: "other",    label: "Other" },
@@ -55,45 +61,35 @@ function fileTypeIcon(fileName: string): ReactElement {
     return <FileIcon className="w-5 h-5 text-gray-400" />;
 }
 
-// ── Project types (stored in localStorage) ────────────────────────────────────
-
-interface Project {
-    id: string;
-    name: string;
-    description: string;
-    createdAt: string;
-    fileIds: number[];
-}
-
-const STORAGE_KEY = "portal_projects_v1";
-
-function loadProjects(): Project[] {
-    if (typeof window === "undefined") return [];
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
-}
-
-function saveProjects(projects: Project[]): void {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
-}
-
 // ── Upload modal ──────────────────────────────────────────────────────────────
 
-function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (file: DesignFile) => void }): ReactElement {
+interface UploadModalProps {
+    onClose: () => void;
+    onSuccess: (file: DesignFile) => void;
+    defaultCategory?: DesignCategory;
+    projectId?: number;
+}
+
+function UploadModal({ onClose, onSuccess, defaultCategory, projectId }: UploadModalProps): ReactElement {
     const [file, setFile] = useState<File | null>(null);
     const [title, setTitle] = useState("");
-    const [category, setCategory] = useState<DesignCategory>("other");
+    const [category, setCategory] = useState<DesignCategory>(defaultCategory ?? "other");
     const [notes, setNotes] = useState("");
     const [dragging, setDragging] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     const mutation = useMutation({
-        mutationFn: () => uploadDesign({ file: file!, title, category, notes }),
+        mutationFn: () => uploadDesign({ file: file!, title, category, notes, project_id: projectId }),
         onSuccess: (data) => { toast.success("Uploaded!"); onSuccess(data); onClose(); },
         onError: (err: Error) => toast.error(err.message || "Upload failed"),
     });
 
     const pickFile = (f: File) => { setFile(f); if (!title) setTitle(f.name.replace(/\.[^.]+$/, "")); };
-    const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) pickFile(f); }, []);
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault(); setDragging(false);
+        const f = e.dataTransfer.files[0]; if (f) pickFile(f);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
     const handleInput = (e: ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; if (f) pickFile(f); };
 
     return (
@@ -154,15 +150,15 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
 // ── New Project modal ─────────────────────────────────────────────────────────
 
-function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate: (p: Project) => void }): ReactElement {
+function NewProjectModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (p: DesignProject) => void }): ReactElement {
     const [name, setName] = useState("");
     const [desc, setDesc] = useState("");
 
-    const submit = () => {
-        if (!name.trim()) return;
-        onCreate({ id: `proj_${Date.now()}`, name: name.trim(), description: desc.trim(), createdAt: new Date().toISOString(), fileIds: [] });
-        onClose();
-    };
+    const mutation = useMutation({
+        mutationFn: () => createDesignProject(name.trim(), desc.trim()),
+        onSuccess: (data) => { toast.success("Project created."); onSuccess(data); onClose(); },
+        onError: (err: Error) => toast.error(err.message || "Failed to create project"),
+    });
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -173,7 +169,7 @@ function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate:
                 </div>
                 <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Project name <span className="text-red-400">*</span></label>
-                    <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} placeholder="e.g. Annual Conference 2026" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30" />
+                    <input autoFocus type="text" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !mutation.isPending && mutation.mutate()} placeholder="e.g. Annual Conference 2026" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30" />
                 </div>
                 <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Description <span className="text-gray-400">(optional)</span></label>
@@ -181,7 +177,165 @@ function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate:
                 </div>
                 <div className="flex gap-2">
                     <button type="button" onClick={onClose} className="flex-1 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-                    <button type="button" disabled={!name.trim()} onClick={submit} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-brand-blue/90">Create</button>
+                    <button type="button" disabled={!name.trim() || mutation.isPending} onClick={() => mutation.mutate()} className="flex-1 py-2 bg-brand-blue text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-brand-blue/90">
+                        {mutation.isPending ? "Creating…" : "Create"}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Share modal ───────────────────────────────────────────────────────────────
+
+interface ShareModalProps {
+    files: DesignFile[];
+    preSelectedIds?: number[];
+    onClose: () => void;
+}
+
+function ShareModal({ files, preSelectedIds, onClose }: ShareModalProps): ReactElement {
+    const [selectedFileIds, setSelectedFileIds] = useState<Set<number>>(
+        new Set(preSelectedIds ?? files.map((f) => f.id))
+    );
+    const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set());
+    const [instructions, setInstructions] = useState("");
+
+    const { data: staff = [], isLoading: staffLoading } = useQuery({
+        queryKey: ["portal-staff-for-share"],
+        queryFn: fetchStaffForShare,
+        staleTime: 120_000,
+    });
+
+    const shareMutation = useMutation({
+        mutationFn: () => shareDesignFiles({
+            file_ids: Array.from(selectedFileIds),
+            recipient_ids: Array.from(selectedRecipients),
+            instructions,
+        }),
+        onSuccess: (data) => {
+            toast.success(`Shared ${data.shared_count} file(s) with ${data.notified} person(s).`);
+            onClose();
+        },
+        onError: (err: Error) => toast.error(err.message || "Failed to share"),
+    });
+
+    const toggleFile = (id: number) => {
+        setSelectedFileIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const toggleRecipient = (id: number) => {
+        setSelectedRecipients((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const canShare = selectedFileIds.size > 0 && selectedRecipients.size > 0 && !shareMutation.isPending;
+
+    // Group staff by role
+    const groupedStaff = staff.reduce<Record<string, StaffMember[]>>((acc, m) => {
+        (acc[m.role] = acc[m.role] ?? []).push(m);
+        return acc;
+    }, {});
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-5 border-b border-gray-100 shrink-0">
+                    <div className="flex items-center gap-2">
+                        <Share2 className="w-4 h-4 text-brand-blue" />
+                        <h2 className="text-base font-semibold text-gray-900">Share Files</h2>
+                    </div>
+                    <button type="button" onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5 space-y-5">
+                    {/* File selection */}
+                    <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Files to share</p>
+                        <div className="space-y-1.5 max-h-36 overflow-y-auto border border-gray-100 rounded-xl p-2">
+                            {files.map((f) => (
+                                <label key={f.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedFileIds.has(f.id)}
+                                        onChange={() => toggleFile(f.id)}
+                                        className="w-4 h-4 rounded border-gray-300 text-brand-blue"
+                                    />
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-gray-800 truncate">{f.title}</p>
+                                        <p className="text-xs text-gray-400">{f.file_name} · {fmtSize(f.file_size)}</p>
+                                    </div>
+                                </label>
+                            ))}
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1">{selectedFileIds.size} of {files.length} selected</p>
+                    </div>
+
+                    {/* Instructions */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                            Instructions <span className="text-gray-400 font-normal normal-case">(optional)</span>
+                        </label>
+                        <textarea
+                            value={instructions}
+                            onChange={(e) => setInstructions(e.target.value)}
+                            rows={3}
+                            placeholder="Add any instructions or notes for the recipient…"
+                            className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30 resize-none"
+                        />
+                    </div>
+
+                    {/* Recipients */}
+                    <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Send to</p>
+                        {staffLoading ? (
+                            <div className="space-y-2">
+                                {[...Array(3)].map((_, i) => <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />)}
+                            </div>
+                        ) : staff.length === 0 ? (
+                            <p className="text-sm text-gray-400 text-center py-4">No staff members available.</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {Object.entries(groupedStaff).map(([role, members]) => (
+                                    <div key={role}>
+                                        <p className="text-xs font-medium text-gray-400 mb-1.5">{role}</p>
+                                        <div className="space-y-1">
+                                            {members.map((m) => (
+                                                <label key={m.id} className="flex items-center gap-3 px-3 py-2 rounded-xl border border-gray-100 hover:bg-gray-50 cursor-pointer">
+                                                    <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${selectedRecipients.has(m.id) ? "bg-brand-blue border-brand-blue" : "border-gray-300"}`}>
+                                                        {selectedRecipients.has(m.id) && <Check className="w-3 h-3 text-white" />}
+                                                    </div>
+                                                    <input type="checkbox" className="sr-only" checked={selectedRecipients.has(m.id)} onChange={() => toggleRecipient(m.id)} />
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-medium text-gray-800">{m.name}</p>
+                                                        <p className="text-xs text-gray-400">{m.email}</p>
+                                                    </div>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {selectedRecipients.size > 0 && (
+                            <p className="text-xs text-brand-blue mt-2">{selectedRecipients.size} recipient(s) selected</p>
+                        )}
+                    </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-3 p-5 border-t border-gray-100 shrink-0">
+                    <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="button" onClick={() => shareMutation.mutate()} disabled={!canShare} className="inline-flex items-center gap-2 px-5 py-2 bg-brand-blue text-white text-sm font-medium rounded-lg hover:bg-brand-blue/90 disabled:opacity-50">
+                        {shareMutation.isPending ? <span className="animate-spin rounded-full w-4 h-4 border-2 border-white border-t-transparent" /> : <Share2 className="w-4 h-4" />}
+                        {shareMutation.isPending ? "Sharing…" : "Share"}
+                    </button>
                 </div>
             </div>
         </div>
@@ -190,11 +344,23 @@ function NewProjectModal({ onClose, onCreate }: { onClose: () => void; onCreate:
 
 // ── File card ─────────────────────────────────────────────────────────────────
 
-function FileCard({ design, onDelete }: { design: DesignFile; onDelete: (id: number) => void }): ReactElement {
+interface FileCardProps {
+    design: DesignFile;
+    onDelete: (id: number) => void;
+    onShare?: (file: DesignFile) => void;
+    selectable?: boolean;
+    selected?: boolean;
+    onToggleSelect?: (id: number) => void;
+}
+
+function FileCard({ design, onDelete, onShare, selectable, selected, onToggleSelect }: FileCardProps): ReactElement {
     const isImage = ["jpg", "jpeg", "png", "gif", "webp", "svg"].includes(design.file_name.split(".").pop()?.toLowerCase() ?? "");
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow group">
+        <div
+            className={`bg-white rounded-xl border shadow-sm overflow-hidden hover:shadow-md transition-shadow group ${selected ? "border-brand-blue ring-2 ring-brand-blue/30" : "border-gray-200"}`}
+            onClick={selectable ? () => onToggleSelect?.(design.id) : undefined}
+        >
             <div className="h-32 bg-gray-50 flex items-center justify-center overflow-hidden relative">
                 {isImage && design.file_url ? (
                     <img src={design.file_url} alt={design.title} className="w-full h-full object-contain p-2" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
@@ -204,16 +370,28 @@ function FileCard({ design, onDelete }: { design: DesignFile; onDelete: (id: num
                         <span className="text-xs uppercase tracking-wider font-medium">{design.file_name.split(".").pop()}</span>
                     </div>
                 )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                    {design.file_url && (
-                        <a href={design.file_url} download={design.file_name} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-white rounded-lg flex items-center justify-center hover:bg-gray-100" title="Download">
-                            <Download className="w-4 h-4 text-gray-700" />
-                        </a>
-                    )}
-                    <button type="button" onClick={() => onDelete(design.id)} className="w-8 h-8 bg-white rounded-lg flex items-center justify-center hover:bg-red-50" title="Delete">
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                    </button>
-                </div>
+                {!selectable && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        {design.file_url && (
+                            <a href={design.file_url} download={design.file_name} target="_blank" rel="noopener noreferrer" className="w-8 h-8 bg-white rounded-lg flex items-center justify-center hover:bg-gray-100" title="Download">
+                                <Download className="w-4 h-4 text-gray-700" />
+                            </a>
+                        )}
+                        {onShare && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); onShare(design); }} className="w-8 h-8 bg-white rounded-lg flex items-center justify-center hover:bg-blue-50" title="Share">
+                                <Share2 className="w-4 h-4 text-brand-blue" />
+                            </button>
+                        )}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onDelete(design.id); }} className="w-8 h-8 bg-white rounded-lg flex items-center justify-center hover:bg-red-50" title="Delete">
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                        </button>
+                    </div>
+                )}
+                {selectable && selected && (
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-brand-blue rounded-full flex items-center justify-center">
+                        <Check className="w-3 h-3 text-white" />
+                    </div>
+                )}
             </div>
             <div className="p-3">
                 <p className="text-sm font-semibold text-gray-800 truncate" title={design.title}>{design.title}</p>
@@ -233,27 +411,48 @@ function FileCard({ design, onDelete }: { design: DesignFile; onDelete: (id: num
 // ── Project view ──────────────────────────────────────────────────────────────
 
 interface ProjectViewProps {
-    project: Project;
+    project: DesignProject;
     allFiles: DesignFile[];
     onBack: () => void;
     onDelete: (id: number) => void;
-    onUploadSuccess: (file: DesignFile, projectId: string) => void;
-    onRename: (id: string, name: string, desc: string) => void;
+    onFileUploaded: () => void;
+    onProjectUpdated: () => void;
 }
 
-function ProjectView({ project, allFiles, onBack, onDelete, onUploadSuccess, onRename }: ProjectViewProps): ReactElement {
+function ProjectView({ project, allFiles, onBack, onDelete, onFileUploaded, onProjectUpdated }: ProjectViewProps): ReactElement {
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState("all");
     const [showUpload, setShowUpload] = useState(false);
     const [editingName, setEditingName] = useState(false);
     const [nameVal, setNameVal] = useState(project.name);
     const [descVal, setDescVal] = useState(project.description);
+    const [shareFiles, setShareFiles] = useState<DesignFile[] | null>(null);
+    const [selectedForShare, setSelectedForShare] = useState<Set<number>>(new Set());
+    const [selectMode, setSelectMode] = useState(false);
 
-    const projectFiles = allFiles.filter((f) => project.fileIds.includes(f.id));
+    const projectFiles = allFiles.filter((f) => f.project_id === project.id);
     const filtered = activeTab === "all" ? projectFiles : projectFiles.filter((f) => f.category === activeTab);
 
-    const saveName = () => {
-        setEditingName(false);
-        if (nameVal.trim()) onRename(project.id, nameVal.trim(), descVal.trim());
+    const renameMutation = useMutation({
+        mutationFn: () => updateDesignProject(project.id, nameVal.trim(), descVal.trim()),
+        onSuccess: () => { toast.success("Project renamed."); setEditingName(false); onProjectUpdated(); },
+        onError: () => toast.error("Failed to rename project"),
+    });
+
+    const toggleSelect = (id: number) => {
+        setSelectedForShare((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const activeTabCategory = activeTab !== "all" ? activeTab as DesignCategory : undefined;
+
+    const handleUploadSuccess = () => {
+        queryClient.invalidateQueries({ queryKey: ["portal-designs"] });
+        onFileUploaded();
+        setShowUpload(false);
     };
 
     return (
@@ -261,9 +460,19 @@ function ProjectView({ project, allFiles, onBack, onDelete, onUploadSuccess, onR
             {showUpload && (
                 <UploadModal
                     onClose={() => setShowUpload(false)}
-                    onSuccess={(file) => { onUploadSuccess(file, project.id); setShowUpload(false); }}
+                    onSuccess={handleUploadSuccess}
+                    defaultCategory={activeTabCategory}
+                    projectId={project.id}
                 />
             )}
+            {shareFiles && (
+                <ShareModal
+                    files={shareFiles}
+                    preSelectedIds={selectedForShare.size > 0 ? Array.from(selectedForShare) : undefined}
+                    onClose={() => { setShareFiles(null); setSelectMode(false); setSelectedForShare(new Set()); }}
+                />
+            )}
+
             <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
                 {/* Breadcrumb */}
                 <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -277,10 +486,10 @@ function ProjectView({ project, allFiles, onBack, onDelete, onUploadSuccess, onR
                     <div className="flex-1 min-w-0">
                         {editingName ? (
                             <div className="space-y-1.5">
-                                <input autoFocus value={nameVal} onChange={(e) => setNameVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveName()} className="text-xl font-bold text-gray-900 border-b-2 border-brand-blue outline-none bg-transparent w-full" />
+                                <input autoFocus value={nameVal} onChange={(e) => setNameVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && renameMutation.mutate()} className="text-xl font-bold text-gray-900 border-b-2 border-brand-blue outline-none bg-transparent w-full" />
                                 <input value={descVal} onChange={(e) => setDescVal(e.target.value)} placeholder="Description (optional)" className="text-sm text-gray-500 border-b border-gray-200 outline-none bg-transparent w-full" />
                                 <div className="flex gap-2">
-                                    <button type="button" onClick={saveName} className="text-xs text-brand-blue font-medium">Save</button>
+                                    <button type="button" onClick={() => renameMutation.mutate()} disabled={renameMutation.isPending} className="text-xs text-brand-blue font-medium">Save</button>
                                     <button type="button" onClick={() => setEditingName(false)} className="text-xs text-gray-400">Cancel</button>
                                 </div>
                             </div>
@@ -294,9 +503,32 @@ function ProjectView({ project, allFiles, onBack, onDelete, onUploadSuccess, onR
                             </button>
                         )}
                     </div>
-                    <button type="button" onClick={() => setShowUpload(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-brand-blue text-white text-sm font-medium rounded-lg hover:bg-brand-blue/90">
-                        <Upload className="w-4 h-4" /> Upload File
-                    </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {projectFiles.length > 0 && (
+                            <>
+                                {selectMode ? (
+                                    <>
+                                        <button type="button" onClick={() => { setSelectMode(false); setSelectedForShare(new Set()); }} className="px-3 py-2 text-sm border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Cancel</button>
+                                        <button type="button" disabled={selectedForShare.size === 0} onClick={() => setShareFiles(projectFiles)} className="inline-flex items-center gap-2 px-4 py-2 bg-brand-blue text-white text-sm font-medium rounded-lg hover:bg-brand-blue/90 disabled:opacity-50">
+                                            <Share2 className="w-4 h-4" /> Share ({selectedForShare.size})
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <button type="button" onClick={() => setShareFiles(projectFiles)} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
+                                            <Share2 className="w-4 h-4" /> Share All
+                                        </button>
+                                        <button type="button" onClick={() => setSelectMode(true)} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
+                                            <Check className="w-4 h-4" /> Select
+                                        </button>
+                                    </>
+                                )}
+                            </>
+                        )}
+                        <button type="button" onClick={() => setShowUpload(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-brand-blue text-white text-sm font-medium rounded-lg hover:bg-brand-blue/90">
+                            <Upload className="w-4 h-4" /> Upload File
+                        </button>
+                    </div>
                 </div>
 
                 {/* Category tabs */}
@@ -320,7 +552,17 @@ function ProjectView({ project, allFiles, onBack, onDelete, onUploadSuccess, onR
                     </div>
                 ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                        {filtered.map((d) => <FileCard key={d.id} design={d} onDelete={onDelete} />)}
+                        {filtered.map((d) => (
+                            <FileCard
+                                key={d.id}
+                                design={d}
+                                onDelete={onDelete}
+                                onShare={(f) => setShareFiles([f])}
+                                selectable={selectMode}
+                                selected={selectedForShare.has(d.id)}
+                                onToggleSelect={toggleSelect}
+                            />
+                        ))}
                     </div>
                 )}
             </div>
@@ -331,12 +573,18 @@ function ProjectView({ project, allFiles, onBack, onDelete, onUploadSuccess, onR
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DesignsDocumentsPage(): ReactElement {
-    const [projects, setProjects] = useState<Project[]>(() => loadProjects());
-    const [activeProject, setActiveProject] = useState<string | null>(null);
-    const [showNewProject, setShowNewProject] = useState(false);
     const queryClient = useQueryClient();
+    const [activeProject, setActiveProject] = useState<number | null>(null);
+    const [showNewProject, setShowNewProject] = useState(false);
+    const [shareAllFiles, setShareAllFiles] = useState<DesignFile[] | null>(null);
 
-    const { data, isLoading, isError } = useQuery({
+    const { data: projectsData, isLoading: projectsLoading } = useQuery({
+        queryKey: ["portal-design-projects"],
+        queryFn: fetchDesignProjects,
+        staleTime: 30_000,
+    });
+
+    const { data: filesData, isLoading: filesLoading, isError } = useQuery({
         queryKey: ["portal-designs", "all"],
         queryFn: () => fetchDesigns("all"),
         staleTime: 30_000,
@@ -344,34 +592,26 @@ export default function DesignsDocumentsPage(): ReactElement {
 
     const deleteMutation = useMutation({
         mutationFn: deleteDesign,
-        onSuccess: () => { toast.success("File deleted."); queryClient.invalidateQueries({ queryKey: ["portal-designs"] }); },
+        onSuccess: () => { toast.success("File deleted."); queryClient.invalidateQueries({ queryKey: ["portal-designs"] }); queryClient.invalidateQueries({ queryKey: ["portal-design-projects"] }); },
         onError: () => toast.error("Could not delete. Please try again."),
     });
 
-    const allFiles: DesignFile[] = data?.results ?? [];
+    const deleteProjectMutation = useMutation({
+        mutationFn: deleteDesignProject,
+        onSuccess: () => {
+            toast.success("Project deleted. Files were kept.");
+            queryClient.invalidateQueries({ queryKey: ["portal-design-projects"] });
+            queryClient.invalidateQueries({ queryKey: ["portal-designs"] });
+            if (activeProject !== null) setActiveProject(null);
+        },
+        onError: () => toast.error("Failed to delete project"),
+    });
 
-    const persistProjects = (updated: Project[]) => { setProjects(updated); saveProjects(updated); };
+    const allFiles: DesignFile[] = filesData?.results ?? [];
+    const projects: DesignProject[] = projectsData?.results ?? [];
+    const isLoading = projectsLoading || filesLoading;
 
-    const createProject = (p: Project) => persistProjects([...projects, p]);
-
-    const renameProject = (id: string, name: string, desc: string) => {
-        persistProjects(projects.map((p) => p.id === id ? { ...p, name, description: desc } : p));
-    };
-
-    const deleteProject = (id: string) => {
-        persistProjects(projects.filter((p) => p.id !== id));
-        if (activeProject === id) setActiveProject(null);
-    };
-
-    const handleUploadSuccess = (file: DesignFile, projectId: string) => {
-        persistProjects(projects.map((p) => p.id === projectId ? { ...p, fileIds: [...p.fileIds, file.id] } : p));
-        queryClient.invalidateQueries({ queryKey: ["portal-designs"] });
-    };
-
-    const unassignedIds = new Set(projects.flatMap((p) => p.fileIds));
-    const unassigned = allFiles.filter((f) => !unassignedIds.has(f.id));
-
-    if (activeProject) {
+    if (activeProject !== null) {
         const proj = projects.find((p) => p.id === activeProject);
         if (proj) {
             return (
@@ -380,16 +620,33 @@ export default function DesignsDocumentsPage(): ReactElement {
                     allFiles={allFiles}
                     onBack={() => setActiveProject(null)}
                     onDelete={(id) => deleteMutation.mutate(id)}
-                    onUploadSuccess={handleUploadSuccess}
-                    onRename={renameProject}
+                    onFileUploaded={() => {
+                        queryClient.invalidateQueries({ queryKey: ["portal-designs"] });
+                        queryClient.invalidateQueries({ queryKey: ["portal-design-projects"] });
+                    }}
+                    onProjectUpdated={() => queryClient.invalidateQueries({ queryKey: ["portal-design-projects"] })}
                 />
             );
         }
     }
 
+    // Unassigned files — files with no project
+    const unassigned = allFiles.filter((f) => f.project_id === null);
+
     return (
         <>
-            {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} onCreate={createProject} />}
+            {showNewProject && (
+                <NewProjectModal
+                    onClose={() => setShowNewProject(false)}
+                    onSuccess={() => queryClient.invalidateQueries({ queryKey: ["portal-design-projects"] })}
+                />
+            )}
+            {shareAllFiles && (
+                <ShareModal
+                    files={shareAllFiles}
+                    onClose={() => setShareAllFiles(null)}
+                />
+            )}
 
             <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-6">
                 <div className="flex items-center justify-between flex-wrap gap-3">
@@ -429,7 +686,7 @@ export default function DesignsDocumentsPage(): ReactElement {
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {projects.map((proj) => {
-                            const projFiles = allFiles.filter((f) => proj.fileIds.includes(f.id));
+                            const projFiles = allFiles.filter((f) => f.project_id === proj.id);
                             const preview = projFiles.find((f) => f.file_url && ["jpg","jpeg","png","gif","webp","svg"].includes(f.file_name.split(".").pop()?.toLowerCase() ?? ""));
                             return (
                                 <div key={proj.id} className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden group">
@@ -439,8 +696,23 @@ export default function DesignsDocumentsPage(): ReactElement {
                                         ) : (
                                             <FolderOpen className="w-10 h-10 text-gray-200" />
                                         )}
-                                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <button type="button" onClick={() => deleteProject(proj.id)} className="w-8 h-8 bg-white/90 rounded-lg flex items-center justify-center hover:bg-red-50">
+                                        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                            {projFiles.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); setShareAllFiles(projFiles); }}
+                                                    className="w-8 h-8 bg-white/90 rounded-lg flex items-center justify-center hover:bg-blue-50"
+                                                    title="Share project"
+                                                >
+                                                    <Share2 className="w-4 h-4 text-brand-blue" />
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); deleteProjectMutation.mutate(proj.id); }}
+                                                className="w-8 h-8 bg-white/90 rounded-lg flex items-center justify-center hover:bg-red-50"
+                                                title="Delete project"
+                                            >
                                                 <Trash2 className="w-4 h-4 text-red-500" />
                                             </button>
                                         </div>
@@ -454,7 +726,7 @@ export default function DesignsDocumentsPage(): ReactElement {
                                             {proj.description && <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{proj.description}</p>}
                                         </button>
                                         <p className="text-xs text-gray-400 mt-2">
-                                            {projFiles.length} file{projFiles.length !== 1 ? "s" : ""} · {fmtDate(proj.createdAt)}
+                                            {proj.file_count} file{proj.file_count !== 1 ? "s" : ""} · {fmtDate(proj.created_at)}
                                         </p>
                                     </div>
                                 </div>
@@ -466,9 +738,21 @@ export default function DesignsDocumentsPage(): ReactElement {
                 {/* Unassigned files */}
                 {unassigned.length > 0 && (
                     <div>
-                        <h2 className="text-sm font-semibold text-gray-700 mb-3">Unassigned Files</h2>
+                        <div className="flex items-center justify-between mb-3">
+                            <h2 className="text-sm font-semibold text-gray-700">Unassigned Files</h2>
+                            <button type="button" onClick={() => setShareAllFiles(unassigned)} className="inline-flex items-center gap-1.5 text-xs text-brand-blue hover:underline">
+                                <Share2 className="w-3.5 h-3.5" /> Share all
+                            </button>
+                        </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                            {unassigned.map((d) => <FileCard key={d.id} design={d} onDelete={(id) => deleteMutation.mutate(id)} />)}
+                            {unassigned.map((d) => (
+                                <FileCard
+                                    key={d.id}
+                                    design={d}
+                                    onDelete={(id) => deleteMutation.mutate(id)}
+                                    onShare={(f) => setShareAllFiles([f])}
+                                />
+                            ))}
                         </div>
                     </div>
                 )}

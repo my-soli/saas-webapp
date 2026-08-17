@@ -18,10 +18,12 @@ import {
     TruckIcon,
     XIcon,
     DownloadIcon,
+    RefreshCwIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { ProductionComponent } from "../types";
 import { fetchJob, fetchJobAttachments, fetchComponentEvents, type JobAttachment, type ComponentEvent } from "@/services/jobs";
+import { syncQuoteToJob } from "@/services/quotes";
 import { fetchJobComponents, createDispatchUnit } from "@/services/orchestration";
 import type { JobComponent } from "@/services/orchestration";
 import type { Job } from "@/types/jobs";
@@ -103,7 +105,7 @@ function CreateDispatchModal({ jobId, rawComponents, onClose, onSuccess }: Creat
         new Set(readyComponents.map((c) => c.id))
     );
     const [form, setForm] = useState({
-        dispatch_type: "courier",
+        dispatch_type: "full",
         courier: "",
         delivery_location: "",
         dispatch_date: "",
@@ -200,10 +202,11 @@ function CreateDispatchModal({ jobId, rawComponents, onClose, onSuccess }: Creat
                                 onChange={(e: ChangeEvent<HTMLSelectElement>) => setForm((p) => ({ ...p, dispatch_type: e.target.value }))}
                                 className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
                             >
-                                <option value="courier">Courier</option>
-                                <option value="pickup">Client Pickup</option>
-                                <option value="field">Field Delivery</option>
-                                <option value="internal">Internal Transfer</option>
+                                <option value="full">Full Dispatch</option>
+                                <option value="partial">Partial Dispatch</option>
+                                <option value="blind">Blind Dispatch (Vendor → Client)</option>
+                                <option value="warehouse">Warehouse Routing</option>
+                                <option value="installation">Installation Dispatch</option>
                             </select>
                         </div>
                         <div>
@@ -276,6 +279,21 @@ export default function JobDetailWorkspace({ basePath = "/production-team" }: { 
     const queryClient = useQueryClient();
 
     const [showDispatchModal, setShowDispatchModal] = useState(false);
+
+    const syncQuoteMut = useMutation({
+        mutationFn: (quoteId: number) => syncQuoteToJob(quoteId),
+        onSuccess: (result) => {
+            const parts: string[] = [`New total: KES ${result.new_total.toLocaleString()}`];
+            if (result.components_created > 0) parts.push(`${result.components_created} new component(s) added`);
+            if (result.components_updated > 0) parts.push(`${result.components_updated} component(s) updated`);
+            if (result.zoho_updated) parts.push("Zoho invoice updated");
+            if (result.zoho_reset) parts.push("Zoho sync reset — re-sync needed");
+            toast.success("Quote changes pushed to job", { description: parts.join(" · ") });
+            queryClient.invalidateQueries({ queryKey: ["orchestration", "job-detail", jobId] });
+            queryClient.invalidateQueries({ queryKey: ["job-components", numericJobId] });
+        },
+        onError: (err: Error) => toast.error(err.message || "Failed to sync quote changes"),
+    });
 
     const apiJobQuery = useQuery({
         queryKey: ["orchestration", "job-detail", jobId],
@@ -398,10 +416,27 @@ export default function JobDetailWorkspace({ basePath = "/production-team" }: { 
                             <span className={`rounded-full px-3 py-1 text-xs font-bold ${riskColor(vm.riskLevel)}`}>
                                 {vm.riskLevel} RISK
                             </span>
+                            {apiJobQuery.data?.quote != null && (
+                                <button
+                                    onClick={() => {
+                                        if (!window.confirm("Pull the latest quantities and totals from the quote into this job and LPO?\n\nThis will overwrite component quantities and recalculate the invoice amount.")) return;
+                                        syncQuoteMut.mutate(apiJobQuery.data!.quote as number);
+                                    }}
+                                    disabled={syncQuoteMut.isPending}
+                                    className="flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                                    title="Pull latest quantities and totals from the linked quote"
+                                >
+                                    {syncQuoteMut.isPending
+                                        ? <LoaderCircleIcon className="h-4 w-4 animate-spin" />
+                                        : <RefreshCwIcon className="h-4 w-4" />
+                                    }
+                                    Pull from Quote
+                                </button>
+                            )}
                             {readyCount > 0 && (
                                 <button
                                     onClick={() => setShowDispatchModal(true)}
-                                    className="ml-2 flex items-center gap-2 rounded-md bg-brand-green px-4 py-2 text-sm font-semibold text-white hover:bg-brand-green/90 transition-colors"
+                                    className="flex items-center gap-2 rounded-md bg-brand-green px-4 py-2 text-sm font-semibold text-white hover:bg-brand-green/90 transition-colors"
                                 >
                                     <TruckIcon className="h-4 w-4" />
                                     Create Dispatch Unit

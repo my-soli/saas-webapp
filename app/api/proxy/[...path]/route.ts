@@ -3,13 +3,14 @@ import { cookies } from 'next/headers';
 
 const DJANGO_API = process.env.DJANGO_API_URL || 'http://localhost:8000';
 
-async function fetchCsrfToken(sessionId: string | undefined): Promise<{ token: string; cookieValue: string }> {
+async function fetchCsrfToken(sessionId: string | undefined, tenantHost: string): Promise<{ token: string; cookieValue: string }> {
     try {
         const csrfRes = await fetch(`${DJANGO_API}/api/auth/csrf/`, {
             cache: 'no-store',
             redirect: 'manual',
             headers: {
                 'Accept': 'application/json',
+                'X-Tenant-Host': tenantHost,
                 ...(sessionId ? { Cookie: `sessionid=${sessionId}` } : {}),
             },
         });
@@ -40,6 +41,7 @@ async function handler(
         // Always append a trailing slash so Django's APPEND_SLASH works correctly.
         const targetPath = path.join('/');
         const targetUrl = `${DJANGO_API}/${targetPath}/${request.nextUrl.search}`;
+        const tenantHost = request.headers.get('host') ?? '';
 
         const cookieStore = await cookies();
         const sessionId = cookieStore.get('sessionid')?.value;
@@ -53,7 +55,7 @@ async function handler(
         let csrfCookieValue = '';
 
         if (isMutation) {
-            ({ token: csrfToken, cookieValue: csrfCookieValue } = await fetchCsrfToken(sessionId));
+            ({ token: csrfToken, cookieValue: csrfCookieValue } = await fetchCsrfToken(sessionId, tenantHost));
         }
 
         // Build cookie header: start from the browser's cookies, patch in fresh csrftoken if we got one.
@@ -74,6 +76,7 @@ async function handler(
 
         const forwardHeaders: Record<string, string> = {
             'Accept': request.headers.get('accept') || 'application/json',
+            'X-Tenant-Host': tenantHost,
         };
 
         const contentType = request.headers.get('content-type');

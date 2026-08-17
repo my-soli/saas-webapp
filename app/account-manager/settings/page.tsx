@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { useState } from "react";
+import { useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import AccountManagerLayout from "@/components/account-manager/account-manager-layout";
 import TotpSetupCard from "@/components/settings/TotpSetupCard";
@@ -10,6 +11,16 @@ import { Shield, Lock, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from "l
 import { toast } from "sonner";
 
 export default function AccountManagerSettingsPage(): ReactElement {
+    return (
+        <Suspense fallback={null}>
+            <AccountManagerSettingsPageInner />
+        </Suspense>
+    );
+}
+
+function AccountManagerSettingsPageInner(): ReactElement {
+    const searchParams = useSearchParams();
+    const require2fa = searchParams.get("require2fa") === "1";
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -63,6 +74,15 @@ export default function AccountManagerSettingsPage(): ReactElement {
             </header>
 
             <main className="p-4 lg:p-8 max-w-2xl space-y-6">
+                {require2fa && (
+                    <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-sm font-semibold text-amber-900">Two-factor authentication is required for your role</p>
+                            <p className="text-sm text-amber-700 mt-0.5">Admin and Account Manager accounts must set up an authenticator app before continuing.</p>
+                        </div>
+                    </div>
+                )}
                 {/* Change Password */}
                 <section className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
                     <div className="flex items-center gap-2">

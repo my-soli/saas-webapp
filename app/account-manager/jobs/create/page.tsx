@@ -114,7 +114,7 @@ function CreateJobPageInner(): ReactElement {
             products: productRows,
         }));
         setQuotePreFilled(true);
-    }, [quoteQuery.data, quotePreFilled]);
+    }, [quoteQuery.data, quotePreFilled, router]);
 
     const set = <K extends keyof CreateJobForm>(key: K, value: CreateJobForm[K]): void => {
         setForm((prev) => ({ ...prev, [key]: value }));
@@ -194,6 +194,9 @@ function CreateJobPageInner(): ReactElement {
                 delivery_method: form.delivery_method,
                 delivery_date: form.delivery_date || null,
                 notes: form.notes || null,
+                // Preserve the quote linkage when this job originated from one —
+                // the backend now validates the quote is Approved before accepting it.
+                ...(quoteId ? { quote: Number(quoteId) } : {}),
                 job_products: validProducts.map((p) => ({
                     name: p.name,
                     quantity: p.quantity,

@@ -3,6 +3,10 @@
 import { useState, type ReactNode } from "react";
 import { Menu } from "lucide-react";
 import ProductionSidebar from "./production-sidebar";
+import AIChatPanel from "@/components/admin/AIChatPanel";
+import NotificationBell from "@/components/admin/NotificationBell";
+import WhatsNewWidget from "@/components/shared/WhatsNewWidget";
+import UniversalSearch from "@/components/shared/UniversalSearch";
 
 interface ProductionLayoutProps {
     children: ReactNode;
@@ -38,6 +42,10 @@ export default function ProductionLayout({ children }: ProductionLayoutProps) {
                     {children}
                 </main>
             </div>
+            <AIChatPanel />
+            <UniversalSearch portal="production-team" />
+            <NotificationBell />
+            <WhatsNewWidget />
         </div>
     );
 }

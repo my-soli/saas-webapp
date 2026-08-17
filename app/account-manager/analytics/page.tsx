@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import type { ReactElement } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -6,11 +6,10 @@ import {
     AlertCircleIcon, TrendingUpIcon, UsersIcon, FileTextIcon, TargetIcon,
     BriefcaseIcon, UserCheckIcon, AlertTriangleIcon,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import AccountManagerLayout from "@/components/account-manager/account-manager-layout";
-import JobStatusDonutChart from "@/features/analytics/components/JobStatusDonutChart";
 import QuoteBreakdownBarChart from "@/features/analytics/components/QuoteBreakdownBarChart";
-import { fetchAccountManagerPerformance, fetchJobCompletionStats } from "@/services/analytics";
+import { fetchAccountManagerPerformance } from "@/services/analytics";
 
 export default function AnalyticsPage(): ReactElement {
     const performanceQuery = useQuery({
@@ -18,13 +17,8 @@ export default function AnalyticsPage(): ReactElement {
         queryFn: fetchAccountManagerPerformance,
     });
 
-    const completionQuery = useQuery({
-        queryKey: ["job-completion"],
-        queryFn: fetchJobCompletionStats,
-    });
-
-    const isLoading = performanceQuery.isLoading || completionQuery.isLoading;
-    const hasError = performanceQuery.error || completionQuery.error;
+    const isLoading = performanceQuery.isLoading;
+    const hasError = performanceQuery.error;
     const performance = performanceQuery.data;
 
     const quoteStatusData = performance ? [
@@ -47,8 +41,21 @@ export default function AnalyticsPage(): ReactElement {
     const jobStatusData = performance?.jobs ? [
         { name: "Pending", value: performance.jobs.pending, fill: "#F6B619" },
         { name: "In Progress", value: performance.jobs.in_progress, fill: "#093756" },
-        { name: "On Hold", value: performance.jobs.on_hold, fill: "#9ca3af" },
+        { name: "Blocked", value: performance.jobs.blocked ?? 0, fill: "#dc2626" },
+        { name: "QC Hold", value: performance.jobs.qc_hold ?? 0, fill: "#f97316" },
+        { name: "Ready", value: performance.jobs.ready ?? 0, fill: "#3b82f6" },
+        { name: "Dispatched", value: performance.jobs.dispatched ?? 0, fill: "#8b5cf6" },
         { name: "Completed", value: performance.jobs.completed, fill: "#009444" },
+    ].filter(d => d.value > 0) : [];
+
+    const jobDonutData = performance?.jobs ? [
+        { name: "Completed", value: performance.jobs.completed, fill: "#009444" },
+        { name: "In Progress", value: performance.jobs.in_progress, fill: "#093756" },
+        { name: "Pending", value: performance.jobs.pending, fill: "#F6B619" },
+        { name: "Blocked", value: performance.jobs.blocked ?? 0, fill: "#dc2626" },
+        { name: "QC Hold", value: performance.jobs.qc_hold ?? 0, fill: "#f97316" },
+        { name: "Ready", value: performance.jobs.ready ?? 0, fill: "#3b82f6" },
+        { name: "Dispatched", value: performance.jobs.dispatched ?? 0, fill: "#8b5cf6" },
     ].filter(d => d.value > 0) : [];
 
     return (
@@ -129,10 +136,47 @@ export default function AnalyticsPage(): ReactElement {
                                 </div>
                             )}
 
-                            {/* Job Status + Quote Breakdown */}
-                            {performance && completionQuery.data && (
+                            {/* Job Status Donut + Quote Breakdown */}
+                            {performance && (
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                    <JobStatusDonutChart stats={completionQuery.data} />
+                                    {/* Job Status Donut — scoped to this AM's clients */}
+                                    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
+                                        <div className="mb-4">
+                                            <h3 className="text-sm font-semibold text-gray-900">Job Status Distribution</h3>
+                                            <p className="text-sm text-gray-500 mt-1">Current jobs for your clients</p>
+                                        </div>
+                                        {jobDonutData.length === 0 ? (
+                                            <div className="flex items-center justify-center h-64 text-gray-400 text-sm">No jobs yet</div>
+                                        ) : (
+                                            <ResponsiveContainer width="100%" height={260}>
+                                                <PieChart>
+                                                    <Pie
+                                                        data={jobDonutData}
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={70}
+                                                        outerRadius={110}
+                                                        paddingAngle={2}
+                                                        dataKey="value"
+                                                    >
+                                                        {jobDonutData.map((entry, i) => (
+                                                            <Cell key={i} fill={entry.fill} />
+                                                        ))}
+                                                    </Pie>
+                                                    <Tooltip
+                                                        formatter={(value) => [`${value} jobs`, "Count"]}
+                                                        contentStyle={{ backgroundColor: "white", border: "1px solid #e5e7eb", borderRadius: "0.5rem", fontSize: "0.875rem" }}
+                                                    />
+                                                    <Legend verticalAlign="bottom" height={36} formatter={(value) => <span className="text-sm text-gray-700">{value}</span>} />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        )}
+                                        <div className="mt-3 pt-3 border-t border-gray-100 text-center">
+                                            <p className="text-3xl font-bold text-gray-900">{performance.jobs?.total ?? 0}</p>
+                                            <p className="text-sm text-gray-500 mt-1">Total Jobs</p>
+                                        </div>
+                                    </div>
+
                                     <QuoteBreakdownBarChart performance={performance} />
                                 </div>
                             )}
@@ -175,7 +219,7 @@ export default function AnalyticsPage(): ReactElement {
                                         )}
                                     </div>
 
-                                    {/* Client List Analytics */}
+                                    {/* Client Portfolio */}
                                     <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
                                         <div className="flex items-center gap-2 mb-4">
                                             <UserCheckIcon className="w-5 h-5 text-brand-blue" />
@@ -201,12 +245,13 @@ export default function AnalyticsPage(): ReactElement {
                                         {clientTypeData.length > 0 ? (
                                             <ResponsiveContainer width="100%" height={180}>
                                                 <PieChart>
-                                                    <Pie data={clientTypeData} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}>
+                                                    <Pie data={clientTypeData} cx="50%" cy="50%" outerRadius={65} dataKey="value">
                                                         {clientTypeData.map((entry, i) => (
                                                             <Cell key={i} fill={entry.fill} />
                                                         ))}
                                                     </Pie>
                                                     <Tooltip formatter={(v) => [`${v} clients`, ""]} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "12px" }} />
+                                                    <Legend verticalAlign="bottom" height={28} formatter={(value) => <span className="text-xs text-gray-600">{value}</span>} />
                                                 </PieChart>
                                             </ResponsiveContainer>
                                         ) : (
@@ -249,12 +294,13 @@ export default function AnalyticsPage(): ReactElement {
                                         {quoteStatusData.length > 0 ? (
                                             <ResponsiveContainer width="100%" height={180}>
                                                 <PieChart>
-                                                    <Pie data={quoteStatusData} cx="50%" cy="50%" outerRadius={70} dataKey="value" label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}>
+                                                    <Pie data={quoteStatusData} cx="50%" cy="50%" outerRadius={65} dataKey="value">
                                                         {quoteStatusData.map((entry, i) => (
                                                             <Cell key={i} fill={entry.fill} />
                                                         ))}
                                                     </Pie>
                                                     <Tooltip formatter={(v) => [`${v} quotes`, ""]} contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px", fontSize: "12px" }} />
+                                                    <Legend verticalAlign="bottom" height={28} formatter={(value) => <span className="text-xs text-gray-600">{value}</span>} />
                                                 </PieChart>
                                             </ResponsiveContainer>
                                         ) : (

@@ -22,6 +22,7 @@ import {
     PackageCheck,
     Scale,
     ClipboardCheck,
+    SparklesIcon,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { logoutUserSession } from "@/lib/api/auth";
@@ -72,6 +73,7 @@ const menuSections: MenuSection[] = [
         title: "INSIGHTS",
         items: [
             { label: "Analytics", href: "/production-team/analytics", icon: BarChart3 },
+            { label: "AI Insights", href: "/production-team/ai-insights", icon: SparklesIcon },
             { label: "Notifications", href: "/production-team/notifications", icon: Bell },
             { label: "Settings", href: "/production-team/settings", icon: Settings },
         ],

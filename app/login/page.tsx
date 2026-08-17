@@ -24,7 +24,17 @@ const PORTALS_BY_GROUP: Partial<Record<StaffGroup, string>> = {
 export default function LoginPage() {
     const router = useRouter();
 
-    const handleLoginSuccess = (user: User) => {
+    const handleLoginSuccess = (user: User, mustSetup2fa?: boolean) => {
+        // Admin/Account Manager accounts must have 2FA configured — send them
+        // straight to the security tab instead of their normal dashboard
+        // until that's done. Their own settings page is reachable either way
+        // (it's not a hard route block), but this makes sure they can't miss it.
+        if (mustSetup2fa) {
+            const setupHref = user.portal_role === 'account_manager' ? '/account-manager/settings' : '/admin/settings';
+            router.push(`${setupHref}?tab=security&require2fa=1`);
+            return;
+        }
+
         // Honour the user's last active portal (saved by PortalSwitcher) if they still have access.
         const saved = localStorage.getItem("active-portal") as StaffGroup | null;
         const savedHref = saved ? PORTALS_BY_GROUP[saved] : null;

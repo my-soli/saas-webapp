@@ -2,6 +2,9 @@
 
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import AccountManagerSidebar from "./account-manager-sidebar";
+import AIChatPanel from "@/components/admin/AIChatPanel";
+import UniversalSearch from "@/components/shared/UniversalSearch";
+import WhatsNewWidget from "@/components/shared/WhatsNewWidget";
 import { Menu } from "lucide-react";
 import { toast } from "sonner";
 import { fetchNotifications } from "@/lib/api/notifications";
@@ -96,6 +99,9 @@ export default function AccountManagerLayout({ children }: AccountManagerLayoutP
                     {children}
                 </main>
             </div>
+            <AIChatPanel />
+            <UniversalSearch portal="account-manager" />
+            <WhatsNewWidget />
         </div>
     );
 }

@@ -7,7 +7,7 @@ import { loginUserSession, verifyTotpSession } from '@/lib/api/auth';
 import type { LoginCredentials, User } from '@/types/auth';
 
 interface LoginFormProps {
-    onSuccess: (user: User) => void;
+    onSuccess: (user: User, mustSetup2fa?: boolean) => void;
     onError?: (error: Error) => void;
 }
 
@@ -27,7 +27,7 @@ export default function LoginForm({ onSuccess, onError }: LoginFormProps) {
                 setStep('totp');
                 setTimeout(() => totpInputRef.current?.focus(), 50);
             } else if ('user' in data) {
-                onSuccess(data.user);
+                onSuccess(data.user, data.must_setup_2fa);
             }
         },
         onError: (error: Error) => {

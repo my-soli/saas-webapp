@@ -56,6 +56,27 @@ export async function fetchJobs(params: JobsQueryParams): Promise<JobsResponse> 
     return response.json();
 }
 
+// Lightweight, unpaginated fetch of jobs due within a date range — used by
+// ScheduleCalendar, which needs every job in a visible month, not a page.
+export async function fetchJobsByDeadline(dateFrom: string, dateTo: string): Promise<Job[]> {
+    const qs = new URLSearchParams({
+        expected_completion__gte: dateFrom,
+        expected_completion__lte: dateTo,
+        page_size: "500",
+    });
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/?${qs.toString()}`, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+    });
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(`Failed to fetch jobs: ${response.status} ${errorText}`);
+    }
+    const data = await response.json() as JobsResponse | Job[];
+    return Array.isArray(data) ? data : (data.results ?? []);
+}
+
 export async function fetchJob(jobId: number): Promise<Job> {
     const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/${jobId}/`, {
         headers: {

@@ -29,7 +29,10 @@ export interface AccountManagerPerformance {
         total: number;
         pending: number;
         in_progress: number;
-        on_hold: number;
+        blocked: number;
+        qc_hold: number;
+        ready: number;
+        dispatched: number;
         completed: number;
         overdue: number;
     };

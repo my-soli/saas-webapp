@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AdminLayout from "@/components/admin/admin-layout";
 import Tabs from "@/components/admin/tabs";
@@ -13,8 +14,19 @@ import TotpSetupCard from "@/components/settings/TotpSetupCard";
 type TabType = "general" | "notifications" | "security" | "platform";
 
 export default function SettingsPage() {
+    return (
+        <Suspense fallback={<LoaderOne />}>
+            <SettingsPageInner />
+        </Suspense>
+    );
+}
+
+function SettingsPageInner() {
     const queryClient = useQueryClient();
-    const [activeTab, setActiveTab] = useState<TabType>("general");
+    const searchParams = useSearchParams();
+    const requestedTab = searchParams.get("tab");
+    const require2fa = searchParams.get("require2fa") === "1";
+    const [activeTab, setActiveTab] = useState<TabType>(requestedTab === "security" ? "security" : "general");
     const [formData, setFormData] = useState<SystemSettings>({});
     const [hasChanges, setHasChanges] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
@@ -294,6 +306,15 @@ export default function SettingsPage() {
 
                         {activeTab === "security" && (
                             <div className="space-y-6 max-w-2xl">
+                                {require2fa && (
+                                    <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                                        <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-sm font-semibold text-amber-900">Two-factor authentication is required for your role</p>
+                                            <p className="text-sm text-amber-700 mt-0.5">Admin and Account Manager accounts must set up an authenticator app before continuing.</p>
+                                        </div>
+                                    </div>
+                                )}
                                 <label className="flex items-start gap-3 cursor-pointer">
                                     <input
                                         type="checkbox"

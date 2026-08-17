@@ -20,7 +20,7 @@ export default function MultiProductQuotesTable({
     onDelete,
 }: MultiProductQuotesTableProps) {
     const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-    const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
+    const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; right: number }>({ right: 0 });
     const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
 
     useEffect(() => {
@@ -44,10 +44,17 @@ export default function MultiProductQuotesTable({
             setOpenMenuId(null);
         } else {
             const rect = buttonElement.getBoundingClientRect();
-            setMenuPosition({
-                top: rect.bottom + window.scrollY + 4,
-                right: window.innerWidth - rect.right + window.scrollX,
-            });
+            const DROPDOWN_HEIGHT = 180; // max estimated height for the menu
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const right = window.innerWidth - rect.right;
+
+            if (spaceBelow < DROPDOWN_HEIGHT) {
+                // Not enough room below — open upward
+                setMenuPosition({ bottom: window.innerHeight - rect.top + 4, right });
+            } else {
+                // Enough room below — open downward
+                setMenuPosition({ top: rect.bottom + 4, right });
+            }
             setOpenMenuId(quoteId);
         }
     };
@@ -224,7 +231,7 @@ export default function MultiProductQuotesTable({
                     id={`dropdown-${openMenuId}`}
                     className="fixed w-40 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50"
                     style={{
-                        top: `${menuPosition.top}px`,
+                        ...(menuPosition.top !== undefined ? { top: `${menuPosition.top}px` } : { bottom: `${menuPosition.bottom}px` }),
                         right: `${menuPosition.right}px`,
                     }}
                 >
@@ -267,19 +274,17 @@ export default function MultiProductQuotesTable({
                                     <Download className="w-4 h-4" />
                                     Download
                                 </button>
-                                {quote.status === "Approved" && (
-                                    <button
-                                        onClick={(): void => {
-                                            onClone(quote.id);
-                                            setOpenMenuId(null);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                        type="button"
-                                    >
-                                        <Copy className="w-4 h-4" />
-                                        Clone
-                                    </button>
-                                )}
+                                <button
+                                    onClick={(): void => {
+                                        onClone(quote.id);
+                                        setOpenMenuId(null);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                    type="button"
+                                >
+                                    <Copy className="w-4 h-4" />
+                                    Clone
+                                </button>
                                 <button
                                     onClick={(): void => {
                                         onDelete(quote.id);

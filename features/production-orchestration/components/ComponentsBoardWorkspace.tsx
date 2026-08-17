@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, type ReactElement } from "react";
+import { useMemo, useState, type ReactElement } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
     ArrowLeftIcon,
     LayoutGridIcon,
@@ -12,10 +13,13 @@ import {
     PackageIcon,
     InboxIcon,
     LoaderCircleIcon,
+    CheckIcon,
+    TruckIcon,
+    RefreshCwIcon,
 } from "lucide-react";
 import type { CompStatus, ProductionComponent } from "../types";
 import { fetchJob } from "@/services/jobs";
-import { fetchJobComponents } from "@/services/orchestration";
+import { fetchJobComponents, updateComponentStatus } from "@/services/orchestration";
 import { jobComponentToProductionComponent } from "../lib/api-job-helpers";
 
 const statusConfig: Record<CompStatus, { label: string; bg: string; text: string; border: string }> = {
@@ -48,6 +52,8 @@ export default function ComponentsBoardWorkspace({ basePath = "/production-team"
     const params = useParams();
     const jobId = (params?.jobId as string) ?? "";
     const isNumeric = Boolean(jobId && /^\d+$/.test(jobId));
+    const queryClient = useQueryClient();
+    const [updatingId, setUpdatingId] = useState<string | null>(null);
 
     const numericJobId = isNumeric ? Number(jobId) : 0;
 
@@ -74,6 +80,33 @@ export default function ComponentsBoardWorkspace({ basePath = "/production-team"
         }
         return null;
     }, [isNumeric, apiJobQuery.data]);
+
+    const statusMutation = useMutation({
+        mutationFn: ({ compId, newStatus }: { compId: number; newStatus: string }) =>
+            updateComponentStatus(compId, newStatus as never),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["job-components", numericJobId] });
+            queryClient.invalidateQueries({ queryKey: ["orchestration", "components-board", jobId] });
+            setUpdatingId(null);
+        },
+        onError: () => {
+            toast.error("Status update failed.");
+            setUpdatingId(null);
+        },
+    });
+
+    const handleStatusAction = (
+        e: React.MouseEvent,
+        compId: string,
+        newStatus: string,
+        label: string,
+    ) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setUpdatingId(compId);
+        statusMutation.mutate({ compId: Number(compId), newStatus });
+        toast.success(`Marked as ${label}`);
+    };
 
     const components: ProductionComponent[] = useMemo(() => {
         if (!componentsQuery.data || !isNumeric) return [];
@@ -296,6 +329,45 @@ export default function ComponentsBoardWorkspace({ basePath = "/production-team"
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Quick status actions */}
+                                {(comp.status === "IN_PRODUCTION" || comp.status === "DISPATCH_READY" || comp.status === "QC_FAILED") && (
+                                    <div
+                                        className="border-t border-gray-100 px-5 py-2.5 flex gap-2"
+                                        onClick={e => { e.preventDefault(); e.stopPropagation(); }}
+                                    >
+                                        {comp.status === "IN_PRODUCTION" && (
+                                            <button
+                                                disabled={updatingId === comp.id}
+                                                onClick={e => handleStatusAction(e, comp.id, "ready", "Dispatch Ready")}
+                                                className="flex items-center gap-1.5 rounded-md border border-brand-green/40 bg-brand-green/8 px-3 py-1.5 text-[11px] font-semibold text-brand-green hover:bg-brand-green/15 disabled:opacity-50 transition-colors"
+                                            >
+                                                <TruckIcon className="h-3 w-3" />
+                                                Mark Dispatch Ready
+                                            </button>
+                                        )}
+                                        {comp.status === "DISPATCH_READY" && (
+                                            <button
+                                                disabled={updatingId === comp.id}
+                                                onClick={e => handleStatusAction(e, comp.id, "completed", "Complete")}
+                                                className="flex items-center gap-1.5 rounded-md border border-brand-blue/40 bg-brand-blue/8 px-3 py-1.5 text-[11px] font-semibold text-brand-blue hover:bg-brand-blue/15 disabled:opacity-50 transition-colors"
+                                            >
+                                                <CheckIcon className="h-3 w-3" />
+                                                Mark Complete
+                                            </button>
+                                        )}
+                                        {comp.status === "QC_FAILED" && (
+                                            <button
+                                                disabled={updatingId === comp.id}
+                                                onClick={e => handleStatusAction(e, comp.id, "in_progress", "In Production")}
+                                                className="flex items-center gap-1.5 rounded-md border border-brand-orange/40 bg-brand-orange/8 px-3 py-1.5 text-[11px] font-semibold text-brand-orange hover:bg-brand-orange/15 disabled:opacity-50 transition-colors"
+                                            >
+                                                <RefreshCwIcon className="h-3 w-3" />
+                                                Return to Production
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </Link>
                         );
                     })}

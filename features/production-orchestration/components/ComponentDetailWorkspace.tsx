@@ -40,6 +40,7 @@ import {
     MessageCircleIcon,
     PaperclipIcon,
     UploadIcon,
+    BanknoteIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -74,6 +75,7 @@ import {
     deleteBriefAttachment,
     logCommunication,
     respondToAdjustment,
+    respondToPrice,
     type JobComponent,
     type ComponentDependency,
     type ComponentTask,
@@ -86,12 +88,13 @@ import {
     type OffSystemChannel,
     type OffSystemDirection,
     type ProductionCostItem,
+    type ProductionCostType,
 } from "@/services/orchestration";
 import { getCurrentUser } from "@/services/users";
 import { jobComponentToProductionComponent } from "../lib/api-job-helpers";
 import type { ProductionComponent } from "../types";
 
-type Tab = "deps" | "tasks" | "qc" | "brief" | "files" | "adjustment" | "audit";
+type Tab = "deps" | "tasks" | "qc" | "brief" | "costing" | "files" | "adjustment" | "audit";
 
 // ── Built-in QC template options (match backend QC_TEMPLATES keys) ─────────────
 const BUILTIN_QC_OPTIONS = [
@@ -117,6 +120,7 @@ const tabs: { key: Tab; label: string; icon: ReactElement }[] = [
     { key: "tasks",      label: "Tasks",          icon: <ListChecksIcon className="h-4 w-4" /> },
     { key: "qc",         label: "QC Checkpoints", icon: <ClipboardCheckIcon className="h-4 w-4" /> },
     { key: "brief",      label: "Vendor Brief",   icon: <SendIcon className="h-4 w-4" /> },
+    { key: "costing",    label: "Production Costing", icon: <BanknoteIcon className="h-4 w-4" /> },
     { key: "files",      label: "Files & Assets", icon: <FolderOpenIcon className="h-4 w-4" /> },
     { key: "adjustment", label: "Adjustment",     icon: <AlertCircleIcon className="h-4 w-4" /> },
     { key: "audit",      label: "Audit Log",      icon: <ActivityIcon className="h-4 w-4" /> },
@@ -128,6 +132,19 @@ const compStatusColor = (status: string) => {
     if (status === "IN_PRODUCTION") return "bg-brand-blue/10 text-brand-blue";
     if (["DISPATCH_READY", "COMPLETE"].includes(status)) return "bg-brand-green/10 text-brand-green";
     return "bg-gray-100 text-gray-500";
+};
+
+// Mirrors JobComponentViewSet.STATUS_TRANSITIONS in orchestration_views.py —
+// keeps invalid choices disabled here instead of letting the user pick them
+// and only find out from a rejected request.
+const COMP_STATUS_TRANSITIONS: Record<string, string[]> = {
+    pending: ["in_progress", "blocked"],
+    in_progress: ["pending", "blocked", "qc_hold", "ready", "completed"],
+    blocked: ["pending", "in_progress"],
+    qc_hold: ["in_progress", "ready", "blocked"],
+    ready: ["in_progress", "qc_hold", "dispatched"],
+    dispatched: ["completed"],
+    completed: [],
 };
 
 const apiTaskStatusLabel = (s: string) => {
@@ -359,18 +376,44 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
     const updateStatusMut = useMutation({
         mutationFn: (status: JobComponent["status"]) => updateComponentStatus(numericCompId, status),
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ["job-components", numericJobId] }),
+        onError: (err: Error) => {
+            const raw = err.message.replace(/^.*?failed:\s*\d+\s*/i, "");
+            let detail = raw;
+            try {
+                detail = JSON.parse(raw).detail ?? raw;
+            } catch {
+                // raw wasn't JSON — fall back to it as-is
+            }
+            toast.error(detail || "Failed to update status.");
+        },
     });
 
     const sendBriefMut = useMutation({
-        mutationFn: (channel: "email" | "whatsapp" | "both" = "email") => sendVendorBrief(numericCompId, channel),
+        mutationFn: (channel: "email" | "whatsapp") => sendVendorBrief(numericCompId, channel),
         onSuccess: (data, channel) => {
             queryClient.invalidateQueries({ queryKey: ["vendor-brief-status", numericCompId] });
-            if ((channel === "whatsapp" || channel === "both") && data.wa_message) {
+            if (channel === "whatsapp" && data.wa_message) {
                 const phone = data.vendor_phone.replace(/\D/g, "");
-                const url = `https://api.whatsapp.com/send?${phone ? `phone=${phone}&` : ""}text=${encodeURIComponent(data.wa_message)}`;
-                window.open(url, "_blank");
+                window.open(`https://api.whatsapp.com/send?${phone ? `phone=${phone}&` : ""}text=${encodeURIComponent(data.wa_message)}`, "_blank");
+            }
+            if (channel === "email" && data.compose_data) {
+                const { to, subject, body } = data.compose_data;
+                window.open(`mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`, "_blank");
             }
         },
+    });
+
+    const [linkCopied, setLinkCopied] = useState(false);
+    const copyLinkMut = useMutation({
+        mutationFn: () => sendVendorBrief(numericCompId, "email"),
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["vendor-brief-status", numericCompId] });
+            navigator.clipboard.writeText(data.acknowledge_url).then(() => {
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 2500);
+            });
+        },
+        onError: () => toast.error("Failed to generate link."),
     });
 
     // Brief attachments
@@ -446,6 +489,26 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
         onError: (err: Error) => toast.error(err.message || "Failed to respond."),
     });
 
+    // Price review
+    const [showPriceReply, setShowPriceReply] = useState(false);
+    const [priceAction, setPriceAction] = useState<"accept" | "counter">("accept");
+    const [priceMessage, setPriceMessage] = useState("");
+    const [priceCounter, setPriceCounter] = useState("");
+
+    const respondPriceMut = useMutation({
+        mutationFn: () => respondToPrice(numericCompId, {
+            action: priceAction,
+            message: priceMessage || undefined,
+            counter_price: priceCounter || undefined,
+        }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["vendor-brief-status", numericCompId] });
+            setShowPriceReply(false); setPriceMessage(""); setPriceCounter("");
+            toast.success("Response sent.");
+        },
+        onError: (err: Error) => toast.error(err.message || "Failed to respond."),
+    });
+
     const assignVendorMut = useMutation({
         mutationFn: (vendorId: number | null) =>
             updateJobComponent(numericCompId, { vendor: vendorId } as Partial<JobComponent>),
@@ -485,7 +548,6 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
     const [activeTab, setActiveTab] = useState<Tab>("deps");
     const [selectedTemplate, setSelectedTemplate] = useState("");
     const [briefMasked, setBriefMasked] = useState(true);
-    const [briefChannel, setBriefChannel] = useState<"email" | "whatsapp" | "both">("email");
     const [showVendorPicker, setShowVendorPicker] = useState(false);
     const [briefDraft, setBriefDraft] = useState({
         product_name: "",
@@ -723,13 +785,22 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                 disabled={updateStatusMut.isPending}
                                 className="appearance-none rounded-md border border-gray-200 bg-white py-1.5 pl-3 pr-8 text-xs font-semibold text-gray-700 focus:border-brand-blue focus:outline-none"
                             >
-                                <option value="pending">Pending</option>
-                                <option value="in_progress">In Progress</option>
-                                <option value="blocked">Blocked</option>
-                                <option value="qc_hold">QC Hold</option>
-                                <option value="ready">Ready</option>
-                                <option value="dispatched">Dispatched</option>
-                                <option value="completed">Completed</option>
+                                {(() => {
+                                    const current = rawComp?.status ?? "pending";
+                                    const allowed = COMP_STATUS_TRANSITIONS[current] ?? [];
+                                    const isDisabled = (value: string) => value !== current && !allowed.includes(value);
+                                    return (
+                                        <>
+                                            <option value="pending" disabled={isDisabled("pending")}>Pending</option>
+                                            <option value="in_progress" disabled={isDisabled("in_progress")}>In Progress</option>
+                                            <option value="blocked" disabled={isDisabled("blocked")}>Blocked</option>
+                                            <option value="qc_hold" disabled={isDisabled("qc_hold")}>QC Hold</option>
+                                            <option value="ready" disabled={isDisabled("ready")}>Ready</option>
+                                            <option value="dispatched" disabled={isDisabled("dispatched")}>Dispatched</option>
+                                            <option value="completed" disabled={isDisabled("completed")}>Completed</option>
+                                        </>
+                                    );
+                                })()}
                             </select>
                             <div
                                 className="h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
@@ -1659,158 +1730,67 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
 
                                 {/* Send brief footer */}
                                 {sendBriefMut.isSuccess ? (
-                                    <div className="flex items-center gap-2 border-t border-brand-green/20 bg-brand-green/5 px-5 py-3">
-                                        <CheckCircleIcon className="h-4 w-4 text-brand-green" />
-                                        <p className="text-sm font-semibold text-brand-green">Brief sent to {rawComp?.vendor_name}</p>
-                                        <button onClick={() => sendBriefMut.reset()} className="ml-auto text-xs text-gray-400 hover:text-gray-600">Send again</button>
+                                    <div className="border-t border-brand-green/20 bg-brand-green/5 px-5 py-3 space-y-1.5">
+                                        <div className="flex items-center gap-2">
+                                            <CheckCircleIcon className="h-4 w-4 text-brand-green" />
+                                            <p className="text-sm font-semibold text-brand-green">Brief opened for {rawComp?.vendor_name}</p>
+                                            <button onClick={() => sendBriefMut.reset()} className="ml-auto text-xs text-gray-400 hover:text-gray-600">Send again</button>
+                                        </div>
+                                        {sendBriefMut.data?.deadline_missing && (
+                                            <p className="text-xs text-amber-600 pl-6">Note: deadline was shown as TBD — set the SLA deadline and resend if needed.</p>
+                                        )}
                                     </div>
                                 ) : sendBriefMut.isError ? (
                                     <div className="flex items-start justify-between border-t border-brand-red/20 bg-brand-red/5 px-5 py-3 gap-3">
-                                        <p className="text-sm text-brand-red break-all">{sendBriefMut.error instanceof Error ? sendBriefMut.error.message : "Failed to send. Check vendor email address."}</p>
-                                        <button onClick={() => sendBriefMut.mutate(briefChannel)} className="text-xs font-semibold text-brand-red hover:underline shrink-0">Retry</button>
+                                        <p className="text-sm text-brand-red break-all">{sendBriefMut.error instanceof Error ? sendBriefMut.error.message : "Failed. Check vendor details."}</p>
+                                        <button onClick={() => sendBriefMut.reset()} className="text-xs font-semibold text-brand-red hover:underline shrink-0">Dismiss</button>
                                     </div>
                                 ) : (
                                     <div className="border-t border-gray-100 px-5 py-4 space-y-3">
                                         {!rawComp?.vendor && (
                                             <p className="text-xs text-brand-orange">Assign a vendor above before sending the brief</p>
                                         )}
+                                        {rawComp?.vendor && !rawComp?.sla_deadline && (
+                                            <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                                                <span className="text-amber-600 text-sm font-medium shrink-0">⚠</span>
+                                                <p className="text-xs text-amber-700">
+                                                    <strong>No deadline set.</strong> The brief will show "Deadline: TBD" to the vendor. Set the SLA deadline in component details before sending.
+                                                </p>
+                                            </div>
+                                        )}
                                         <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-xs font-semibold text-gray-500 shrink-0">Send via:</span>
-                                            {(["email", "whatsapp", "both"] as const).map((ch) => (
-                                                <button
-                                                    key={ch}
-                                                    onClick={() => setBriefChannel(ch)}
-                                                    className={`px-3 py-1.5 text-xs font-semibold rounded-md border transition-colors ${
-                                                        briefChannel === ch
-                                                            ? "border-brand-blue bg-brand-blue text-white"
-                                                            : "border-gray-200 text-gray-600 hover:border-brand-blue hover:text-brand-blue"
-                                                    }`}
-                                                >
-                                                    {ch === "email" ? "Email" : ch === "whatsapp" ? "WhatsApp" : "Email + WhatsApp"}
-                                                </button>
-                                            ))}
                                             <button
-                                                onClick={() => sendBriefMut.mutate(briefChannel)}
-                                                disabled={sendBriefMut.isPending || !rawComp?.vendor}
-                                                className="ml-auto flex items-center gap-2 rounded-md bg-brand-blue px-5 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
+                                                onClick={() => {
+                                                    if (!rawComp?.sla_deadline && !window.confirm("No SLA deadline is set — the brief will show 'Deadline: TBD'. Send anyway?")) return;
+                                                    sendBriefMut.mutate("email");
+                                                }}
+                                                disabled={sendBriefMut.isPending || copyLinkMut.isPending || !rawComp?.vendor}
+                                                className="flex items-center gap-2 rounded-md bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
                                             >
                                                 {sendBriefMut.isPending ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <SendIcon className="h-4 w-4" />}
-                                                {sendBriefMut.isPending ? "Sending…" : "Send Brief →"}
+                                                {sendBriefMut.isPending ? "Loading…" : "Send via Email"}
                                             </button>
-                                        </div>
-                                        {briefChannel === "whatsapp" && (
-                                            <p className="text-xs text-gray-400">WhatsApp: generates the brief link and opens a pre-filled WhatsApp message in a new tab.</p>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* ── Production Cost Breakdown ── */}
-                            <div className="lg:col-span-3 rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                                <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50">
-                                    <div className="flex items-center gap-2">
-                                        <LockIcon className="h-4 w-4 text-gray-400" />
-                                        <span className="text-sm font-semibold text-gray-800">Production Cost Breakdown</span>
-                                        {productionCostQuery.data?.total != null && productionCostQuery.data.total > 0 && (
-                                            <span className="ml-1 rounded-full bg-brand-blue/10 px-2.5 py-0.5 text-xs font-bold text-brand-blue">
-                                                KES {productionCostQuery.data.total.toLocaleString("en-KE", { minimumFractionDigits: 2 })}
-                                            </span>
-                                        )}
-                                    </div>
-                                    {!costEditing && (
-                                        <button
-                                            onClick={() => {
-                                                const existing = productionCostQuery.data?.items ?? [];
-                                                setCostItems(existing.length > 0 ? existing.map(i => ({ ...i })) : [{ service_name: "", cost: 0 }]);
-                                                setCostEditing(true);
-                                            }}
-                                            className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue transition-colors"
-                                        >
-                                            <PlusIcon className="h-3.5 w-3.5" />
-                                            {productionCostQuery.data?.items?.length ? "Edit Costs" : "Create Cost"}
-                                        </button>
-                                    )}
-                                </div>
-
-                                {costEditing ? (
-                                    <div className="px-5 py-4 space-y-3">
-                                        <p className="text-xs text-gray-400">Add each service/material and its cost in KES. Click <strong>Compute &amp; Save</strong> when done.</p>
-                                        <div className="space-y-2">
-                                            {costItems.map((item, idx) => (
-                                                <div key={idx} className="flex items-center gap-2">
-                                                    <input
-                                                        type="text"
-                                                        value={item.service_name}
-                                                        onChange={e => setCostItems(prev => prev.map((it, i) => i === idx ? { ...it, service_name: e.target.value } : it))}
-                                                        placeholder="Service / material name"
-                                                        className="flex-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
-                                                    />
-                                                    <div className="relative w-36">
-                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">KES</span>
-                                                        <input
-                                                            type="number"
-                                                            min={0}
-                                                            value={item.cost || ""}
-                                                            onChange={e => setCostItems(prev => prev.map((it, i) => i === idx ? { ...it, cost: parseFloat(e.target.value) || 0 } : it))}
-                                                            placeholder="0.00"
-                                                            className="w-full rounded-md border border-gray-200 pl-10 pr-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
-                                                        />
-                                                    </div>
-                                                    <button
-                                                        onClick={() => setCostItems(prev => prev.filter((_, i) => i !== idx))}
-                                                        className="p-1.5 text-gray-300 hover:text-brand-red transition-colors"
-                                                    >
-                                                        <TrashIcon className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <button
-                                            onClick={() => setCostItems(prev => [...prev, { service_name: "", cost: 0 }])}
-                                            className="flex items-center gap-1.5 text-xs text-brand-blue hover:underline"
-                                        >
-                                            <PlusIcon className="h-3.5 w-3.5" /> Add Row
-                                        </button>
-
-                                        {/* Total preview */}
-                                        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5">
-                                            <span className="text-sm font-semibold text-gray-700">Total</span>
-                                            <span className="text-sm font-bold text-brand-blue">
-                                                KES {costItems.reduce((s, i) => s + (i.cost || 0), 0).toLocaleString("en-KE", { minimumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center gap-3 pt-1">
                                             <button
-                                                onClick={() => saveCostMut.mutate(costItems.filter(i => i.service_name.trim()))}
-                                                disabled={saveCostMut.isPending}
-                                                className="flex items-center gap-1.5 rounded-md bg-brand-blue px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
+                                                onClick={() => {
+                                                    if (!rawComp?.sla_deadline && !window.confirm("No SLA deadline is set — the brief will show 'Deadline: TBD'. Send anyway?")) return;
+                                                    sendBriefMut.mutate("whatsapp");
+                                                }}
+                                                disabled={sendBriefMut.isPending || copyLinkMut.isPending || !rawComp?.vendor}
+                                                className="flex items-center gap-2 rounded-md border border-green-500 px-4 py-2 text-sm font-semibold text-green-600 hover:bg-green-50 disabled:opacity-40 transition-colors"
                                             >
-                                                {saveCostMut.isPending ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-3.5 w-3.5" />}
-                                                {saveCostMut.isPending ? "Saving…" : "Compute & Save"}
+                                                <MessageCircleIcon className="h-4 w-4" />
+                                                WhatsApp
                                             </button>
-                                            <button onClick={() => setCostEditing(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
-                                            {saveCostMut.isError && <span className="text-xs text-brand-red">Save failed. Try again.</span>}
+                                            <button
+                                                onClick={() => copyLinkMut.mutate()}
+                                                disabled={sendBriefMut.isPending || copyLinkMut.isPending || !rawComp?.vendor}
+                                                className="flex items-center gap-2 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+                                            >
+                                                {copyLinkMut.isPending ? <LoaderCircleIcon className="h-4 w-4 animate-spin" /> : <LinkIcon className="h-4 w-4" />}
+                                                {linkCopied ? "Copied!" : "Copy Link"}
+                                            </button>
                                         </div>
-                                    </div>
-                                ) : productionCostQuery.data?.items?.length ? (
-                                    <div className="divide-y divide-gray-50">
-                                        {productionCostQuery.data.items.map((item, idx) => (
-                                            <div key={idx} className="flex items-center justify-between px-5 py-2.5">
-                                                <span className="text-sm text-gray-700">{item.service_name}</span>
-                                                <span className="text-sm font-mono text-gray-800">KES {Number(item.cost).toLocaleString("en-KE", { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                        ))}
-                                        <div className="flex items-center justify-between bg-gray-50 px-5 py-3">
-                                            <span className="text-sm font-bold text-gray-700">Total</span>
-                                            <span className="text-sm font-bold text-brand-blue">KES {productionCostQuery.data.total.toLocaleString("en-KE", { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="px-5 py-8 text-center">
-                                        <p className="text-sm text-gray-400">No production cost recorded yet.</p>
-                                        <p className="text-xs text-gray-300 mt-1">Click <strong>Create Cost</strong> above to add a breakdown.</p>
+                                        <p className="text-xs text-gray-400">Email opens a pre-filled draft in your mail client. WhatsApp opens a pre-filled message. Copy Link gives you the brief URL to share however you like.</p>
                                     </div>
                                 )}
                             </div>
@@ -2156,6 +2136,300 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
                                         )}
                                     </div>
                                 </div>
+                            );
+                        })()}
+
+                        {/* ── Vendor Price Proposal ── */}
+                        {(() => {
+                            const bs = vendorBriefStatusQuery.data;
+                            if (!bs?.vendor_proposed_price) return null;
+                            const fmtBs = (iso: string) => new Date(iso).toLocaleString("en-KE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+                            return (
+                                <div className="rounded-xl border border-brand-blue/30 bg-white shadow-sm overflow-hidden">
+                                    <div className="flex items-center gap-3 border-b border-brand-blue/20 bg-brand-blue/5 px-5 py-4">
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-gray-800">Vendor Price Proposal</p>
+                                            {bs.price_reviewed_at && (
+                                                <p className="text-xs text-gray-500 mt-0.5">{fmtBs(bs.price_reviewed_at)}</p>
+                                            )}
+                                        </div>
+                                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
+                                            bs.price_review_status === "accepted" ? "bg-brand-green/10 text-brand-green" :
+                                            bs.price_review_status === "countered" ? "bg-brand-orange/10 text-brand-orange" :
+                                            "bg-brand-blue/10 text-brand-blue"
+                                        }`}>
+                                            {(bs.price_review_status || "PENDING").toUpperCase()}
+                                        </span>
+                                    </div>
+                                    <div className="px-5 py-4 space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <p className="text-xs font-semibold text-gray-400 mb-1">Vendor Proposed Price</p>
+                                                <p className="text-sm font-semibold text-gray-800">{bs.vendor_proposed_price}</p>
+                                            </div>
+                                            {bs.price_counter_offer && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-gray-400 mb-1">Your Counter Offer</p>
+                                                    <p className="text-sm font-semibold text-brand-orange">{bs.price_counter_offer}</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {bs.price_review_status === "pending" ? (
+                                            !showPriceReply ? (
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <button
+                                                        onClick={() => { setPriceAction("accept"); setShowPriceReply(true); }}
+                                                        className="flex items-center gap-1.5 rounded-md border border-brand-green/40 bg-brand-green/5 px-4 py-2 text-sm font-semibold text-brand-green hover:bg-brand-green/10 transition-colors"
+                                                    >
+                                                        <ThumbsUpIcon className="h-4 w-4" /> Accept Price
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { setPriceAction("counter"); setShowPriceReply(true); }}
+                                                        className="flex items-center gap-1.5 rounded-md border border-brand-orange/30 bg-brand-orange/5 px-4 py-2 text-sm font-semibold text-brand-orange hover:bg-brand-orange/10 transition-colors"
+                                                    >
+                                                        <MessageSquareIcon className="h-4 w-4" /> Counter Offer
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                                    <p className="text-xs font-bold uppercase tracking-wide text-gray-500">
+                                                        {priceAction === "accept" ? "Accept Price" : "Send Counter Offer"}
+                                                    </p>
+                                                    {priceAction === "counter" && (
+                                                        <div>
+                                                            <label className="block text-xs font-semibold text-gray-400 mb-1">Counter Price <span className="text-brand-red">*</span></label>
+                                                            <input
+                                                                type="text"
+                                                                value={priceCounter}
+                                                                onChange={(e) => setPriceCounter(e.target.value)}
+                                                                placeholder="e.g. KES 12,000"
+                                                                className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <label className="block text-xs font-semibold text-gray-400 mb-1">Note to Vendor <span className="text-gray-300">(optional)</span></label>
+                                                        <textarea
+                                                            rows={2}
+                                                            value={priceMessage}
+                                                            onChange={(e) => setPriceMessage(e.target.value)}
+                                                            placeholder="Additional note to vendor…"
+                                                            className="w-full rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none resize-none"
+                                                        />
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => respondPriceMut.mutate()}
+                                                            disabled={respondPriceMut.isPending || (priceAction === "counter" && !priceCounter.trim())}
+                                                            className={`flex items-center gap-1.5 rounded-md px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-40 transition-colors ${
+                                                                priceAction === "accept" ? "bg-brand-green hover:bg-brand-green/90" : "bg-brand-orange hover:bg-brand-orange/90"
+                                                            }`}
+                                                        >
+                                                            {respondPriceMut.isPending ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-3.5 w-3.5" />}
+                                                            {priceAction === "accept" ? "Confirm Acceptance" : "Send Counter"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { setShowPriceReply(false); setPriceMessage(""); setPriceCounter(""); }}
+                                                            className="text-xs text-gray-400 hover:text-gray-600"
+                                                        >Cancel</button>
+                                                    </div>
+                                                </div>
+                                            )
+                                        ) : (
+                                            bs.price_review_note && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-gray-400 mb-1">Your Note</p>
+                                                    <p className="rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-sm text-gray-700">{bs.price_review_note}</p>
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+                )}
+
+                {/* ── PRODUCTION COSTING ── */}
+                {activeTab === "costing" && (
+                    <div className="space-y-5">
+                        {(() => {
+                            const quoted = rawComp?.brief_quoted_price ? parseFloat(rawComp.brief_quoted_price) : null;
+                            const actual = productionCostQuery.data?.total ?? 0;
+                            const hasActual = (productionCostQuery.data?.items?.length ?? 0) > 0;
+                            const variance = quoted != null && hasActual ? quoted - actual : null;
+                            const variancePct = quoted != null && quoted > 0 && hasActual ? (variance! / quoted) * 100 : null;
+
+                            const items = productionCostQuery.data?.items ?? [];
+                            const byType: Record<ProductionCostType, number> = { material: 0, vendor: 0, labor: 0, other: 0 };
+                            items.forEach(i => { byType[i.cost_type ?? "other"] += i.cost; });
+                            const typeLabel: Record<ProductionCostType, string> = { material: "Materials", vendor: "Vendor", labor: "Labor", other: "Other" };
+                            const typeColor: Record<ProductionCostType, string> = {
+                                material: "bg-brand-blue/10 text-brand-blue",
+                                vendor: "bg-purple-100 text-purple-700",
+                                labor: "bg-amber-100 text-amber-700",
+                                other: "bg-gray-100 text-gray-600",
+                            };
+
+                            return (
+                                <>
+                                    {/* Budget vs Actual */}
+                                    {quoted != null && (
+                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Vendor Quoted Price</p>
+                                                <p className="mt-1.5 text-lg font-bold text-gray-800">KES {quoted.toLocaleString("en-KE", { minimumFractionDigits: 2 })}</p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Actual Cost Recorded</p>
+                                                <p className="mt-1.5 text-lg font-bold text-gray-800">
+                                                    {hasActual ? `KES ${actual.toLocaleString("en-KE", { minimumFractionDigits: 2 })}` : "—"}
+                                                </p>
+                                            </div>
+                                            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                                                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Variance</p>
+                                                <p className={`mt-1.5 text-lg font-bold ${variance == null ? "text-gray-300" : variance >= 0 ? "text-brand-green" : "text-brand-red"}`}>
+                                                    {variance == null
+                                                        ? "—"
+                                                        : `${variance >= 0 ? "+" : ""}KES ${variance.toLocaleString("en-KE", { minimumFractionDigits: 2 })}${variancePct != null ? ` (${variancePct.toFixed(1)}%)` : ""}`}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Cost Breakdown */}
+                                    <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                                        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3.5 bg-gray-50">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <LockIcon className="h-4 w-4 text-gray-400" />
+                                                <span className="text-sm font-semibold text-gray-800">Production Cost Breakdown</span>
+                                                {hasActual && (
+                                                    <span className="ml-1 rounded-full bg-brand-blue/10 px-2.5 py-0.5 text-xs font-bold text-brand-blue">
+                                                        KES {actual.toLocaleString("en-KE", { minimumFractionDigits: 2 })}
+                                                    </span>
+                                                )}
+                                                {hasActual && (["material", "vendor", "labor", "other"] as ProductionCostType[])
+                                                    .filter(t => byType[t] > 0)
+                                                    .map(t => (
+                                                        <span key={t} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${typeColor[t]}`}>
+                                                            {typeLabel[t]}: {byType[t].toLocaleString("en-KE", { minimumFractionDigits: 0 })}
+                                                        </span>
+                                                    ))}
+                                            </div>
+                                            {!costEditing && (
+                                                <button
+                                                    onClick={() => {
+                                                        const existing = productionCostQuery.data?.items ?? [];
+                                                        setCostItems(existing.length > 0 ? existing.map(i => ({ ...i })) : [{ service_name: "", cost: 0, cost_type: "other" }]);
+                                                        setCostEditing(true);
+                                                    }}
+                                                    className="flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue transition-colors"
+                                                >
+                                                    <PlusIcon className="h-3.5 w-3.5" />
+                                                    {hasActual ? "Edit Costs" : "Create Cost"}
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {costEditing ? (
+                                            <div className="px-5 py-4 space-y-3">
+                                                <p className="text-xs text-gray-400">Add each service/material, its type, and its cost in KES. Click <strong>Compute &amp; Save</strong> when done.</p>
+                                                <div className="space-y-2">
+                                                    {costItems.map((item, idx) => (
+                                                        <div key={idx} className="flex items-center gap-2">
+                                                            <input
+                                                                type="text"
+                                                                value={item.service_name}
+                                                                onChange={e => setCostItems(prev => prev.map((it, i) => i === idx ? { ...it, service_name: e.target.value } : it))}
+                                                                placeholder="Service / material name"
+                                                                className="flex-1 rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                                            />
+                                                            <select
+                                                                value={item.cost_type ?? "other"}
+                                                                onChange={e => setCostItems(prev => prev.map((it, i) => i === idx ? { ...it, cost_type: e.target.value as ProductionCostType } : it))}
+                                                                className="w-28 rounded-md border border-gray-200 px-2 py-1.5 text-xs text-gray-600 focus:border-brand-blue focus:outline-none"
+                                                            >
+                                                                <option value="material">Material</option>
+                                                                <option value="vendor">Vendor</option>
+                                                                <option value="labor">Labor</option>
+                                                                <option value="other">Other</option>
+                                                            </select>
+                                                            <div className="relative w-36">
+                                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">KES</span>
+                                                                <input
+                                                                    type="number"
+                                                                    min={0}
+                                                                    value={item.cost || ""}
+                                                                    onChange={e => setCostItems(prev => prev.map((it, i) => i === idx ? { ...it, cost: parseFloat(e.target.value) || 0 } : it))}
+                                                                    placeholder="0.00"
+                                                                    className="w-full rounded-md border border-gray-200 pl-10 pr-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none"
+                                                                />
+                                                            </div>
+                                                            <button
+                                                                onClick={() => setCostItems(prev => prev.filter((_, i) => i !== idx))}
+                                                                className="p-1.5 text-gray-300 hover:text-brand-red transition-colors"
+                                                            >
+                                                                <TrashIcon className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                <button
+                                                    onClick={() => setCostItems(prev => [...prev, { service_name: "", cost: 0, cost_type: "other" }])}
+                                                    className="flex items-center gap-1.5 text-xs text-brand-blue hover:underline"
+                                                >
+                                                    <PlusIcon className="h-3.5 w-3.5" /> Add Row
+                                                </button>
+
+                                                {/* Total preview */}
+                                                <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5">
+                                                    <span className="text-sm font-semibold text-gray-700">Total</span>
+                                                    <span className="text-sm font-bold text-brand-blue">
+                                                        KES {costItems.reduce((s, i) => s + (i.cost || 0), 0).toLocaleString("en-KE", { minimumFractionDigits: 2 })}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-3 pt-1">
+                                                    <button
+                                                        onClick={() => saveCostMut.mutate(costItems.filter(i => i.service_name.trim()))}
+                                                        disabled={saveCostMut.isPending}
+                                                        className="flex items-center gap-1.5 rounded-md bg-brand-blue px-4 py-1.5 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-40 transition-colors"
+                                                    >
+                                                        {saveCostMut.isPending ? <LoaderCircleIcon className="h-3.5 w-3.5 animate-spin" /> : <CheckIcon className="h-3.5 w-3.5" />}
+                                                        {saveCostMut.isPending ? "Saving…" : "Compute & Save"}
+                                                    </button>
+                                                    <button onClick={() => setCostEditing(false)} className="text-xs text-gray-400 hover:text-gray-600">Cancel</button>
+                                                    {saveCostMut.isError && <span className="text-xs text-brand-red">Save failed. Try again.</span>}
+                                                </div>
+                                            </div>
+                                        ) : hasActual ? (
+                                            <div className="divide-y divide-gray-50">
+                                                {items.map((item, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between px-5 py-2.5">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm text-gray-700">{item.service_name}</span>
+                                                            <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${typeColor[item.cost_type ?? "other"]}`}>
+                                                                {typeLabel[item.cost_type ?? "other"]}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-sm font-mono text-gray-800">KES {Number(item.cost).toLocaleString("en-KE", { minimumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                ))}
+                                                <div className="flex items-center justify-between bg-gray-50 px-5 py-3">
+                                                    <span className="text-sm font-bold text-gray-700">Total</span>
+                                                    <span className="text-sm font-bold text-brand-blue">KES {actual.toLocaleString("en-KE", { minimumFractionDigits: 2 })}</span>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="px-5 py-8 text-center">
+                                                <p className="text-sm text-gray-400">No production cost recorded yet.</p>
+                                                <p className="text-xs text-gray-300 mt-1">Click <strong>Create Cost</strong> above to add a breakdown.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
                             );
                         })()}
                     </div>

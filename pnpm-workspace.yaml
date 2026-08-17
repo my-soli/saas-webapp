@@ -1,6 +1,8 @@
 allowBuilds:
-  sharp: set this to true or false
-  unrs-resolver: set this to true or false
-ignoredBuiltDependencies:
+  '@sentry/cli': true
+  sharp: true
+  unrs-resolver: true
+onlyBuiltDependencies:
+  - '@sentry/cli'
   - sharp
   - unrs-resolver

@@ -57,8 +57,9 @@ function QuoteRow({ quote }: { quote: PortalQuote }): ReactElement {
     const Icon = meta.Icon;
 
     const handleDownload = async (): Promise<void> => {
+        if (!quote.approval_token) return;
         try {
-            const blob = await downloadPortalQuotePdf(quote.quote_id);
+            const blob = await downloadPortalQuotePdf(quote.approval_token);
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
@@ -136,9 +137,25 @@ function QuoteRow({ quote }: { quote: PortalQuote }): ReactElement {
                                 ))}
                             </tbody>
                             <tfoot>
+                                {quote.tax_rate > 0 && (
+                                    <tr className="bg-gray-50 border-t border-gray-100">
+                                        <td colSpan={3} className="px-3 py-2 text-right text-xs text-gray-500">
+                                            Subtotal
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-xs text-gray-600">{fmt(quote.subtotal)}</td>
+                                    </tr>
+                                )}
+                                {quote.tax_rate > 0 && (
+                                    <tr className="bg-gray-50">
+                                        <td colSpan={3} className="px-3 py-2 text-right text-xs text-gray-500">
+                                            VAT ({quote.tax_rate}%)
+                                        </td>
+                                        <td className="px-3 py-2 text-right text-xs text-gray-600">{fmt(quote.tax_total)}</td>
+                                    </tr>
+                                )}
                                 <tr className="bg-gray-50 border-t border-gray-200">
                                     <td colSpan={3} className="px-3 py-2.5 text-right text-sm font-semibold text-gray-700">
-                                        {quote.include_vat ? "Total (incl. VAT)" : "Total"}
+                                        {quote.tax_rate > 0 ? "Total (incl. VAT)" : "Total"}
                                     </td>
                                     <td className="px-3 py-2.5 text-right text-sm font-bold text-gray-900">{fmt(quote.total_amount)}</td>
                                 </tr>
@@ -148,14 +165,16 @@ function QuoteRow({ quote }: { quote: PortalQuote }): ReactElement {
 
                     {/* Actions */}
                     <div className="mt-4 flex items-center gap-3 flex-wrap">
-                        <button
-                            type="button"
-                            onClick={handleDownload}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                        >
-                            <Download className="w-4 h-4" />
-                            Download PDF
-                        </button>
+                        {quote.approval_token && (
+                            <button
+                                type="button"
+                                onClick={handleDownload}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                                <Download className="w-4 h-4" />
+                                Download PDF
+                            </button>
+                        )}
                         {approvalUrl && quote.status === "Sent to Customer" && (
                             <a
                                 href={approvalUrl}

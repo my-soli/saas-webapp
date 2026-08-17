@@ -16,6 +16,7 @@ import {
     Bell,
     ShoppingCart,
     Settings,
+    SparklesIcon,
 } from "lucide-react";
 import { logoutUserSession } from "@/lib/api/auth";
 import PortalSwitcher from "@/components/shared/PortalSwitcher";
@@ -46,6 +47,7 @@ const menuSections: MenuSection[] = [
             { label: "Quotes", href: "/account-manager/quotes", icon: FileText },
             { label: "Cart", href: "/account-manager/cart", icon: ShoppingCart },
             { label: "Analytics", href: "/account-manager/analytics", icon: BarChart3 },
+            { label: "AI Insights", href: "/account-manager/ai-insights", icon: SparklesIcon },
             { label: "Jobs", href: "/account-manager/jobs", icon: Briefcase },
             { label: "Notifications", href: "/account-manager/notifications", icon: Bell },
             { label: "Settings", href: "/account-manager/settings", icon: Settings },

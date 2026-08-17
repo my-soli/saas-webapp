@@ -25,43 +25,59 @@ export interface TopProduct {
 }
 
 export interface ConversionMetrics {
-    lead_to_client: number;
-    quote_to_order: number;
+    lead_conversion_rate: number;
+    quote_approval_rate: number;
     total_leads: number;
-    converted_clients: number;
+    converted_leads: number;
+    total_quotes: number;
+    approved_quotes: number;
 }
 
 export interface RevenueByCategory {
-    category: string;
+    product_name: string;
     revenue: number;
-    percentage: number;
+    orders: number;
 }
 
 export interface ProfitMargins {
-    total_revenue: number;
-    total_cost: number;
+    avg_markup: number | null;
+    total_revenue: number | null;
+    total_cost: number | null;
     overall_margin: number;
-    gross_profit: number;
 }
 
 export interface TimeInsights {
-    peak_order_day: string;
-    peak_order_hour: number;
-    average_order_processing_days: number;
-    busiest_month: string;
+    today_revenue: number;
+    yesterday_revenue: number;
+    daily_change: number;
+    daily_change_abs: number;
+    this_week_revenue: number;
+    last_week_revenue: number;
+    weekly_change: number;
+    weekly_change_abs: number;
+    this_month_revenue: number;
+    last_month_revenue: number;
+    monthly_change: number;
+    monthly_change_abs: number;
+    busiest_days: { date: string; orders: number }[];
 }
 
 export interface OutstandingReceivables {
     total_receivables: number;
     overdue_amount: number;
     overdue_percentage: number;
-    outstanding_count: number;
+    current: number;
+    days_30_60: number;
+    days_60_90: number;
+    over_90: number;
+    unpaid_invoices_count: number;
 }
 
 export interface CollectionRate {
     collection_rate: number;
-    collected_amount: number;
+    avg_days_to_payment: number;
     total_invoiced: number;
+    total_collected: number;
 }
 
 export interface SalesRepresentative {
@@ -74,7 +90,24 @@ export interface SalesRepresentative {
 
 export interface StaffPerformance {
     sales_leaderboard: SalesRepresentative[];
-    total_reps: number;
+    production_leaderboard: { name: string; jobs_completed: number }[];
+}
+
+export interface ActiveQuotes {
+    count: number;
+    total_value: number;
+}
+
+export interface OrdersPipeline {
+    pending: number;
+    in_progress: number;
+    blocked: number;
+    qc_hold: number;
+    ready: number;
+    dispatched: number;
+    completed: number;
+    overdue: number;
+    total_active: number;
 }
 
 export interface AnalyticsData {
@@ -89,6 +122,8 @@ export interface AnalyticsData {
     receivables: OutstandingReceivables;
     collection_rate: CollectionRate;
     staff_performance: StaffPerformance;
+    active_quotes: ActiveQuotes;
+    orders_pipeline: OrdersPipeline;
 }
 
 export interface ActionBreakdownItem {
@@ -117,4 +152,31 @@ export interface ClientActivityData {
     action_breakdown: ActionBreakdownItem[];
     top_active_clients: TopActiveClient[];
     activity_over_time: ActivityOverTimeItem[];
+}
+
+export interface TopClient {
+    client_id: string;
+    name: string;
+    total_revenue: number;
+    order_count: number;
+    last_order: string | null;
+    is_lapsed: boolean;
+}
+
+export interface ClientRevenueData {
+    top_clients: TopClient[];
+    total_clients: number;
+    lapsed_count: number;
+    repeat_clients: number;
+    repeat_rate_percent: number;
+}
+
+export interface DispatchHealthData {
+    pending: number;
+    ready: number;
+    dispatched: number;
+    delivered: number;
+    on_time_rate_percent: number;
+    dispatched_without_invoice: number;
+    total_dispatches_30d: number;
 }

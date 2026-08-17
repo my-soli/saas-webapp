@@ -43,11 +43,11 @@ interface SessionData {
     };
 }
 
-async function fetchSessionData(sessionId: string): Promise<SessionData | null> {
+async function fetchSessionData(sessionId: string, tenantHost: string): Promise<SessionData | null> {
     try {
         const response = await fetch(`${API_BASE_URL}/api/auth/session/check/`, {
             method: 'GET',
-            headers: { Cookie: `sessionid=${sessionId}` },
+            headers: { Cookie: `sessionid=${sessionId}`, 'X-Tenant-Host': tenantHost },
             cache: 'no-store',
         });
         if (!response.ok) return null;
@@ -59,6 +59,7 @@ async function fetchSessionData(sessionId: string): Promise<SessionData | null> 
 
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
+    const tenantHost = request.headers.get('host') ?? '';
 
     const matchedRoute = ROUTE_ALLOWED_ROLES.find((r) => pathname.startsWith(r.prefix));
     const isAuthRoute = pathname.startsWith('/login') || pathname.startsWith('/register');
@@ -69,7 +70,7 @@ export async function proxy(request: NextRequest) {
             return NextResponse.redirect(new URL('/login', request.url));
         }
 
-        const session = await fetchSessionData(sessionCookie.value);
+        const session = await fetchSessionData(sessionCookie.value, tenantHost);
         if (!session?.authenticated) {
             return NextResponse.redirect(new URL('/login', request.url));
         }
@@ -96,7 +97,7 @@ export async function proxy(request: NextRequest) {
     if (isAuthRoute) {
         const sessionCookie = request.cookies.get('sessionid');
         if (sessionCookie) {
-            const session = await fetchSessionData(sessionCookie.value);
+            const session = await fetchSessionData(sessionCookie.value, tenantHost);
             if (session?.authenticated && session.user?.portal_role) {
                 const destination = ROLE_DASHBOARD[session.user.portal_role];
                 return NextResponse.redirect(new URL(destination, request.url));

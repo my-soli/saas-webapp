@@ -2,10 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircleIcon, X, BookOpen, ExternalLink, RefreshCw, Plus, Search, Filter, CreditCard, TrendingUp, Clock, AlertCircle, CloudOff, Cloud, Download } from "lucide-react";
+import { AlertCircleIcon, X, BookOpen, ExternalLink, RefreshCw, Plus, Search, Filter, CreditCard, TrendingUp, Clock, AlertCircle, CloudOff, Cloud, Download, SparklesIcon, ChevronDownIcon, ChevronUpIcon, CheckCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin/admin-layout";
 import { createPayment, deletePayment, fetchPayments, importZohoInvoices, updatePayment } from "@/services/payments";
+import { matchPaymentToInvoice, type AIPaymentMatchResult } from "@/services/analytics";
 import {
     Payment,
     PaymentMethod,
@@ -167,6 +168,145 @@ function JobSearchField({
     );
 }
 
+/* ─── AI Payment Matcher ─────────────────────────────────────────────────── */
+
+function AIPaymentMatcher({
+    onUseMatch,
+}: {
+    onUseMatch: (result: AIPaymentMatchResult) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [desc, setDesc] = useState("");
+    const [amount, setAmount] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [result, setResult] = useState<AIPaymentMatchResult | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const run = async () => {
+        if (!desc.trim()) return;
+        setLoading(true);
+        setResult(null);
+        setError(null);
+        try {
+            const r = await matchPaymentToInvoice(desc.trim(), parseFloat(amount) || 0);
+            setResult(r);
+        } catch {
+            setError("AI matching failed. Check your connection and try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const confidenceStyle = (c: number) => {
+        if (c >= 80) return "text-green-700 bg-green-50 border-green-200";
+        if (c >= 50) return "text-amber-700 bg-amber-50 border-amber-200";
+        return "text-red-700 bg-red-50 border-red-200";
+    };
+
+    return (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <button
+                onClick={() => setOpen(v => !v)}
+                className="flex w-full items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors"
+            >
+                <div className="flex items-center gap-2.5">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-blue/10">
+                        <SparklesIcon className="h-3.5 w-3.5 text-brand-blue" />
+                    </div>
+                    <span className="text-sm font-semibold text-gray-800">AI Payment Matcher</span>
+                    <span className="hidden sm:block text-xs text-gray-400">— paste an M-Pesa or bank notification to find the matching invoice</span>
+                </div>
+                {open ? <ChevronUpIcon className="h-4 w-4 text-gray-400" /> : <ChevronDownIcon className="h-4 w-4 text-gray-400" />}
+            </button>
+
+            {open && (
+                <div className="border-t border-gray-100 px-5 py-4 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="sm:col-span-2">
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Payment message / reference</label>
+                            <textarea
+                                value={desc}
+                                onChange={e => setDesc(e.target.value)}
+                                placeholder="e.g. 'QHA5KXYZ Confirmed. KES 12,500 received from John Kamau 0722... on 14/6/25 at 10:23 AM...'"
+                                rows={3}
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue resize-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Amount (KES)</label>
+                            <input
+                                type="number"
+                                value={amount}
+                                onChange={e => setAmount(e.target.value)}
+                                placeholder="0.00"
+                                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                            />
+                            <button
+                                onClick={run}
+                                disabled={loading || !desc.trim()}
+                                className="mt-2 w-full flex items-center justify-center gap-2 rounded-lg bg-brand-blue px-4 py-2 text-sm font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-50 transition-colors"
+                            >
+                                <SparklesIcon className={`h-3.5 w-3.5 ${loading ? "animate-pulse" : ""}`} />
+                                {loading ? "Matching…" : "Find Match"}
+                            </button>
+                        </div>
+                    </div>
+
+                    {error && (
+                        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+                            <AlertCircleIcon className="h-4 w-4 shrink-0" />
+                            {error}
+                        </div>
+                    )}
+
+                    {result && (
+                        <div className={`rounded-lg border px-4 py-3 space-y-2 ${result.invoice_id ? "border-green-200 bg-green-50" : "border-gray-200 bg-gray-50"}`}>
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-2">
+                                    {result.invoice_id
+                                        ? <CheckCircleIcon className="h-4 w-4 text-green-600 shrink-0" />
+                                        : <AlertCircleIcon className="h-4 w-4 text-gray-400 shrink-0" />
+                                    }
+                                    <span className="text-sm font-semibold text-gray-800">
+                                        {result.invoice_id
+                                            ? `Matched: ${result.lpo_number ?? `Invoice #${result.invoice_id}`}`
+                                            : "No match found"
+                                        }
+                                    </span>
+                                </div>
+                                {result.confidence > 0 && (
+                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${confidenceStyle(result.confidence)}`}>
+                                        {result.confidence}% confidence
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-xs text-gray-600 pl-6">{result.reasoning}</p>
+                            {result.invoice_id && result.job_number && (
+                                <div className="pl-6">
+                                    <p className="text-xs text-gray-500">
+                                        Job: <span className="font-mono font-semibold text-brand-blue">{result.job_number}</span>
+                                        {result.job_name && <span className="text-gray-500"> — {result.job_name}</span>}
+                                    </p>
+                                </div>
+                            )}
+                            {result.invoice_id && (
+                                <div className="pl-6">
+                                    <button
+                                        onClick={() => onUseMatch(result)}
+                                        className="text-xs font-semibold text-brand-blue hover:underline"
+                                    >
+                                        Use this match → Record Payment
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
 /* ─── Main page ──────────────────────────────────────────────────────────── */
 
 export default function PaymentsPage() {
@@ -182,6 +322,7 @@ export default function PaymentsPage() {
     const [pageSize] = useState(20);
     const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
     const [formMode, setFormMode] = useState<"create" | "edit" | null>(null);
+    const [aiMatch, setAiMatch] = useState<AIPaymentMatchResult | null>(null);
     const [formState, setFormState] = useState<PaymentFormState>(emptyForm);
     const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -223,6 +364,19 @@ export default function PaymentsPage() {
     const totalPages = Math.ceil(totalCount / pageSize);
 
     const openCreate = () => { setFormState(emptyForm); setEditingId(null); setFormMode("create"); };
+    const openCreateFromMatch = (match: AIPaymentMatchResult) => {
+        setAiMatch(match);
+        setFormState({
+            ...emptyForm,
+            job_id: match.job_id ? String(match.job_id) : "",
+            job_label: match.job_number && match.job_name
+                ? `${match.job_number} — ${match.job_name}`
+                : (match.job_number ?? ""),
+            amount: "",
+        });
+        setEditingId(null);
+        setFormMode("create");
+    };
     const openEdit = (p: Payment) => {
         setFormState({
             job_id: p.job != null ? String(p.job) : "",
@@ -350,6 +504,9 @@ export default function PaymentsPage() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* AI Payment Matcher */}
+                            <AIPaymentMatcher onUseMatch={openCreateFromMatch} />
 
                             {/* Filters */}
                             <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
@@ -549,9 +706,16 @@ export default function PaymentsPage() {
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
                         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                             <h2 className="text-lg font-semibold text-gray-900">{formMode === "create" ? "Record Payment" : "Edit Payment"}</h2>
-                            <button onClick={() => setFormMode(null)}><X className="w-5 h-5 text-gray-500" /></button>
+                            <button onClick={() => { setFormMode(null); setAiMatch(null); }}><X className="w-5 h-5 text-gray-500" /></button>
                         </div>
                         <form onSubmit={handleFormSubmit} className="px-6 py-5 space-y-4">
+                            {/* AI match notice */}
+                            {formMode === "create" && aiMatch?.invoice_id && (
+                                <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+                                    <SparklesIcon className="h-3.5 w-3.5 shrink-0" />
+                                    <span>Pre-filled from AI match: <strong>{aiMatch.lpo_number}</strong> ({aiMatch.confidence}% confidence)</span>
+                                </div>
+                            )}
                             {/* Job search — full width */}
                             <div>
                                 <label className="block text-xs font-medium text-gray-700 mb-1">Job</label>

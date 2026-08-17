@@ -40,7 +40,6 @@ const baseClientSchema = z.object({
 
 const b2bClientSchema = baseClientSchema.extend({
     client_type: z.literal("B2B"),
-    email: z.string().min(1, "Email is required for B2B clients").email("Invalid email address"),
     company: z.string().min(1, "Company name is required for B2B clients"),
     industry: z.string().optional(),
     vat_tax_id: z.string().optional(),
@@ -55,10 +54,19 @@ const b2cClientSchema = baseClientSchema.extend({
     client_type: z.literal("B2C"),
 });
 
+const EITHER_CONTACT_REQUIRED_MSG = "Provide at least an email or a phone number.";
+
 export const clientFormSchema = z.discriminatedUnion("client_type", [
     b2bClientSchema,
     b2cClientSchema,
-]);
+]).superRefine((data, ctx) => {
+    // Some clients can only be reached by one channel at a time — neither
+    // email nor phone is unconditionally required, but both cannot be blank.
+    if (!data.email && !data.phone) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: EITHER_CONTACT_REQUIRED_MSG, path: ["email"] });
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: EITHER_CONTACT_REQUIRED_MSG, path: ["phone"] });
+    }
+});
 
 export type ClientFormData = z.infer<typeof clientFormSchema>;
 export type ContactFormData = z.infer<typeof contactSchema>;

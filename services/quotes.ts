@@ -581,6 +581,27 @@ export async function convertQuoteToJob(
     return response.json();
 }
 
+export interface GenerateInvoiceResponse {
+    detail: string;
+    invoice_id: number;
+    invoice_number: string;
+}
+
+export async function generateInvoiceFromQuote(quoteId: number): Promise<GenerateInvoiceResponse> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/generate-invoice/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to generate invoice"));
+    }
+
+    return response.json();
+}
+
 export async function downloadQuotePdf(quoteId: string): Promise<Blob> {
     const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/download-pdf/`, {
         credentials: "include",
@@ -659,6 +680,32 @@ export async function sendQuoteBackToAM(quoteId: number, notes?: string): Promis
     if (!response.ok) {
         const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
         throw new Error(parseErrorMessage(errorText, "Failed to send quote back to AM"));
+    }
+
+    return response.json();
+}
+
+export interface SyncQuoteToJobResult {
+    detail: string;
+    lpo_updated: boolean;
+    components_updated: number;
+    components_created: number;
+    new_total: number;
+    zoho_updated: boolean;
+    zoho_reset: boolean;
+}
+
+/** Push updated quote line items and totals to the linked job, LPO, and Zoho invoice. */
+export async function syncQuoteToJob(quoteId: number): Promise<SyncQuoteToJobResult> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/sync-to-job/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to sync quote changes to job"));
     }
 
     return response.json();

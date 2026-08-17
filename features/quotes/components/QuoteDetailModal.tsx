@@ -17,6 +17,7 @@ interface QuoteDetailModalProps {
     isSendingToCustomer?: boolean;
     onMarkLost: (quoteId: number) => void;
     onConvertToJob: (quoteId: number) => void;
+    onGenerateInvoice: (quoteId: number) => void;
     onDownloadPdf: (quoteId: string) => void;
     onEdit?: (quoteId: number) => void;
 }
@@ -29,6 +30,7 @@ export default function QuoteDetailModal({
     isSendingToCustomer,
     onMarkLost,
     onConvertToJob,
+    onGenerateInvoice,
     onDownloadPdf,
     onEdit,
 }: QuoteDetailModalProps) {
@@ -376,6 +378,15 @@ export default function QuoteDetailModal({
                                     Convert to Job
                                 </button>
                             )}
+
+                            <button
+                                onClick={(): void => onGenerateInvoice(quote.id)}
+                                className="px-4 py-2 text-sm font-medium border border-brand-blue text-brand-blue hover:bg-brand-blue/5 rounded transition-colors"
+                                type="button"
+                                title="Generate a draft invoice from this quote, available in any status"
+                            >
+                                Generate Invoice
+                            </button>
 
                             {quote.status !== "Approved" && quote.status !== "Lost" && (
                                 <button

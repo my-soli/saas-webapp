@@ -4,7 +4,11 @@ import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import AdminSidebar from "./admin-sidebar";
+import AIChatPanel from "./AIChatPanel";
+import NotificationBell from "./NotificationBell";
+import WhatsNewWidget from "@/components/shared/WhatsNewWidget";
 import ProductionLayout from "@/components/production/production-layout";
+import UniversalSearch from "@/components/shared/UniversalSearch";
 import { checkSession } from "@/lib/api/auth";
 import { Menu } from "lucide-react";
 
@@ -58,6 +62,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     {children}
                 </main>
             </div>
+            <AIChatPanel />
+            <UniversalSearch portal="admin" />
+            <NotificationBell />
+            <WhatsNewWidget />
         </div>
     );
 }

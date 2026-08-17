@@ -421,12 +421,11 @@ export default function ClientFormDrawer({
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</label>
-                                <p className="text-xs text-gray-500 mt-0.5">Primary contact number with country code</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Primary contact number with country code — email or phone is required</p>
                                 <input
                                     type="text"
                                     value={formState.phone}
                                     onChange={handleInputChange("phone")}
-                                    required
                                     className={`mt-2 w-full rounded-md border px-3 py-2 text-sm ${fieldErrors.phone ? "border-red-500 focus:ring-red-500" : "border-gray-300"
                                         }`}
                                 />
@@ -436,7 +435,7 @@ export default function ClientFormDrawer({
                             </div>
                             <div>
                                 <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</label>
-                                <p className="text-xs text-gray-500 mt-0.5">Primary email address for communication</p>
+                                <p className="text-xs text-gray-500 mt-0.5">Primary email address — email or phone is required</p>
                                 <input
                                     type="email"
                                     value={formState.email}

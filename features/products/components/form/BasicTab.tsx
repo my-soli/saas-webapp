@@ -73,9 +73,9 @@ export default function BasicTab({
                 required
                 hint={`One-line summary shown in product listings and search results (${values.short_description.length}/150 chars)`}
             >
-                <input
-                    type="text"
-                    className={inputCls}
+                <textarea
+                    className={`${textareaCls} resize-none`}
+                    rows={2}
                     placeholder="One-line summary shown in listings"
                     maxLength={150}
                     value={values.short_description}

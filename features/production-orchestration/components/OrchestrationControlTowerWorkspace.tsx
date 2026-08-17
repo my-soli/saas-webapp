@@ -18,7 +18,11 @@ import {
     ChevronDownIcon,
     UploadIcon,
     FileIcon,
+    SearchIcon,
+    XIcon,
+    CalendarIcon,
 } from "lucide-react";
+import ScheduleCalendar from "./ScheduleCalendar";
 import { fetchJobs } from "@/services/jobs";
 import { getCurrentUser } from "@/services/users";
 import {
@@ -40,7 +44,7 @@ import {
     apiUserLabel,
 } from "../lib/api-job-helpers";
 
-type Tab = "overview" | "jobs" | "work";
+type Tab = "overview" | "jobs" | "work" | "schedule";
 
 const riskColor = (level: string) => {
     if (level === "HIGH") return "bg-brand-red/10 text-brand-red";
@@ -311,6 +315,7 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
     const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<Tab>("overview");
     const [workTabInitialised, setWorkTabInitialised] = useState(false);
+    const [completedSearch, setCompletedSearch] = useState("");
 
     const currentUserQuery = useQuery({
         queryKey: ["orchestration", "current-user"],
@@ -354,7 +359,16 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
     const myJobs: Job[] = myJobsQuery.data?.results ?? [];
     const myJobsCount = myJobsQuery.data?.count ?? myJobs.length;
     const activeJobs = myJobs.filter((j) => j.status !== "completed");
-    const completedJobs = myJobs.filter((j) => j.status === "completed");
+    const completedJobs = myJobs.filter((j) => {
+        if (j.status !== "completed") return false;
+        if (!completedSearch.trim()) return true;
+        const q = completedSearch.toLowerCase();
+        return (
+            j.job_name?.toLowerCase().includes(q) ||
+            j.job_number?.toLowerCase().includes(q) ||
+            j.client?.name?.toLowerCase().includes(q)
+        );
+    });
 
     // Auto-switch to "My Work" tab for members with no PIC jobs but with task/component assignments
     useMemo(() => {
@@ -387,9 +401,10 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
         vendorCapacity.length > 0;
 
     const tabs: { key: Tab; label: string; icon: ReactElement; badge?: number }[] = [
-        { key: "overview", label: "Live Overview", icon: <ZapIcon className="h-4 w-4" /> },
-        { key: "jobs",     label: "Master Jobs",   icon: <BriefcaseIcon className="h-4 w-4" />, badge: myJobsCount || undefined },
-        { key: "work",     label: "My Work",       icon: <InboxIcon className="h-4 w-4" />,    badge: myTasks.length || undefined },
+        { key: "overview",  label: "Live Overview", icon: <ZapIcon className="h-4 w-4" /> },
+        { key: "jobs",      label: "Master Jobs",   icon: <BriefcaseIcon className="h-4 w-4" />, badge: myJobsCount || undefined },
+        { key: "work",      label: "My Work",       icon: <InboxIcon className="h-4 w-4" />,    badge: myTasks.length || undefined },
+        { key: "schedule",  label: "Schedule",      icon: <CalendarIcon className="h-4 w-4" /> },
     ];
 
     return (
@@ -753,6 +768,9 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
                     </div>
                 )}
 
+                {/* ── SCHEDULE TAB ── */}
+                {activeTab === "schedule" && <ScheduleCalendar basePath={basePath} />}
+
                 {/* ── MASTER JOBS TAB ── */}
                 {activeTab === "jobs" && (
                     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -797,18 +815,42 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
                                 )}
 
                                 {/* Completed jobs */}
-                                {completedJobs.length > 0 && (
+                                {myJobs.some((j) => j.status === "completed") && (
                                     <div>
-                                        <div className="flex items-center gap-2 border-t border-gray-100 px-5 py-3 bg-gray-50">
-                                            <CheckCircleIcon className="h-4 w-4 text-brand-green" />
-                                            <span className="text-sm font-semibold text-gray-600">Completed</span>
-                                            <span className="rounded-full bg-brand-green/10 px-2 py-0.5 text-[10px] font-bold text-brand-green">
-                                                {completedJobs.length}
-                                            </span>
+                                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 border-t border-gray-100 px-5 py-3 bg-gray-50">
+                                            <div className="flex items-center gap-2 flex-1">
+                                                <CheckCircleIcon className="h-4 w-4 text-brand-green" />
+                                                <span className="text-sm font-semibold text-gray-600">Completed</span>
+                                                <span className="rounded-full bg-brand-green/10 px-2 py-0.5 text-[10px] font-bold text-brand-green">
+                                                    {completedJobs.length}
+                                                </span>
+                                            </div>
+                                            <div className="relative w-full sm:w-56">
+                                                <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
+                                                <input
+                                                    type="text"
+                                                    value={completedSearch}
+                                                    onChange={(e) => setCompletedSearch(e.target.value)}
+                                                    placeholder="Search completed…"
+                                                    className="w-full rounded-md border border-gray-200 bg-white pl-8 pr-7 py-1 text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-brand-blue"
+                                                />
+                                                {completedSearch && (
+                                                    <button
+                                                        onClick={() => setCompletedSearch("")}
+                                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                                    >
+                                                        <XIcon className="h-3 w-3" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="overflow-x-auto">
-                                            <JobsTable jobs={completedJobs} onNavigate={(id) => router.push(`${basePath}/jobs/${id}`)} muted />
-                                        </div>
+                                        {completedJobs.length > 0 ? (
+                                            <div className="overflow-x-auto">
+                                                <JobsTable jobs={completedJobs} onNavigate={(id) => router.push(`${basePath}/jobs/${id}`)} muted />
+                                            </div>
+                                        ) : (
+                                            <p className="px-5 py-6 text-center text-sm text-gray-400">No completed jobs match &ldquo;{completedSearch}&rdquo;</p>
+                                        )}
                                     </div>
                                 )}
                             </>

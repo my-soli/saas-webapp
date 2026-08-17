@@ -19,8 +19,11 @@ import {
     CopyIcon,
     UserIcon,
     BikeIcon,
+    MapPinIcon,
+    ImageIcon,
     Pencil,
     Trash2,
+    SearchIcon,
 } from "lucide-react";
 import {
     fetchDispatchUnits,
@@ -542,6 +545,7 @@ export default function DispatchWorkspace(): ReactElement {
     const [editUnit, setEditUnit] = useState<DispatchUnit | null>(null);
     const [signatureUnit, setSignatureUnit] = useState<DispatchUnit | null>(null);
     const [deliveryLinks, setDeliveryLinks] = useState<{ dispatchNumber: string; riderLink: string; recipientLink: string } | null>(null);
+    const [search, setSearch] = useState("");
 
     const dispatchQuery = useQuery({
         queryKey: ["dispatch-units"],
@@ -577,7 +581,19 @@ export default function DispatchWorkspace(): ReactElement {
         onSuccess: () => queryClient.invalidateQueries({ queryKey: ["dispatch-units"] }),
     });
 
-    const units: DispatchUnit[] = dispatchQuery.data ?? [];
+    const allUnits: DispatchUnit[] = dispatchQuery.data ?? [];
+    const units: DispatchUnit[] = search.trim()
+        ? allUnits.filter((u) => {
+            const q = search.toLowerCase();
+            return (
+                u.dispatch_number.toLowerCase().includes(q) ||
+                u.job_name?.toLowerCase().includes(q) ||
+                u.client_name?.toLowerCase().includes(q) ||
+                u.courier?.toLowerCase().includes(q) ||
+                u.delivery_location?.toLowerCase().includes(q)
+            );
+          })
+        : allUnits;
 
     const toggle = (id: number) =>
         setExpanded((prev) => {
@@ -586,10 +602,10 @@ export default function DispatchWorkspace(): ReactElement {
             return next;
         });
 
-    const readyCount      = units.filter((u) => u.status === "ready").length;
-    const partialCount    = units.filter((u) => u.status === "partial").length;
-    const dispatchedCount = units.filter((u) => u.status === "dispatched").length;
-    const deliveredCount  = units.filter((u) => u.status === "delivered").length;
+    const readyCount      = allUnits.filter((u) => u.status === "ready").length;
+    const partialCount    = allUnits.filter((u) => u.status === "partial").length;
+    const dispatchedCount = allUnits.filter((u) => u.status === "dispatched").length;
+    const deliveredCount  = allUnits.filter((u) => u.status === "delivered").length;
 
     return (
         <>
@@ -623,8 +639,17 @@ export default function DispatchWorkspace(): ReactElement {
                     </div>
                     <div className="flex items-center gap-3">
                         {dispatchQuery.isFetching && <LoaderCircleIcon className="h-4 w-4 animate-spin text-gray-300" />}
+                        <div className="relative">
+                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                            <input
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Search dispatch, job, client…"
+                                className="pl-9 pr-3 py-2 rounded-md border border-gray-200 text-sm focus:border-brand-blue focus:outline-none w-56"
+                            />
+                        </div>
                         <button
-                            onClick={() => units.forEach((u) => void downloadDeliveryNote(u))}
+                            onClick={() => allUnits.forEach((u) => void downloadDeliveryNote(u))}
                             disabled={units.length === 0}
                             className="flex items-center gap-2 rounded-md border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue transition-colors disabled:opacity-40"
                         >
@@ -829,6 +854,101 @@ export default function DispatchWorkspace(): ReactElement {
                                             <div className="flex items-start gap-2 border-t border-brand-orange/20 bg-brand-orange/5 px-5 py-3">
                                                 <AlertCircleIcon className="h-4 w-4 text-brand-orange shrink-0 mt-0.5" />
                                                 <p className="text-sm text-brand-orange">{unit.exception_notes}</p>
+                                            </div>
+                                        )}
+
+                                        {/* Delivery confirmation details */}
+                                        {(unit.rider_confirmed_by || unit.recipient_confirmed_by) && (
+                                            <div className="border-t border-gray-100 px-5 py-4 space-y-3">
+                                                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Delivery Confirmation Details</p>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                    {/* Rider panel */}
+                                                    {unit.rider_confirmed_by && (
+                                                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+                                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+                                                                <BikeIcon className="h-3.5 w-3.5" />
+                                                                Rider
+                                                            </div>
+                                                            <div className="space-y-1 text-xs text-gray-600">
+                                                                <div><span className="font-medium text-gray-700">By:</span> {unit.rider_confirmed_by}</div>
+                                                                {unit.rider_confirmed_at && (
+                                                                    <div><span className="font-medium text-gray-700">At:</span> {formatDate(unit.rider_confirmed_at)}</div>
+                                                                )}
+                                                                {unit.rider_notes && (
+                                                                    <div><span className="font-medium text-gray-700">Notes:</span> {unit.rider_notes}</div>
+                                                                )}
+                                                                {unit.rider_gps_lat && unit.rider_gps_lng && (
+                                                                    <a
+                                                                        href={`https://maps.google.com/?q=${unit.rider_gps_lat},${unit.rider_gps_lng}`}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        className="flex items-center gap-1 text-brand-blue hover:underline font-medium"
+                                                                    >
+                                                                        <MapPinIcon className="h-3 w-3" />
+                                                                        View on Google Maps
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                            {unit.rider_photos && unit.rider_photos.length > 0 && (
+                                                                <div className="space-y-1">
+                                                                    <div className="flex items-center gap-1 text-xs text-gray-400">
+                                                                        <ImageIcon className="h-3 w-3" />
+                                                                        {unit.rider_photos.length} photo{unit.rider_photos.length !== 1 ? "s" : ""}
+                                                                    </div>
+                                                                    <div className="flex flex-wrap gap-1.5">
+                                                                        {unit.rider_photos.map((url, i) => (
+                                                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                                                                <img
+                                                                                    src={url}
+                                                                                    alt={`Delivery photo ${i + 1}`}
+                                                                                    className="h-14 w-14 rounded-md object-cover border border-gray-200 hover:opacity-80 transition-opacity"
+                                                                                />
+                                                                            </a>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* Recipient panel */}
+                                                    {unit.recipient_confirmed_by && (
+                                                        <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-2">
+                                                            <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">
+                                                                <UserIcon className="h-3.5 w-3.5" />
+                                                                Recipient
+                                                            </div>
+                                                            <div className="space-y-1 text-xs text-gray-600">
+                                                                <div><span className="font-medium text-gray-700">By:</span> {unit.recipient_confirmed_by}</div>
+                                                                {unit.recipient_confirmed_at && (
+                                                                    <div><span className="font-medium text-gray-700">At:</span> {formatDate(unit.recipient_confirmed_at)}</div>
+                                                                )}
+                                                                {unit.recipient_notes && (
+                                                                    <div><span className="font-medium text-gray-700">Notes:</span> {unit.recipient_notes}</div>
+                                                                )}
+                                                            </div>
+                                                            {unit.recipient_photos && unit.recipient_photos.length > 0 && (
+                                                                <div className="space-y-1">
+                                                                    <div className="flex items-center gap-1 text-xs text-gray-400">
+                                                                        <ImageIcon className="h-3 w-3" />
+                                                                        {unit.recipient_photos.length} photo{unit.recipient_photos.length !== 1 ? "s" : ""}
+                                                                    </div>
+                                                                    <div className="flex flex-wrap gap-1.5">
+                                                                        {unit.recipient_photos.map((url, i) => (
+                                                                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                                                                                <img
+                                                                                    src={url}
+                                                                                    alt={`Receipt photo ${i + 1}`}
+                                                                                    className="h-14 w-14 rounded-md object-cover border border-gray-200 hover:opacity-80 transition-opacity"
+                                                                                />
+                                                                            </a>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
 

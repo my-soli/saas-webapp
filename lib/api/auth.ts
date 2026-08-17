@@ -1,7 +1,7 @@
 import type { LoginCredentials, RegisterData, ChangePasswordData, User } from '@/types/auth';
 
 export type LoginResult =
-    | { success: true; user: User }
+    | { success: true; user: User; must_setup_2fa?: boolean }
     | { requires_2fa: true; totp_token: string };
 
 export interface TotpStatus {

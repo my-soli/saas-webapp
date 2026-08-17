@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { CheckCircle, XCircle, Loader2, Eye, EyeOff, MailCheck } from "lucide-react";
+import { CheckCircle, XCircle, Loader2, Eye, EyeOff, MailCheck, Clock } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 
@@ -35,6 +35,7 @@ function ActivatePageContent() {
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [activating, setActivating] = useState(false);
     const [activated, setActivated] = useState(false);
+    const [pendingApproval, setPendingApproval] = useState(false);
     const [error, setError] = useState("");
     const [username, setUsername] = useState("");
     const [resendEmail, setResendEmail] = useState("");
@@ -137,10 +138,15 @@ function ActivatePageContent() {
                 const data = await response.json();
                 setUsername(data.username);
                 setActivated(true);
-                toast.success("Account activated successfully! Redirecting to login...");
-                setTimeout(() => {
-                    router.push("/login");
-                }, 3000);
+                if (data.pending_approval) {
+                    setPendingApproval(true);
+                    toast.success("Email verified! Your account is pending admin approval.");
+                } else {
+                    toast.success("Account activated successfully! Redirecting to login...");
+                    setTimeout(() => {
+                        router.push("/login");
+                    }, 3000);
+                }
             } else {
                 const errorData = await response.json();
                 const errorMsg = errorData.detail || "Failed to activate account";
@@ -255,6 +261,34 @@ function ActivatePageContent() {
                         className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:ring-offset-2 transition-all duration-150"
                     >
                         Go to Login
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (activated && pendingApproval) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+                    <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Clock className="w-10 h-10 text-amber-600" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Verified!</h1>
+                    <p className="text-gray-600 mb-4">
+                        Your email has been confirmed. Your account is now <strong>pending admin approval</strong> — we&apos;ll notify you by email once it&apos;s approved, usually within 1 business day.
+                    </p>
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6 text-left">
+                        <p className="text-sm text-amber-800">
+                            <span className="font-semibold">What happens next?</span><br />
+                            Our team will review your registration and send you an approval email. You can then sign in to your portal.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => router.push("/login")}
+                        className="px-6 py-2 bg-brand-blue text-white rounded-lg hover:bg-blue-700 active:scale-95 focus:outline-none focus:ring-2 focus:ring-brand-blue focus:ring-offset-2 transition-all duration-150"
+                    >
+                        Back to Login
                     </button>
                 </div>
             </div>

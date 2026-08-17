@@ -18,12 +18,15 @@ import {
     ChevronDownIcon,
     ChevronRightIcon,
     ShieldCheckIcon,
+    SearchIcon,
+    XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
     fetchReconciliation,
     fetchOverrideLog,
     postReconciliationOverride,
+    postReconciliationFlag,
     syncJobToZoho,
     pullZohoPayments,
     type ReconciliationRow,
@@ -102,6 +105,7 @@ export default function ReconciliationWorkspace(): ReactElement {
     const [expanded, setExpanded] = useState<Set<string>>(new Set());
     const [overrideTarget, setOverrideTarget] = useState<ReconciliationRow | null>(null);
     const [overrideReason, setOverrideReason] = useState("");
+    const [search, setSearch] = useState("");
 
     const toggleExpand = (jobId: string) =>
         setExpanded(prev => { const n = new Set(prev); n.has(jobId) ? n.delete(jobId) : n.add(jobId); return n; });
@@ -140,22 +144,49 @@ export default function ReconciliationWorkspace(): ReactElement {
         onError: (err: Error) => toast.error(err.message || "Failed to pull payments from Zoho."),
     });
 
+    const flagMutation = useMutation({
+        mutationFn: ({ jobDbId, flagged: next }: { jobDbId: number; flagged: boolean }) =>
+            postReconciliationFlag(jobDbId, next),
+        onError: (err: Error) => toast.error(err.message || "Failed to update flag."),
+        onSettled: () => queryClient.invalidateQueries({ queryKey: ["pt-reconciliation"] }),
+    });
+
     const overrideMutation = useMutation({
         mutationFn: ({ jobDbId, reason }: { jobDbId: number; reason: string }) =>
             postReconciliationOverride(jobDbId, reason),
-        onSuccess: (_data, vars) => {
+        onSuccess: (data, vars) => {
             const row = overrideTarget;
-            if (row) setOverridden(prev => { const n = new Set(prev); n.add(row.jobId); return n; });
-            toast.success("Override recorded.");
+            if (row) {
+                setOverridden(prev => { const n = new Set(prev); n.add(row.jobId); return n; });
+                if (data?.zoho_invoice_number) {
+                    setSyncedJobs(prev => new Map(prev).set(row.jobDbId, {
+                        invoiceNumber: data.zoho_invoice_number!,
+                        zohoStatus: data.zoho_status ?? "sent",
+                        balance: data.zoho_balance ?? 0,
+                    }));
+                }
+            }
+            toast.success(data?.detail ?? "Override recorded.");
             setOverrideTarget(null);
             setOverrideReason("");
             queryClient.invalidateQueries({ queryKey: ["pt-override-log"] });
+            queryClient.invalidateQueries({ queryKey: ["pt-reconciliation"] });
         },
-        onError: () => toast.error("Failed to record override."),
+        onError: (err: Error) => toast.error(err.message || "Failed to record override."),
     });
 
-    const items: ReconciliationRow[] = data?.rows ?? [];
+    const allItems: ReconciliationRow[] = useMemo(() => data?.rows ?? [], [data]);
     const reworkCostsTotal: number = data?.rework_costs_total ?? 0;
+
+    const items = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return allItems;
+        return allItems.filter((i) =>
+            i.jobId.toLowerCase().includes(q) ||
+            i.jobName.toLowerCase().includes(q) ||
+            i.client.toLowerCase().includes(q)
+        );
+    }, [allItems, search]);
 
     const totalQuoted   = items.reduce((s, i) => s + i.quotedRevenue, 0);
     const totalCost     = items.reduce((s, i) => s + i.actualCost, 0);
@@ -163,23 +194,30 @@ export default function ReconciliationWorkspace(): ReactElement {
     const totalVariance = items.reduce((s, i) => s + i.variance, 0);
     const grossMargin   = totalQuoted > 0 ? ((totalQuoted - totalCost) / totalQuoted) * 100 : 0;
     const varianceCount = items.filter((i) => i.status === "VARIANCE").length;
-    const flaggedCount  = flagged.size;
+    const flaggedCount  = items.filter((i) => i.flagged || flagged.has(i.jobId)).length;
 
     const mismatches = useMemo(() => items.filter((i) => i.status === "VARIANCE"), [items]);
 
-    const toggleFlag = (jobId: string) =>
+    const toggleFlag = (row: ReconciliationRow) => {
+        const currentlyFlagged = row.flagged || flagged.has(row.jobId);
+        const next = !currentlyFlagged;
         setFlagged((prev) => {
-            const next = new Set(prev);
-            next.has(jobId) ? next.delete(jobId) : next.add(jobId);
-            return next;
+            const s = new Set(prev);
+            next ? s.add(row.jobId) : s.delete(row.jobId);
+            return s;
         });
+        flagMutation.mutate({ jobDbId: row.jobDbId, flagged: next });
+    };
 
-    const flagAllVariances = () =>
+    const flagAllVariances = () => {
+        const toFlag = items.filter((i) => i.status === "VARIANCE" && !i.flagged && !flagged.has(i.jobId));
         setFlagged((prev) => {
             const next = new Set(prev);
-            items.filter((i) => i.status === "VARIANCE").forEach((i) => next.add(i.jobId));
+            toFlag.forEach((i) => next.add(i.jobId));
             return next;
         });
+        toFlag.forEach((i) => flagMutation.mutate({ jobDbId: i.jobDbId, flagged: true }));
+    };
 
     return (
         <>
@@ -225,6 +263,28 @@ export default function ReconciliationWorkspace(): ReactElement {
                             <FlagIcon className="h-4 w-4" />
                             Flag All Mismatches
                         </button>
+                    </div>
+                </div>
+                <div className="px-4 lg:px-8 pb-4">
+                    <div className="relative max-w-md">
+                        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <input
+                            type="text"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search by job name, job ID, or client…"
+                            className="w-full rounded-md border border-gray-200 py-2 pl-9 pr-9 text-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
+                        />
+                        {search && (
+                            <button
+                                type="button"
+                                onClick={() => setSearch("")}
+                                aria-label="Clear search"
+                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
+                            >
+                                <XIcon className="h-4 w-4" />
+                            </button>
+                        )}
                     </div>
                 </div>
             </header>
@@ -313,12 +373,20 @@ export default function ReconciliationWorkspace(): ReactElement {
                             <LoaderCircleIcon className="h-8 w-8 animate-spin text-gray-300" />
                             <p className="mt-3 text-sm text-gray-400">Loading reconciliation data…</p>
                         </div>
-                    ) : items.length === 0 ? (
+                    ) : allItems.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16">
                             <InboxIcon className="h-10 w-10 text-gray-200" />
                             <p className="mt-3 text-sm font-semibold text-gray-400">No reconciliation data</p>
                             <p className="mt-1 text-xs text-gray-300 text-center px-4 lg:px-8">
                                 Jobs assigned to you with PT-costed quotes will appear here.
+                            </p>
+                        </div>
+                    ) : items.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16">
+                            <SearchIcon className="h-10 w-10 text-gray-200" />
+                            <p className="mt-3 text-sm font-semibold text-gray-400">No jobs match &quot;{search}&quot;</p>
+                            <p className="mt-1 text-xs text-gray-300 text-center px-4 lg:px-8">
+                                Try a different job name, ID, or client.
                             </p>
                         </div>
                     ) : (
@@ -339,7 +407,7 @@ export default function ReconciliationWorkspace(): ReactElement {
                                     {items.map((row) => {
                                         const displayStatus = mapStatus(row);
                                         const sc = statusCfg[displayStatus];
-                                        const isFlagged = flagged.has(row.jobId);
+                                        const isFlagged = row.flagged || flagged.has(row.jobId);
                                         const isExpanded = expanded.has(row.jobId);
                                         const hasComponents = (row.components ?? []).length > 0;
                                         const quoteVsProdMatch = row.actualCost === 0 || Math.abs(row.quotedRevenue - row.actualCost) < 0.01;
@@ -418,8 +486,8 @@ export default function ReconciliationWorkspace(): ReactElement {
                                                                 return (
                                                                     <button
                                                                         onClick={() => zohoSyncMutation.mutate(row.jobDbId)}
-                                                                        disabled={isSyncing || !row.hasLpo}
-                                                                        title={!row.hasLpo ? "No LPO — approve quote first" : "Sync to Zoho Books"}
+                                                                        disabled={isSyncing || (!row.hasLpo && !row.overridden && !syncedJobs.has(row.jobDbId))}
+                                                                        title={(!row.hasLpo && !row.overridden) ? "No LPO — use Override first" : "Sync to Zoho Books"}
                                                                         className="flex items-center gap-1 rounded-md border border-brand-green/40 px-2.5 py-1.5 text-[10px] font-bold text-brand-green hover:bg-brand-green/10 transition-colors disabled:opacity-40"
                                                                     >
                                                                         {isSyncing
@@ -431,7 +499,7 @@ export default function ReconciliationWorkspace(): ReactElement {
                                                                 );
                                                             })()}
                                                             <button
-                                                                onClick={() => toggleFlag(row.jobId)}
+                                                                onClick={() => toggleFlag(row)}
                                                                 className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
                                                                     isFlagged
                                                                         ? "bg-brand-red text-white hover:bg-brand-red/90"
@@ -442,7 +510,7 @@ export default function ReconciliationWorkspace(): ReactElement {
                                                             >
                                                                 {isFlagged ? "Flagged ✓" : "Flag"}
                                                             </button>
-                                                            {row.status === "VARIANCE" && !overridden.has(row.jobId) && (
+                                                            {row.status === "VARIANCE" && !row.overridden && !overridden.has(row.jobId) && (
                                                                 <button
                                                                     onClick={() => { setOverrideTarget(row); setOverrideReason(""); }}
                                                                     className="flex items-center gap-1 rounded-md border border-brand-blue/40 px-3 py-1.5 text-xs font-semibold text-brand-blue hover:bg-brand-blue/10 transition-colors"

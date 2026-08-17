@@ -19,6 +19,9 @@ export interface PortalQuote {
     created_at: string | null;
     valid_until: string | null;
     total_amount: string;
+    subtotal: string;
+    tax_total: string;
+    tax_rate: number;
     include_vat: boolean;
     project_name: string;
     item_count: number;
@@ -44,11 +47,33 @@ export interface DesignFile {
     notes: string;
     uploaded_at: string;
     file_url: string | null;
+    project_id: number | null;
 }
 
 export interface DesignsResponse {
     count: number;
     results: DesignFile[];
+}
+
+export interface DesignProject {
+    id: number;
+    name: string;
+    description: string;
+    created_at: string;
+    updated_at: string;
+    file_count: number;
+}
+
+export interface DesignProjectsResponse {
+    count: number;
+    results: DesignProject[];
+}
+
+export interface StaffMember {
+    id: number;
+    name: string;
+    email: string;
+    role: string;
 }
 
 // ── Cart ──────────────────────────────────────────────────────────────────────

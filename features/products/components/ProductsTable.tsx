@@ -59,16 +59,22 @@ function ProductRowMenu({
     onArchive: () => void;
 }): ReactElement {
     const [open, setOpen] = useState<boolean>(false);
-    const [menuPos, setMenuPos] = useState<{ top: number; right: number }>({ top: 0, right: 0 });
+    const [menuPos, setMenuPos] = useState<{ top?: number; bottom?: number; right: number }>({ right: 0 });
     const btnRef = useRef<HTMLButtonElement>(null);
+
+    const DROPDOWN_HEIGHT = 160; // max estimated height for the menu
 
     const handleOpen = (): void => {
         if (btnRef.current) {
             const rect = btnRef.current.getBoundingClientRect();
-            setMenuPos({
-                top: rect.bottom + window.scrollY + 4,
-                right: window.innerWidth - rect.right,
-            });
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const right = window.innerWidth - rect.right;
+
+            if (spaceBelow < DROPDOWN_HEIGHT) {
+                setMenuPos({ bottom: window.innerHeight - rect.top + 4, right });
+            } else {
+                setMenuPos({ top: rect.bottom + 4, right });
+            }
         }
         setOpen((prev) => !prev);
     };
@@ -90,7 +96,7 @@ function ProductRowMenu({
                         onClick={() => setOpen(false)}
                     />
                     <div
-                        style={{ top: menuPos.top, right: menuPos.right }}
+                        style={{ ...(menuPos.top !== undefined ? { top: menuPos.top } : { bottom: menuPos.bottom }), right: menuPos.right }}
                         className="fixed z-50 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
                     >
                         <button

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, type ReactElement } from "react";
+import { useState, useEffect, useRef, type ReactElement } from "react";
 import { useParams } from "next/navigation";
-import { CheckCircle2, AlertCircle, Loader2, Truck, MapPin, User, MessageSquare, XCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, Truck, MapPin, Camera, XCircle } from "lucide-react";
 
 interface DispatchItem { product_name: string; quantity: number; unit: string; }
 interface DispatchInfo {
@@ -12,6 +12,7 @@ interface DispatchInfo {
     client_name: string;
     delivery_location: string;
     courier: string;
+    rider_name: string;
     dispatch_date: string | null;
     items: DispatchItem[];
 }
@@ -54,6 +55,7 @@ export default function RiderConfirmationPage(): ReactElement {
 
     // Confirm form
     const [riderName, setRiderName] = useState("");
+    const [riderNameEdited, setRiderNameEdited] = useState(false);
     const [recipientName, setRecipientName] = useState("");
     const [notes, setNotes] = useState("");
     const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
@@ -67,13 +69,38 @@ export default function RiderConfirmationPage(): ReactElement {
     const [cannotNotes, setCannotNotes] = useState("");
     const [cannotLoading, setCannotLoading] = useState(false);
 
+    // Photo selection (uploaded after confirmation)
+    const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+    const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
+    const [uploadedCount, setUploadedCount] = useState(0);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? []);
+        if (!files.length) return;
+        setSelectedPhotos((prev) => [...prev, ...files]);
+        setPhotoPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))]);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+
+    const removePhoto = (i: number) => {
+        setSelectedPhotos((prev) => prev.filter((_, idx) => idx !== i));
+        setPhotoPreviews((prev) => prev.filter((_, idx) => idx !== i));
+    };
+
     useEffect(() => {
         fetch(apiBase, { cache: "no-store" })
             .then((r) => {
                 if (!r.ok) throw new Error(r.status === 404 ? "This link is invalid or has been removed." : r.status === 410 ? "This link has expired." : "Could not load delivery details.");
                 return r.json() as Promise<ConfirmationData>;
             })
-            .then(setData)
+            .then((d) => {
+                setData(d);
+                // Pre-fill rider name from dispatch record
+                if (d.dispatch.rider_name && !riderNameEdited) {
+                    setRiderName(d.dispatch.rider_name);
+                }
+            })
             .catch((e: Error) => setError(e.message))
             .finally(() => setLoading(false));
     }, [apiBase]);
@@ -89,6 +116,7 @@ export default function RiderConfirmationPage(): ReactElement {
 
     const confirmDelivery = async () => {
         if (!recipientName.trim()) { setConfirmError("Please enter the recipient's name."); return; }
+        if (!gps) { setConfirmError("GPS location is required. Please capture your location before confirming."); return; }
         setConfirmLoading(true);
         setConfirmError(null);
         try {
@@ -106,6 +134,17 @@ export default function RiderConfirmationPage(): ReactElement {
             });
             if (!r.ok) { const b = await r.json() as { detail?: string }; throw new Error(b.detail ?? "Failed"); }
             setData(await r.json() as ConfirmationData);
+            // Upload any selected photos after confirmation
+            let uploaded = 0;
+            for (const file of selectedPhotos) {
+                try {
+                    const fd = new FormData();
+                    fd.append("photo", file);
+                    await fetch(`/api/proxy/api/v1/delivery-confirmation/${token}/photo/`, { method: "POST", body: fd });
+                    uploaded++;
+                    setUploadedCount(uploaded);
+                } catch { /* non-fatal */ }
+            }
         } catch (e: unknown) {
             setConfirmError(e instanceof Error ? e.message : "Failed to confirm delivery");
         } finally {
@@ -189,6 +228,7 @@ export default function RiderConfirmationPage(): ReactElement {
                                     </div>
                                 </div>
                             )}
+
                             {hasIssue && !isConfirmed && (
                                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "14px 20px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
                                     <XCircle style={{ width: 20, height: 20, color: "#dc2626", flexShrink: 0 }} />
@@ -198,9 +238,13 @@ export default function RiderConfirmationPage(): ReactElement {
                                     </div>
                                 </div>
                             )}
-                            {data.partner_confirmed && (
+                            {data.partner_confirmed ? (
                                 <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#1e3a5f" }}>
-                                    <strong>Recipient has confirmed receipt</strong>{data.partner_confirmed_by ? ` — ${data.partner_confirmed_by}` : ""}
+                                    <strong>✓ Client has confirmed receipt</strong>{data.partner_confirmed_by ? ` — ${data.partner_confirmed_by}` : ""} — you can now sign off the delivery.
+                                </div>
+                            ) : !isConfirmed && !hasIssue && (
+                                <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#92400e" }}>
+                                    <strong>⏳ Waiting for client to confirm receipt</strong> — the client must tap their confirmation link before you can sign off. Ask them to check their email or WhatsApp.
                                 </div>
                             )}
 
@@ -251,9 +295,20 @@ export default function RiderConfirmationPage(): ReactElement {
                                         )}
                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                                             <div>
-                                                <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>Your Name (optional)</label>
-                                                <input value={riderName} onChange={(e) => setRiderName(e.target.value)} placeholder="Rider name"
-                                                    style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, boxSizing: "border-box", outline: "none" }} />
+                                                <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>
+                                                    Your Name <span style={{ color: "#dc2626" }}>*</span>
+                                                </label>
+                                                <input
+                                                    value={riderName}
+                                                    onChange={(e) => { setRiderName(e.target.value); setRiderNameEdited(true); }}
+                                                    placeholder="Rider name"
+                                                    style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, boxSizing: "border-box", outline: "none" }}
+                                                />
+                                                {riderNameEdited && d.courier && riderName.trim() && riderName.trim().toLowerCase() !== d.courier.toLowerCase() && (
+                                                    <div style={{ marginTop: 6, background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#92400e" }}>
+                                                        ⚠ Dispatch note says <strong>{d.courier}</strong>. If you are a different rider, please raise this with the team before confirming.
+                                                    </div>
+                                                )}
                                             </div>
                                             <div>
                                                 <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>Received by <span style={{ color: "#dc2626" }}>*</span></label>
@@ -264,14 +319,15 @@ export default function RiderConfirmationPage(): ReactElement {
                                         <div>
                                             <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 4 }}>
                                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                                    <span>GPS Location <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span></span>
+                                                    <span>GPS Location <span style={{ color: "#dc2626" }}>*</span></span>
                                                     <button onClick={captureGps} disabled={gpsLoading}
-                                                        style={{ fontSize: 11, color: "#2563eb", fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                                                        style={{ fontSize: 11, color: gps ? "#16a34a" : "#2563eb", fontWeight: 600, background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                                                         <MapPin style={{ width: 12, height: 12 }} />
                                                         {gpsLoading ? "Getting location…" : gps ? "Location captured ✓" : "Capture my location"}
                                                     </button>
                                                 </div>
                                             </label>
+                                            {!gps && <div style={{ fontSize: 11, color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 6, padding: "6px 10px" }}>You must capture your GPS location before confirming delivery.</div>}
                                             {gps && <div style={{ fontSize: 12, color: "#6b7280", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 6, padding: "6px 10px" }}>
                                                 {gps.lat.toFixed(6)}, {gps.lng.toFixed(6)}
                                             </div>}
@@ -283,15 +339,50 @@ export default function RiderConfirmationPage(): ReactElement {
                                             <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any notes about the delivery…" rows={2}
                                                 style={{ width: "100%", padding: "9px 12px", border: "1px solid #d1d5db", borderRadius: 7, fontSize: 13, resize: "vertical", boxSizing: "border-box", outline: "none", fontFamily: "inherit" }} />
                                         </div>
+
+                                        {/* Photo picker */}
+                                        <div>
+                                            <label style={{ fontSize: 12, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+                                                Delivery Photos <span style={{ fontWeight: 400, color: "#9ca3af" }}>(optional)</span>
+                                            </label>
+                                            {photoPreviews.length > 0 && (
+                                                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                                                    {photoPreviews.map((url, i) => (
+                                                        <div key={i} style={{ position: "relative" }}>
+                                                            <img src={url} alt={`Photo ${i + 1}`} style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 8, border: "1px solid #e5e7eb" }} />
+                                                            <button
+                                                                onClick={() => removePhoto(i)}
+                                                                style={{ position: "absolute", top: -6, right: -6, background: "#dc2626", border: "none", borderRadius: "50%", width: 18, height: 18, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: 1 }}
+                                                            >×</button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <input
+                                                ref={fileInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                capture="environment"
+                                                multiple
+                                                onChange={handlePhotoSelect}
+                                                style={{ display: "none" }}
+                                                id="photo-input"
+                                            />
+                                            <label htmlFor="photo-input" style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 14px", background: "#f3f4f6", border: "1px dashed #d1d5db", borderRadius: 7, fontSize: 12, fontWeight: 600, color: "#374151", cursor: "pointer" }}>
+                                                <Camera style={{ width: 14, height: 14 }} />
+                                                {photoPreviews.length > 0 ? "Add More Photos" : "Take / Select Photos"}
+                                            </label>
+                                        </div>
+
                                         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                                             <button onClick={() => setShowCannotDeliver(true)}
                                                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", background: "none", border: "1px solid #e5e7eb", borderRadius: 8, fontSize: 13, fontWeight: 600, color: "#6b7280", cursor: "pointer" }}>
                                                 <XCircle style={{ width: 15, height: 15 }} /> Cannot Deliver
                                             </button>
-                                            <button onClick={confirmDelivery} disabled={confirmLoading || !recipientName.trim()}
-                                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 22px", background: confirmLoading || !recipientName.trim() ? "#9ca3af" : "#16a34a", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: confirmLoading || !recipientName.trim() ? "not-allowed" : "pointer" }}>
+                                            <button onClick={confirmDelivery} disabled={confirmLoading || !recipientName.trim() || !gps || !data.partner_confirmed}
+                                                style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 22px", background: confirmLoading || !recipientName.trim() || !gps || !data.partner_confirmed ? "#9ca3af" : "#16a34a", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: confirmLoading || !recipientName.trim() || !gps || !data.partner_confirmed ? "not-allowed" : "pointer" }}>
                                                 {confirmLoading ? <Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} /> : <CheckCircle2 style={{ width: 16, height: 16 }} />}
-                                                Confirm Delivery
+                                                {confirmLoading ? (selectedPhotos.length > 0 ? `Confirming & uploading ${uploadedCount}/${selectedPhotos.length}…` : "Confirming…") : "Confirm Delivery"}
                                             </button>
                                         </div>
                                     </div>

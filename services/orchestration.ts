@@ -170,13 +170,22 @@ export interface DispatchUnit {
     recipient_link?: string;
     rider_confirmed_by?: string;
     rider_confirmed_at?: string | null;
+    rider_gps_lat?: number | null;
+    rider_gps_lng?: number | null;
+    rider_notes?: string;
+    rider_photos?: string[];
     recipient_confirmed_by?: string;
     recipient_confirmed_at?: string | null;
+    recipient_notes?: string;
+    recipient_photos?: string[];
 }
+
+export type ProductionCostType = "material" | "vendor" | "labor" | "other";
 
 export interface ProductionCostItem {
     service_name: string;
     cost: number;
+    cost_type?: ProductionCostType;
 }
 
 export interface ComponentCost {
@@ -214,6 +223,8 @@ export interface ReconciliationRow {
     zohoStatus: string | null;
     zohoBalance: number | null;
     hasLpo: boolean;
+    overridden: boolean;
+    flagged: boolean;
 }
 
 export interface ZohoSyncResult {
@@ -421,6 +432,16 @@ export const markDelivered = (unitId: number, podSignedBy: string): Promise<Disp
 export const flagDispatchException = (unitId: number, notes: string): Promise<DispatchUnit> =>
     post<DispatchUnit>(`dispatch-units/${unitId}/flag_exception/`, { notes });
 
+export const uploadDeliveryPhoto = async (token: string, photo: File): Promise<void> => {
+    const formData = new FormData();
+    formData.append("photo", photo);
+    const res = await fetch(`${PROXY_BASE}/api/proxy/api/v1/delivery-confirmation/${token}/photo/`, {
+        method: "POST",
+        body: formData,
+    });
+    if (!res.ok) throw new Error("Failed to upload photo");
+};
+
 // ── Control Tower ─────────────────────────────────────────────────────────────
 
 export const fetchControlTowerStats = (): Promise<ControlTowerStats> =>
@@ -444,8 +465,11 @@ export const sendAdjustmentRequest = (jobProductId: number, note: string): Promi
 export const fetchOverrideLog = (): Promise<OverrideLogEntry[]> =>
     get<{ results: OverrideLogEntry[] }>("pt/override-log/").then((d) => d.results ?? []);
 
-export const postReconciliationOverride = (jobDbId: number, reason: string): Promise<{ detail: string }> =>
-    post<{ detail: string }>("pt/reconciliation/override/", { job_id: jobDbId, reason });
+export const postReconciliationOverride = (jobDbId: number, reason: string): Promise<{ detail: string; zoho_invoice_number?: string; zoho_status?: string; zoho_balance?: number }> =>
+    post<{ detail: string; zoho_invoice_number?: string; zoho_status?: string; zoho_balance?: number }>("pt/reconciliation/override/", { job_id: jobDbId, reason });
+
+export const postReconciliationFlag = (jobDbId: number, flagged: boolean): Promise<{ detail: string; jobId: number; flagged: boolean }> =>
+    post<{ detail: string; jobId: number; flagged: boolean }>("pt/reconciliation/flag/", { job_id: jobDbId, flagged });
 
 export const syncJobToZoho = (jobDbId: number): Promise<ZohoSyncResult> =>
     post<ZohoSyncResult>(`pt/zoho/sync-job/${jobDbId}/`, {});
@@ -456,15 +480,23 @@ export const pullZohoPayments = (): Promise<{ created: number; updated: number; 
 // ── Vendor Brief ──────────────────────────────────────────────────────────────
 
 export interface SendBriefResult {
-    detail: string;
     channel: string;
     acknowledge_url: string;
     wa_message: string;
     vendor_phone: string;
     vendor_email: string;
+    deadline_missing?: boolean;
+    compose_data?: {
+        subject: string;
+        body: string;
+        to: string;
+    };
 }
 
-export const sendVendorBrief = (compId: number, channel: "email" | "whatsapp" | "both" = "email"): Promise<SendBriefResult> =>
+export const sendVendorBrief = (
+    compId: number,
+    channel: "email" | "whatsapp" = "email",
+): Promise<SendBriefResult> =>
     post<SendBriefResult>(`job-components/${compId}/send_brief/`, { channel });
 
 // ── Brief Attachments ──────────────────────────────────────────────────────────
@@ -530,6 +562,13 @@ export const respondToAdjustment = (compId: number, payload: {
     new_cost?: string;
 }): Promise<{ detail: string; adjustment_status: string }> =>
     post(`job-components/${compId}/respond-to-adjustment/`, payload);
+
+export const respondToPrice = (compId: number, payload: {
+    action: "accept" | "counter";
+    message?: string;
+    counter_price?: string;
+}): Promise<{ detail: string; price_review_status: string }> =>
+    post(`job-components/${compId}/respond-to-price/`, payload);
 
 // ── QC Custom Templates ───────────────────────────────────────────────────────
 
@@ -627,6 +666,11 @@ export interface VendorBriefStatus {
     adjustment_response?: string;
     adjustment_responded_at?: string | null;
     adjustment_responded_by?: string | null;
+    vendor_proposed_price?: string;
+    price_review_status?: "pending" | "accepted" | "countered" | "";
+    price_counter_offer?: string;
+    price_review_note?: string;
+    price_reviewed_at?: string | null;
     proofs?: VendorBriefProofStatus[];
     updates?: { note: string; created_at: string }[];
     is_active?: boolean;

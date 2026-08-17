@@ -284,7 +284,6 @@ export default function LeadFormDrawer({
                                     type="text"
                                     value={formState.phone}
                                     onChange={handleInputChange("phone")}
-                                    required
                                     className={`mt-2 w-full rounded-md border px-3 py-2 text-sm ${fieldErrors.phone ? "border-red-500 focus:ring-red-500" : "border-gray-300"
                                         }`}
                                 />
