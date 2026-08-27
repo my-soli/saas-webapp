@@ -152,8 +152,8 @@ function EditInvoiceForm({ invoice }: { invoice: FinancialInvoice }): ReactEleme
     const [paymentTerms, setPaymentTerms] = useState(invoice.payment_terms);
     const [dueDate, setDueDate] = useState(invoice.due_date ?? "");
     const [notes, setNotes] = useState(invoice.notes);
-    const [showTermsSection, setShowTermsSection] = useState(Boolean(invoice.terms));
     const [terms, setTerms] = useState(invoice.terms);
+    const [paymentOptions, setPaymentOptions] = useState(invoice.payment_options);
     const [discount, setDiscount] = useState(String(invoice.discount ?? "0"));
     const [showTotalSummary, setShowTotalSummary] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
@@ -231,6 +231,7 @@ function EditInvoiceForm({ invoice }: { invoice: FinancialInvoice }): ReactEleme
                 discount,
                 notes,
                 terms,
+                payment_options: paymentOptions,
                 line_items,
             });
         },
@@ -379,16 +380,21 @@ function EditInvoiceForm({ invoice }: { invoice: FinancialInvoice }): ReactEleme
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent resize-none" />
                                 </div>
 
-                                {!showTermsSection ? (
-                                    <button type="button" onClick={() => setShowTermsSection(true)}
-                                        className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline">
-                                        <Plus className="w-4 h-4" /> Add Terms and Conditions
-                                    </button>
-                                ) : (
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-700">Terms &amp; Conditions</label>
+                                    <textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={5}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent resize-y" />
+                                </div>
+
+                                {/* New section — only added to invoices still being drafted, not
+                                    retrofitted onto already-sent ones (those keep their original
+                                    Notes + Terms-only edit form, unchanged). */}
+                                {invoice.status === "draft" && (
                                     <div className="space-y-1">
-                                        <label className="text-sm font-medium text-gray-700">Terms &amp; Conditions</label>
-                                        <textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={2}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent resize-none" />
+                                        <label className="text-sm font-medium text-gray-700">Payment Options</label>
+                                        <textarea value={paymentOptions} onChange={(e) => setPaymentOptions(e.target.value)} rows={8}
+                                            placeholder="Bank transfer details, M-Pesa paybill, etc."
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent resize-y" />
                                     </div>
                                 )}
                             </div>

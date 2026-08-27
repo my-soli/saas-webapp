@@ -69,6 +69,7 @@ export interface FinancialInvoice {
     balance_due: number;
     notes: string;
     terms: string;
+    payment_options: string;
     line_items: InvoiceLineItem[];
     etims_status: string;
     created_at: string;
@@ -89,6 +90,7 @@ export interface InvoicePayload {
     discount?: string | number;
     notes?: string;
     terms?: string;
+    payment_options?: string;
     status?: string;
     line_items: InvoiceLineItem[];
 }

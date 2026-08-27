@@ -10,7 +10,7 @@ import SearchableSelect from "@/components/admin/searchable-select";
 import TaxRateSelect from "@/components/admin/tax-rate-select";
 import {
     ArrowLeft, Plus, Trash2, Loader2, ChevronDown, ChevronRight,
-    Layers, RefreshCw, SearchIcon, ScanLine, CreditCard,
+    Layers, RefreshCw, SearchIcon, ScanLine,
 } from "lucide-react";
 import {
     createInvoice,
@@ -31,6 +31,28 @@ interface DraftLineItem {
 }
 
 const EMPTY_LINE: DraftLineItem = { description: "", quantity: "1", unit_rate: "0", tax_rate: "0" };
+
+// Same defaults as the quote creation form's "Notes, Terms & Payment" section.
+const DEFAULT_NOTES = "Looking forward for your business.";
+const DEFAULT_TERMS =
+`1. A 70% advance payment or a valid purchase order (PO) is required to initiate production.
+2. The remaining payment must be settled within 14 days after the items are delivered.
+3. The quoted price remains valid for 30 days from the date of the initial quotation.
+4. Late payments may incur additional charges as per our policy.`;
+const DEFAULT_PAYMENT_OPTIONS =
+`Account transfer
+Bank: I&M Bank Limited
+Acc name: Print Duka Limited
+Acc: 04404566816350
+Branch: Tatu City
+Branch code: 044
+Bank code: 57
+Branch full code: 57044
+Swift code: IMBLKENA
+
+M-Pesa
+Paybill: 542542
+Account: 35450`;
 
 function todayISO(): string {
     // Local date components, not toISOString() (UTC) — the latter shows
@@ -169,14 +191,13 @@ export default function NewInvoicePage(): ReactElement {
     const [invoiceDate, setInvoiceDate] = useState(todayISO());
     const [paymentTerms, setPaymentTerms] = useState("due_on_receipt");
     const [dueDate, setDueDate] = useState(() => computeDueDate(todayISO(), "due_on_receipt") ?? todayISO());
-    const [notes, setNotes] = useState("");
-    const [showTermsSection, setShowTermsSection] = useState(false);
-    const [terms, setTerms] = useState("");
+    const [notes, setNotes] = useState(DEFAULT_NOTES);
+    const [terms, setTerms] = useState(DEFAULT_TERMS);
+    const [paymentOptions, setPaymentOptions] = useState(DEFAULT_PAYMENT_OPTIONS);
     const [discount, setDiscount] = useState("0");
     const [showTotalSummary, setShowTotalSummary] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
-    const [showPaymentGateway, setShowPaymentGateway] = useState(false);
     const [lineItems, setLineItems] = useState<DraftLineItem[]>([{ ...EMPTY_LINE }]);
 
     // Payment terms/invoice date drive the due-date convenience-fill, recomputed directly in
@@ -243,6 +264,7 @@ export default function NewInvoicePage(): ReactElement {
                 discount,
                 notes,
                 terms,
+                payment_options: paymentOptions,
                 status,
                 line_items,
             });
@@ -423,32 +445,18 @@ export default function NewInvoicePage(): ReactElement {
                                     <p className="text-xs text-gray-400">Will be displayed on the invoice</p>
                                 </div>
 
-                                {!showTermsSection ? (
-                                    <button type="button" onClick={() => setShowTermsSection(true)}
-                                        className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline">
-                                        <Plus className="w-4 h-4" /> Add Terms and Conditions
-                                    </button>
-                                ) : (
-                                    <div className="space-y-1">
-                                        <label className="text-sm font-medium text-gray-700">Terms &amp; Conditions</label>
-                                        <textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={2}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent resize-none" />
-                                    </div>
-                                )}
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-700">Terms &amp; Conditions</label>
+                                    <textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={5}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent resize-y" />
+                                </div>
 
-                                {!showPaymentGateway ? (
-                                    <button type="button" onClick={() => setShowPaymentGateway(true)}
-                                        className="flex items-center gap-1.5 text-sm text-brand-blue hover:underline">
-                                        <Plus className="w-4 h-4" /> Add Payment Gateway
-                                    </button>
-                                ) : (
-                                    <div className="rounded-lg border border-dashed border-gray-200 p-3 flex items-start gap-2">
-                                        <CreditCard className="w-4 h-4 text-gray-400 mt-0.5" />
-                                        <p className="text-xs text-gray-500">
-                                            No payment gateway is connected yet. Once one is configured, customers will be able to pay this invoice online from the link you send them.
-                                        </p>
-                                    </div>
-                                )}
+                                <div className="space-y-1">
+                                    <label className="text-sm font-medium text-gray-700">Payment Options</label>
+                                    <textarea value={paymentOptions} onChange={(e) => setPaymentOptions(e.target.value)} rows={8}
+                                        placeholder="Bank transfer details, M-Pesa paybill, etc."
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent resize-y" />
+                                </div>
                             </div>
 
                             <div className="space-y-2">
