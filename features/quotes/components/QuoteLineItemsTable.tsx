@@ -262,7 +262,7 @@ export default function QuoteLineItemsTable({
                                         </td>
                                         <td colSpan={2} className="px-4 pb-3 pt-0 align-top">
                                             <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">
-                                                Est. cost/unit (KES)
+                                                Production Cost/unit (KES)
                                             </label>
                                             <input
                                                 type="number"
