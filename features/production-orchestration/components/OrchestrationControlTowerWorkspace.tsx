@@ -20,7 +20,6 @@ import {
     FileIcon,
     SearchIcon,
     XIcon,
-    CalendarIcon,
 } from "lucide-react";
 import ScheduleCalendar from "./ScheduleCalendar";
 import { fetchJobs } from "@/services/jobs";
@@ -44,7 +43,7 @@ import {
     apiUserLabel,
 } from "../lib/api-job-helpers";
 
-type Tab = "overview" | "jobs" | "work" | "schedule";
+type Tab = "overview" | "jobs" | "work";
 
 const riskColor = (level: string) => {
     if (level === "HIGH") return "bg-brand-red/10 text-brand-red";
@@ -404,7 +403,6 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
         { key: "overview",  label: "Live Overview", icon: <ZapIcon className="h-4 w-4" /> },
         { key: "jobs",      label: "Master Jobs",   icon: <BriefcaseIcon className="h-4 w-4" />, badge: myJobsCount || undefined },
         { key: "work",      label: "My Work",       icon: <InboxIcon className="h-4 w-4" />,    badge: myTasks.length || undefined },
-        { key: "schedule",  label: "Schedule",      icon: <CalendarIcon className="h-4 w-4" /> },
     ];
 
     return (
@@ -490,6 +488,8 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
                                 <p className="mt-1 text-xs text-gray-400">Awaiting confirmation</p>
                             </article>
                         </div>
+
+                        <ScheduleCalendar basePath={basePath} />
 
                         {ctStatsQuery.isLoading ? (
                             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white py-20">
@@ -767,9 +767,6 @@ export default function OrchestrationControlTowerWorkspace({ basePath = "/produc
                         )}
                     </div>
                 )}
-
-                {/* ── SCHEDULE TAB ── */}
-                {activeTab === "schedule" && <ScheduleCalendar basePath={basePath} />}
 
                 {/* ── MASTER JOBS TAB ── */}
                 {activeTab === "jobs" && (

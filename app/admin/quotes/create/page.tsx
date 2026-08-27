@@ -67,6 +67,7 @@ function AdminCreateQuotePageContent() {
     const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
     const [referenceNumber, setReferenceNumber] = useState("");
     const [projectName, setProjectName] = useState("");
+    const [productionCost, setProductionCost] = useState("");
     const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split("T")[0]);
     const [expiryDate, setExpiryDate] = useState(
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
@@ -139,6 +140,7 @@ function AdminCreateQuotePageContent() {
             }
             setReferenceNumber(existingQuote.reference_number || "");
             setProjectName(existingQuote.project_name || "");
+            setProductionCost(existingQuote.production_cost ? String(existingQuote.production_cost) : "");
             setQuoteDate(existingQuote.quote_date);
             setExpiryDate(existingQuote.valid_until);
             setCustomerNotes(existingQuote.customer_notes || existingQuote.notes || DEFAULT_NOTES);
@@ -331,6 +333,7 @@ function AdminCreateQuotePageContent() {
             notes: customerNotes || undefined,
             custom_terms: termsAndConditions || undefined,
             payment_options: paymentOptions || undefined,
+            production_cost: productionCost ? Number(productionCost) : undefined,
             line_items: lineItems.map(item => ({
                 product_id: item.is_custom ? 0 : item.product_id,
                 product_name: item.product_name,
@@ -462,6 +465,8 @@ function AdminCreateQuotePageContent() {
                                 onExpiryDateChange={setExpiryDate}
                                 salesperson={displayUserName}
                                 quoteId={existingQuote?.quote_id}
+                                productionCost={productionCost}
+                                onProductionCostChange={setProductionCost}
                             />
 
                             <QuoteLineItemsTable

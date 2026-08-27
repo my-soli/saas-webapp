@@ -206,6 +206,9 @@ export async function updateQuote(quoteId: number, data: CreateQuoteInput): Prom
         customer_notes: data.notes || "",
         custom_terms: data.custom_terms || "",
         payment_options: data.payment_options || "",
+        ...(data.production_cost != null && data.production_cost > 0
+            ? { production_cost: data.production_cost }
+            : {}),
         line_items: data.line_items.map((item, index) => ({
             product: item.product_id || null,
             product_name: item.product_name,
@@ -482,6 +485,9 @@ export async function createMultiProductQuote(data: CreateQuoteInput): Promise<M
         payment_options: data.payment_options || "",
         status: "Draft",
         channel: "portal",
+        ...(data.production_cost != null && data.production_cost > 0
+            ? { production_cost: data.production_cost }
+            : {}),
         line_items: data.line_items.map((item, index) => ({
             product: item.product_id || null,
             product_name: item.product_name,
@@ -558,13 +564,15 @@ export interface LineItemAssignment {
 export async function convertQuoteToJob(
     quoteId: number,
     ownerUserId?: number | null,
-    lineItemAssignments?: LineItemAssignment[]
+    lineItemAssignments?: LineItemAssignment[],
+    jobName?: string
 ): Promise<QuoteActionResponse> {
     const body: Record<string, unknown> = {};
     if (ownerUserId) body.user_id = ownerUserId;
     if (lineItemAssignments && lineItemAssignments.length > 0) {
         body.line_item_assignments = lineItemAssignments.filter((a) => a.user_id !== null);
     }
+    if (jobName) body.job_name = jobName;
 
     const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/approve/`, {
         method: "POST",

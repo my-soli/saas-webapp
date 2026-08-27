@@ -106,8 +106,8 @@ export default function AdminQuotesPage() {
     });
 
     const convertToJobMutation = useMutation({
-        mutationFn: ({ quoteId, ownerUserId, assignments }: { quoteId: number; ownerUserId: number | null; assignments: LineItemAssignment[] }) =>
-            convertQuoteToJob(quoteId, ownerUserId, assignments),
+        mutationFn: ({ quoteId, ownerUserId, assignments, jobName }: { quoteId: number; ownerUserId: number | null; assignments: LineItemAssignment[]; jobName?: string }) =>
+            convertQuoteToJob(quoteId, ownerUserId, assignments, jobName),
         onSuccess: () => {
             toast.success("Quote converted to job!");
             queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
@@ -207,10 +207,10 @@ export default function AdminQuotesPage() {
         }
     };
 
-    const handleConfirmConvertToJob = async (ownerUserId: number | null, assignments: LineItemAssignment[]) => {
+    const handleConfirmConvertToJob = async (ownerUserId: number | null, assignments: LineItemAssignment[], jobName?: string) => {
         if (convertToJobQuote) {
             try {
-                await convertToJobMutation.mutateAsync({ quoteId: convertToJobQuote.id, ownerUserId, assignments });
+                await convertToJobMutation.mutateAsync({ quoteId: convertToJobQuote.id, ownerUserId, assignments, jobName });
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : "Failed to convert quote to job.");
             }

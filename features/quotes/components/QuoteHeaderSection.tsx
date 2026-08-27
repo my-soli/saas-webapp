@@ -26,6 +26,8 @@ interface QuoteHeaderSectionProps {
     onExpiryDateChange: (value: string) => void;
     salesperson: string;
     quoteId?: string;
+    productionCost: string;
+    onProductionCostChange: (value: string) => void;
 }
 
 const fieldClass =
@@ -54,6 +56,8 @@ export default function QuoteHeaderSection({
     onExpiryDateChange,
     salesperson,
     quoteId,
+    productionCost,
+    onProductionCostChange,
 }: QuoteHeaderSectionProps): ReactElement {
     const [search, setSearch] = useState("");
     const [open, setOpen] = useState(false);
@@ -306,6 +310,22 @@ export default function QuoteHeaderSection({
                         value={salesperson}
                         readOnly
                         className={`${fieldClass} bg-gray-50 cursor-default`}
+                    />
+                </div>
+
+                <div>
+                    <label className={labelClass}>
+                        Estimated Production Cost (KES)
+                        <span className="ml-1.5 text-xs font-normal text-gray-400 normal-case tracking-normal">optional — used to show margin in the quotes list</span>
+                    </label>
+                    <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={productionCost}
+                        onChange={(e): void => onProductionCostChange(e.target.value)}
+                        placeholder="e.g. 15000"
+                        className={fieldClass}
                     />
                 </div>
             </div>

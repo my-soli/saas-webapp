@@ -16,7 +16,7 @@ interface ProductionMember {
 interface ConvertToJobModalProps {
     quote: MultiProductQuote;
     onClose: () => void;
-    onConfirm: (ownerUserId: number | null, lineItemAssignments: { line_item_id: number; user_id: number | null }[]) => void;
+    onConfirm: (ownerUserId: number | null, lineItemAssignments: { line_item_id: number; user_id: number | null }[], jobName?: string) => void;
     isLoading?: boolean;
 }
 
@@ -35,6 +35,7 @@ function getMemberName(member: ProductionMember): string {
 
 export default function ConvertToJobModal({ quote, onClose, onConfirm, isLoading }: ConvertToJobModalProps) {
     const [ownerUserId, setOwnerUserId] = useState<number | null>(null);
+    const [jobName, setJobName] = useState("");
 
     const { data: teamData, isLoading: teamLoading } = useQuery({
         queryKey: ["production-team"],
@@ -44,7 +45,7 @@ export default function ConvertToJobModal({ quote, onClose, onConfirm, isLoading
     const members = teamData?.results ?? [];
 
     const handleConfirm = () => {
-        onConfirm(ownerUserId, []);
+        onConfirm(ownerUserId, [], jobName.trim() || undefined);
     };
 
     return (
@@ -71,6 +72,22 @@ export default function ConvertToJobModal({ quote, onClose, onConfirm, isLoading
                     <p className="text-sm text-gray-600">
                         This will approve the quote and create a job. Assign a Production Team member as the job owner.
                     </p>
+
+                    {/* Job Name */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Job Name
+                            <span className="ml-1 text-gray-400 font-normal">— optional</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={jobName}
+                            onChange={(e) => setJobName(e.target.value)}
+                            placeholder='Leave blank to auto-generate (e.g. "Job for …")'
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-green focus:border-transparent"
+                        />
+                        <p className="mt-1 text-xs text-gray-400">Shown in Master Jobs, the Job Reconciliation Matrix, and everywhere else this job is listed.</p>
+                    </div>
 
                     {/* Job Owner */}
                     <div>

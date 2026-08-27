@@ -213,5 +213,9 @@ export interface CreateQuoteInput {
     notes?: string;
     custom_terms?: string;
     payment_options?: string;
+    /** Optional sales-side cost estimate — feeds the Margin column on the quotes
+     * list via the same production_cost field PT later refines through the
+     * "Sent to PT" costing flow. Never required at quote-creation time. */
+    production_cost?: number;
     line_items: CreateQuoteLineItemInput[];
 }

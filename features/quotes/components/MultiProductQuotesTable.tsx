@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Eye, Download, FileEdit, Copy, CheckCircle, XCircle, Clock, AlertCircle, MoreVertical, Edit, Trash2 } from "lucide-react";
+import { Eye, Download, FileEdit, Copy, CheckCircle, XCircle, Clock, AlertCircle, Edit, Trash2 } from "lucide-react";
 import type { MultiProductQuote, QuoteStatus } from "@/types/quotes";
 
 interface MultiProductQuotesTableProps {
@@ -19,44 +19,23 @@ export default function MultiProductQuotesTable({
     onEdit,
     onDelete,
 }: MultiProductQuotesTableProps) {
-    const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-    const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; right: number }>({ right: 0 });
-    const buttonRefs = useRef<{ [key: string]: HTMLButtonElement | null }>({});
+    // Clicking a row reveals its actions inline in the Actions column, replacing
+    // the old floating three-dot dropdown menu — no overlay positioning needed.
+    const [activeRowId, setActiveRowId] = useState<string | null>(null);
+    const tableWrapperRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node;
-            const clickedButton = Object.values(buttonRefs.current).some(btn => btn?.contains(target));
-            if (!clickedButton && openMenuId) {
-                const dropdown = document.getElementById(`dropdown-${openMenuId}`);
-                if (dropdown && !dropdown.contains(target)) {
-                    setOpenMenuId(null);
-                }
+            if (activeRowId && tableWrapperRef.current && !tableWrapperRef.current.contains(event.target as Node)) {
+                setActiveRowId(null);
             }
         };
-
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
-    }, [openMenuId]);
+    }, [activeRowId]);
 
-    const handleMenuToggle = (quoteId: string, buttonElement: HTMLButtonElement) => {
-        if (openMenuId === quoteId) {
-            setOpenMenuId(null);
-        } else {
-            const rect = buttonElement.getBoundingClientRect();
-            const DROPDOWN_HEIGHT = 180; // max estimated height for the menu
-            const spaceBelow = window.innerHeight - rect.bottom;
-            const right = window.innerWidth - rect.right;
-
-            if (spaceBelow < DROPDOWN_HEIGHT) {
-                // Not enough room below — open upward
-                setMenuPosition({ bottom: window.innerHeight - rect.top + 4, right });
-            } else {
-                // Enough room below — open downward
-                setMenuPosition({ top: rect.bottom + 4, right });
-            }
-            setOpenMenuId(quoteId);
-        }
+    const toggleRow = (quoteId: string) => {
+        setActiveRowId((current) => (current === quoteId ? null : quoteId));
     };
 
     const formatCurrency = (value: number) => {
@@ -123,7 +102,7 @@ export default function MultiProductQuotesTable({
     }
 
     return (
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <div ref={tableWrapperRef} className="bg-white rounded-lg border border-gray-200 shadow-sm">
             <div className="overflow-x-auto">
                 <table className="w-full">
                     <thead className="bg-gray-50">
@@ -158,7 +137,10 @@ export default function MultiProductQuotesTable({
                         {quotes.map((quote) => (
                             <tr
                                 key={quote.quote_id}
-                                className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors"
+                                onClick={(): void => toggleRow(quote.quote_id)}
+                                className={`border-b border-gray-100 last:border-0 cursor-pointer transition-colors ${
+                                    activeRowId === quote.quote_id ? "bg-blue-50/60" : "hover:bg-gray-50"
+                                }`}
                             >
                                 <td className="py-3 px-4">
                                     <div className="font-semibold text-gray-900 text-sm">{quote.quote_id}</div>
@@ -212,94 +194,60 @@ export default function MultiProductQuotesTable({
                                     </div>
                                 </td>
                                 <td className="py-3 px-4 text-right">
-                                    <button
-                                        ref={(el): void => { buttonRefs.current[quote.quote_id] = el; }}
-                                        onClick={(e): void => handleMenuToggle(quote.quote_id, e.currentTarget)}
-                                        className="p-1 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-900"
-                                        type="button"
-                                    >
-                                        <MoreVertical className="w-4 h-4" />
-                                    </button>
+                                    {activeRowId === quote.quote_id ? (
+                                        <div className="flex items-center justify-end gap-1">
+                                            <button
+                                                onClick={(e): void => { e.stopPropagation(); onViewDetail(quote); setActiveRowId(null); }}
+                                                title="View"
+                                                className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                                                type="button"
+                                            >
+                                                <Eye className="w-4 h-4" />
+                                            </button>
+                                            {quote.status !== "Approved" && quote.status !== "Lost" && (
+                                                <button
+                                                    onClick={(e): void => { e.stopPropagation(); onEdit(quote.id); setActiveRowId(null); }}
+                                                    title="Edit"
+                                                    className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                                                    type="button"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={(e): void => { e.stopPropagation(); onDownloadPdf(quote.quote_id); setActiveRowId(null); }}
+                                                title="Download"
+                                                className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                                                type="button"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e): void => { e.stopPropagation(); onClone(quote.id); setActiveRowId(null); }}
+                                                title="Clone"
+                                                className="p-1.5 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-900"
+                                                type="button"
+                                            >
+                                                <Copy className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={(e): void => { e.stopPropagation(); onDelete(quote.id); setActiveRowId(null); }}
+                                                title="Delete"
+                                                className="p-1.5 rounded hover:bg-red-50 text-red-600"
+                                                type="button"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <span className="text-xs text-gray-400">Click row for actions</span>
+                                    )}
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
-            {openMenuId && (
-                <div
-                    id={`dropdown-${openMenuId}`}
-                    className="fixed w-40 bg-white rounded-md shadow-lg border border-gray-200 py-1 z-50"
-                    style={{
-                        ...(menuPosition.top !== undefined ? { top: `${menuPosition.top}px` } : { bottom: `${menuPosition.bottom}px` }),
-                        right: `${menuPosition.right}px`,
-                    }}
-                >
-                    {quotes
-                        .filter((q) => q.quote_id === openMenuId)
-                        .map((quote) => (
-                            <div key={quote.quote_id}>
-                                <button
-                                    onClick={(): void => {
-                                        onViewDetail(quote);
-                                        setOpenMenuId(null);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                    type="button"
-                                >
-                                    <Eye className="w-4 h-4" />
-                                    View
-                                </button>
-                                {quote.status !== "Approved" && quote.status !== "Lost" && (
-                                    <button
-                                        onClick={(): void => {
-                                            onEdit(quote.id);
-                                            setOpenMenuId(null);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                        type="button"
-                                    >
-                                        <Edit className="w-4 h-4" />
-                                        Edit
-                                    </button>
-                                )}
-                                <button
-                                    onClick={(): void => {
-                                        onDownloadPdf(quote.quote_id);
-                                        setOpenMenuId(null);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                    type="button"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    Download
-                                </button>
-                                <button
-                                    onClick={(): void => {
-                                        onClone(quote.id);
-                                        setOpenMenuId(null);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                                    type="button"
-                                >
-                                    <Copy className="w-4 h-4" />
-                                    Clone
-                                </button>
-                                <button
-                                    onClick={(): void => {
-                                        onDelete(quote.id);
-                                        setOpenMenuId(null);
-                                    }}
-                                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                                    type="button"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                    Delete
-                                </button>
-                            </div>
-                        ))}
-                </div>
-            )}
         </div>
     );
 }
