@@ -30,7 +30,9 @@ const buildQueryString = (params: QuotesQueryParams): string => {
         searchParams.set("production_status", params.productionStatus);
     }
 
-    searchParams.set("ordering", "-created_at");
+    // No explicit ordering param — QuoteViewSet.get_queryset() already orders by
+    // -updated_at (most-recently-edited first); an explicit "ordering" query param
+    // here would make DRF's OrderingFilter override that with its own order_by().
 
     return searchParams.toString();
 };
@@ -362,7 +364,7 @@ export async function fetchMultiProductQuotes(
     if (search) {
         params.set("search", search);
     }
-    params.set("ordering", "-created_at");
+    // No explicit ordering param — see buildQueryString's comment above.
 
     const queryString = params.toString();
     const url = `${PROXY_BASE}/api/proxy/api/v1/quotes/?${queryString}`;
