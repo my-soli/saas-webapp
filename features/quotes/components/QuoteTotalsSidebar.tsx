@@ -21,6 +21,10 @@ interface QuoteTotalsSidebarProps {
     onEnableAdjustmentChange: (value: boolean) => void;
     onAdjustmentAmountChange: (value: number) => void;
     onAdjustmentReasonChange: (value: string) => void;
+    /** Sum of each line's estimated_cost * quantity — null/0 when no line has one set. */
+    estimatedCostTotal?: number;
+    /** (grandTotal - estimatedCostTotal) / grandTotal * 100 — null when not computable. */
+    estimatedMargin?: number | null;
 }
 
 const formatCurrency = (value: number): string =>
@@ -56,6 +60,8 @@ export default function QuoteTotalsSidebar({
     onEnableAdjustmentChange,
     onAdjustmentAmountChange,
     onAdjustmentReasonChange,
+    estimatedCostTotal,
+    estimatedMargin,
 }: QuoteTotalsSidebarProps): ReactElement {
     return (
         <div className="bg-white rounded-lg border border-gray-200 p-5 sticky top-24">
@@ -171,6 +177,24 @@ export default function QuoteTotalsSidebar({
                         {formatCurrency(grandTotal)}
                     </span>
                 </div>
+
+                {/* Live margin preview — only shown once at least one line has an
+                    Est. cost/unit entered; mirrors the same figure the quotes-list
+                    Margin column will show once this quote is saved. */}
+                {!!estimatedCostTotal && estimatedMargin != null && (
+                    <>
+                        <div className={rowClass}>
+                            <span className={labelClass}>Est. production cost</span>
+                            <span className={valueClass}>{formatCurrency(estimatedCostTotal)}</span>
+                        </div>
+                        <div className={rowClass}>
+                            <span className="text-sm text-gray-500">Est. margin</span>
+                            <span className={`text-sm font-semibold tabular-nums ${estimatedMargin >= 25 ? "text-brand-green" : estimatedMargin >= 15 ? "text-brand-yellow" : "text-brand-red"}`}>
+                                {estimatedMargin.toFixed(1)}%
+                            </span>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );

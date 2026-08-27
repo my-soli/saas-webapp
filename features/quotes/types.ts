@@ -13,4 +13,7 @@ export interface LineItem {
     vat_rate?: number;
     description?: string;
     is_custom?: boolean;
+    /** Optional per-unit cost estimate — feeds the quotes-list Margin column as
+     * sum(estimated_cost * quantity) across all lines, computed server-side. */
+    estimated_cost?: number;
 }

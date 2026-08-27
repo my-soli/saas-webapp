@@ -67,7 +67,6 @@ function AdminCreateQuotePageContent() {
     const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
     const [referenceNumber, setReferenceNumber] = useState("");
     const [projectName, setProjectName] = useState("");
-    const [productionCost, setProductionCost] = useState("");
     const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split("T")[0]);
     const [expiryDate, setExpiryDate] = useState(
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0]
@@ -140,7 +139,6 @@ function AdminCreateQuotePageContent() {
             }
             setReferenceNumber(existingQuote.reference_number || "");
             setProjectName(existingQuote.project_name || "");
-            setProductionCost(existingQuote.production_cost ? String(existingQuote.production_cost) : "");
             setQuoteDate(existingQuote.quote_date);
             setExpiryDate(existingQuote.valid_until);
             setCustomerNotes(existingQuote.customer_notes || existingQuote.notes || DEFAULT_NOTES);
@@ -164,6 +162,7 @@ function AdminCreateQuotePageContent() {
                 discount_amount: item.discount_amount || 0,
                 discount_type: (item.discount_type as "percent" | "fixed") || "percent",
                 variable_amount: item.variable_amount || 0,
+                estimated_cost: item.estimated_cost != null ? Number(item.estimated_cost) : undefined,
                 description: (item as QuoteLineItem & { description?: string }).description || "",
                 is_custom: !item.product,
             }));
@@ -288,6 +287,16 @@ function AdminCreateQuotePageContent() {
 
     const calculateTaxTotal = (): number => enableTax ? calculateSubtotal() * ((Number(taxRate) || 0) / 100) : 0;
 
+    const calculateEstimatedCostTotal = (): number =>
+        lineItems.reduce((sum, item) => sum + (Number(item.estimated_cost) || 0) * (Number(item.quantity) || 0), 0);
+
+    const calculateEstimatedMargin = (): number | null => {
+        const grandTotal = calculateGrandTotal();
+        const costTotal = calculateEstimatedCostTotal();
+        if (grandTotal <= 0 || costTotal <= 0) return null;
+        return ((grandTotal - costTotal) / grandTotal) * 100;
+    };
+
     const calculateGrandTotal = (): number => {
         return calculateSubtotal() + calculateTaxTotal()
             + (enableShipping ? Number(shippingCharges) : 0)
@@ -333,7 +342,6 @@ function AdminCreateQuotePageContent() {
             notes: customerNotes || undefined,
             custom_terms: termsAndConditions || undefined,
             payment_options: paymentOptions || undefined,
-            production_cost: productionCost ? Number(productionCost) : undefined,
             line_items: lineItems.map(item => ({
                 product_id: item.is_custom ? 0 : item.product_id,
                 product_name: item.product_name,
@@ -343,6 +351,7 @@ function AdminCreateQuotePageContent() {
                 discount_amount: item.discount_amount || undefined,
                 discount_type: item.discount_type,
                 variable_amount: item.variable_amount || undefined,
+                estimated_cost: item.estimated_cost || undefined,
             })),
         };
         try {
@@ -465,8 +474,6 @@ function AdminCreateQuotePageContent() {
                                 onExpiryDateChange={setExpiryDate}
                                 salesperson={displayUserName}
                                 quoteId={existingQuote?.quote_id}
-                                productionCost={productionCost}
-                                onProductionCostChange={setProductionCost}
                             />
 
                             <QuoteLineItemsTable
@@ -501,6 +508,8 @@ function AdminCreateQuotePageContent() {
                                 discountTotal={calculateDiscountTotal()}
                                 taxTotal={calculateTaxTotal()}
                                 grandTotal={calculateGrandTotal()}
+                                estimatedCostTotal={calculateEstimatedCostTotal()}
+                                estimatedMargin={calculateEstimatedMargin()}
                                 enableTax={enableTax}
                                 taxRate={taxRate}
                                 enableShipping={enableShipping}

@@ -68,7 +68,6 @@ function CreateQuotePageContent() {
     const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
     const [referenceNumber, setReferenceNumber] = useState("");
     const [projectName, setProjectName] = useState("");
-    const [productionCost, setProductionCost] = useState("");
     const [quoteDate, setQuoteDate] = useState(
         new Date().toISOString().split("T")[0]
     );
@@ -173,7 +172,6 @@ function CreateQuotePageContent() {
 
             setReferenceNumber(existingQuote.reference_number || "");
             setProjectName(existingQuote.project_name || "");
-            setProductionCost(existingQuote.production_cost ? String(existingQuote.production_cost) : "");
             setQuoteDate(existingQuote.quote_date);
             setExpiryDate(existingQuote.valid_until);
             setCustomerNotes(existingQuote.customer_notes || existingQuote.notes || DEFAULT_NOTES);
@@ -199,6 +197,7 @@ function CreateQuotePageContent() {
                 discount_amount: item.discount_amount || 0,
                 discount_type: (item.discount_type as "percent" | "fixed") || "percent",
                 variable_amount: item.variable_amount || 0,
+                estimated_cost: item.estimated_cost != null ? Number(item.estimated_cost) : undefined,
                 description: (item as QuoteLineItem & { description?: string }).description || "",
                 is_custom: !item.product,
             }));
@@ -361,6 +360,16 @@ function CreateQuotePageContent() {
         return subtotal + tax + shipping + adjustment;
     };
 
+    const calculateEstimatedCostTotal = (): number =>
+        lineItems.reduce((sum, item) => sum + (Number(item.estimated_cost) || 0) * (Number(item.quantity) || 0), 0);
+
+    const calculateEstimatedMargin = (): number | null => {
+        const grandTotal = calculateGrandTotal();
+        const costTotal = calculateEstimatedCostTotal();
+        if (grandTotal <= 0 || costTotal <= 0) return null;
+        return ((grandTotal - costTotal) / grandTotal) * 100;
+    };
+
     const resolveDisplayName = (): string => {
         const client = clients.find(c => c.id === selectedClientId);
         if (client) return (client.client_type === "B2B" && client.company) ? client.company : client.name;
@@ -423,7 +432,6 @@ function CreateQuotePageContent() {
             notes: customerNotes || undefined,
             custom_terms: termsAndConditions || undefined,
             payment_options: paymentOptions || undefined,
-            production_cost: productionCost ? Number(productionCost) : undefined,
             line_items: lineItems.map((item) => ({
                 product_id: item.is_custom ? 0 : item.product_id,
                 product_name: item.product_name,
@@ -433,6 +441,7 @@ function CreateQuotePageContent() {
                 discount_amount: item.discount_amount || undefined,
                 discount_type: item.discount_type,
                 variable_amount: item.variable_amount || undefined,
+                estimated_cost: item.estimated_cost || undefined,
             })),
         };
 
@@ -587,8 +596,6 @@ function CreateQuotePageContent() {
                                 expiryDate={expiryDate}
                                 onExpiryDateChange={setExpiryDate}
                                 salesperson={displayUserName}
-                                productionCost={productionCost}
-                                onProductionCostChange={setProductionCost}
                                 quoteId={existingQuote?.quote_id}
                             />
 
@@ -624,6 +631,8 @@ function CreateQuotePageContent() {
                                 discountTotal={calculateDiscountTotal()}
                                 taxTotal={calculateTaxTotal()}
                                 grandTotal={calculateGrandTotal()}
+                                estimatedCostTotal={calculateEstimatedCostTotal()}
+                                estimatedMargin={calculateEstimatedMargin()}
                                 enableTax={enableTax}
                                 taxRate={taxRate}
                                 enableShipping={enableShipping}

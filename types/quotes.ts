@@ -18,7 +18,9 @@ export interface QuoteLineItem {
     quantity: number;
     unit_price: number | string | null;
     line_total?: number | string | null;
-    production_cost?: number | string | null;
+    /** Sales-side per-unit cost estimate, entered at quote-creation time — distinct
+     * from pt_unit_cost, which is PT's own later, authoritative figure. */
+    estimated_cost?: number | string | null;
     discount_amount?: number;
     discount_type?: "percent" | "fixed";
     variable_amount?: number;
@@ -195,6 +197,9 @@ export interface CreateQuoteLineItemInput {
     discount_amount?: number;
     discount_type?: DiscountType;
     variable_amount?: number;
+    /** Optional sales-side per-unit cost estimate — summed (x quantity) across all
+     * lines server-side to set Quote.production_cost, feeding the Margin column. */
+    estimated_cost?: number;
 }
 
 export interface CreateQuoteInput {
@@ -213,9 +218,5 @@ export interface CreateQuoteInput {
     notes?: string;
     custom_terms?: string;
     payment_options?: string;
-    /** Optional sales-side cost estimate — feeds the Margin column on the quotes
-     * list via the same production_cost field PT later refines through the
-     * "Sent to PT" costing flow. Never required at quote-creation time. */
-    production_cost?: number;
     line_items: CreateQuoteLineItemInput[];
 }

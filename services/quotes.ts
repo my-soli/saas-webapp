@@ -206,9 +206,6 @@ export async function updateQuote(quoteId: number, data: CreateQuoteInput): Prom
         customer_notes: data.notes || "",
         custom_terms: data.custom_terms || "",
         payment_options: data.payment_options || "",
-        ...(data.production_cost != null && data.production_cost > 0
-            ? { production_cost: data.production_cost }
-            : {}),
         line_items: data.line_items.map((item, index) => ({
             product: item.product_id || null,
             product_name: item.product_name,
@@ -218,6 +215,7 @@ export async function updateQuote(quoteId: number, data: CreateQuoteInput): Prom
             discount_amount: item.discount_amount || 0,
             discount_type: item.discount_type || "percent",
             variable_amount: item.variable_amount || 0,
+            estimated_cost: item.estimated_cost || undefined,
             customization_level_snapshot: item.product_id ? "" : "fully_customizable",
             base_price_snapshot: item.unit_price,
             order: index,
@@ -485,9 +483,6 @@ export async function createMultiProductQuote(data: CreateQuoteInput): Promise<M
         payment_options: data.payment_options || "",
         status: "Draft",
         channel: "portal",
-        ...(data.production_cost != null && data.production_cost > 0
-            ? { production_cost: data.production_cost }
-            : {}),
         line_items: data.line_items.map((item, index) => ({
             product: item.product_id || null,
             product_name: item.product_name,
@@ -497,6 +492,7 @@ export async function createMultiProductQuote(data: CreateQuoteInput): Promise<M
             discount_amount: item.discount_amount || 0,
             discount_type: item.discount_type || "percent",
             variable_amount: item.variable_amount || 0,
+            estimated_cost: item.estimated_cost || undefined,
             customization_level_snapshot: item.product_id ? "" : "fully_customizable",
             base_price_snapshot: item.unit_price,
             order: index,

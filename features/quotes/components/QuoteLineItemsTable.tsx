@@ -249,7 +249,7 @@ export default function QuoteLineItemsTable({
                                     {/* ── Description row: spans full width ── */}
                                     <tr className="bg-gray-50/30 border-t-0">
                                         <td />
-                                        <td colSpan={includeVat ? 6 : 5} className="px-4 pb-3 pt-0">
+                                        <td colSpan={includeVat ? 5 : 4} className="px-4 pb-3 pt-0">
                                             <textarea
                                                 value={item.description || ""}
                                                 onChange={(e): void =>
@@ -260,7 +260,27 @@ export default function QuoteLineItemsTable({
                                                 className="w-full px-3 py-2 text-base border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue focus:border-transparent placeholder:text-gray-300 resize-none text-gray-700 leading-snug bg-white"
                                             />
                                         </td>
-                                        <td />
+                                        <td colSpan={2} className="px-4 pb-3 pt-0 align-top">
+                                            <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">
+                                                Est. cost/unit (KES)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={item.estimated_cost || ""}
+                                                onChange={(e): void =>
+                                                    onUpdateItem(item.tempId, "estimated_cost", Number(e.target.value) || 0)
+                                                }
+                                                min="0"
+                                                step="0.01"
+                                                placeholder="optional"
+                                                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue text-right placeholder:text-gray-300"
+                                            />
+                                            {!!item.estimated_cost && (
+                                                <p className="mt-1 text-[11px] text-gray-400 text-right">
+                                                    Line cost: {formatCurrency(item.estimated_cost * (Number(item.quantity) || 0))}
+                                                </p>
+                                            )}
+                                        </td>
                                     </tr>
                                 </React.Fragment>
                             ))
