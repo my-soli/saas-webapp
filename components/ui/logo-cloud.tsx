@@ -1,80 +1,84 @@
 export default function LogoCloud() {
+    // Add more brands here any time — the marquee duplicates this list
+    // automatically to loop seamlessly, no other changes needed.
     const logos = [
         {
             name: "Safaricom",
             url: "/logo/SAF-MAIN-LOGO.png",
-            width: 180,
-            height: 120,
         },
         {
             name: "Hotpoint",
             url: "/logo/hotpoint.png",
-            width: 100,
-            height: 40,
         },
         {
             name: "Asshut",
             url: "/logo/asshut.png",
-            width: 100,
-            height: 40,
         },
         {
             name: "IM",
             url: "/logo/im.png",
-            width: 90,
-            height: 40,
         },
         {
             name: "JTL",
             url: "/logo/jtl.png",
-            width: 100,
-            height: 40,
         },
         {
             name: "Njoodada",
             url: "/logo/njoodada.jpg",
-            width: 100,
-            height: 40,
         },
         {
             name: "Tumaini Innovation Center",
             url: "/logo/tumaini-innovation-center.png",
-            width: 110,
-            height: 40,
         },
         {
             name: "Victorial",
             url: "/logo/victorial.png",
-            width: 100,
-            height: 40,
         },
         {
             name: "European Union",
             url: "/logo/Flag-European-Union.webp",
-            width: 80,
-            height: 40,
         },
     ];
 
+    const track = [...logos, ...logos];
+
     return (
-        <section className="bg-background py-16">
-            <div className="mx-auto max-w-5xl px-6">
-                <h2 className="text-center text-lg font-medium text-foreground">
-                    Trusted by leading brands across the world
-                </h2>
-                <div className="mx-auto mt-12 flex max-w-4xl flex-wrap items-center justify-center gap-x-12 gap-y-8 sm:gap-x-16 sm:gap-y-12">
-                    {logos.map((logo) => (
+        <section className="bg-background py-16 sm:py-20 overflow-hidden">
+            <style>{`
+                @keyframes pd-marquee {
+                    from { transform: translateX(0); }
+                    to { transform: translateX(-50%); }
+                }
+                .pd-marquee-track {
+                    animation: pd-marquee 32s linear infinite;
+                }
+                .pd-marquee-track:hover {
+                    animation-play-state: paused;
+                }
+            `}</style>
+
+            <h2 className="text-center text-sm sm:text-base font-semibold uppercase tracking-wider text-muted-foreground">
+                Trusted by leading brands across the world
+            </h2>
+
+            <div
+                className="relative mt-12 w-full"
+                style={{
+                    maskImage: "linear-gradient(to right, transparent, black 8%, black 92%, transparent)",
+                    WebkitMaskImage: "linear-gradient(to right, transparent, black 8%, black 92%, transparent)",
+                }}
+            >
+                <div className="pd-marquee-track flex w-max items-center gap-16 sm:gap-20">
+                    {track.map((logo, i) => (
                         <div
-                            key={logo.name}
-                            className="flex items-center justify-center transition-opacity duration-300"
+                            key={`${logo.name}-${i}`}
+                            className="flex shrink-0 items-center justify-center opacity-90 transition-all duration-300 hover:opacity-100 hover:scale-105"
                         >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                                 src={logo.url}
                                 alt={logo.name}
-                                width={logo.width}
-                                height={logo.height}
-                                className={logo.name === "Safaricom" ? "h-24 w-auto object-contain" : "h-10 w-auto object-contain"}
+                                className={logo.name === "Safaricom" ? "h-16 sm:h-20 w-auto object-contain" : "h-8 sm:h-10 w-auto object-contain"}
                             />
                         </div>
                     ))}

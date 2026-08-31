@@ -1,23 +1,14 @@
 "use client";
 
-import { ArrowUpRight, Menu } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { motion } from "framer-motion";
-import Link from "next/link";
-import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { checkSession } from "@/lib/api/auth";
+import Navbar from "@/components/ui/navbar";
+import DocumentarySection from "@/components/ui/documentary-section";
 import LogoCloud from "@/components/ui/logo-cloud";
 import FeaturesSection from "@/components/ui/features-section";
-import HoverSliderSection from "@/components/ui/hover-slider-section";
+import FeaturedWorkSection from "@/components/ui/featured-work-section";
 import ContactCTASection from "@/components/ui/contact-cta-section";
 import FooterSection from "@/components/ui/footer-section";
 import CallToActionSection from "@/components/ui/call-to-action-section";
@@ -43,11 +34,6 @@ const services = [
     description: "Business essentials & promotional products",
     image: "/banner/stationary.jpg",
   },
-];
-
-const navigation = [
-  { name: "Services", href: "#services" },
-  { name: "Contact", href: "/contact" },
 ];
 
 import type { PortalRole } from "@/types/auth";
@@ -88,99 +74,10 @@ export default function Home() {
       ? ROLE_DASHBOARD[session.user.portal_role]
       : "/login";
   return (
-    <div className="w-full relative container px-2 mx-auto max-w-7xl min-h-screen">
-      <div className="mt-6 bg-accent/50 rounded-2xl relative">
-        {/* Header */}
-        <header className="flex items-center">
-          <div className="w-full md:w-2/3 lg:w-1/2 bg-background/95 backdrop-blur-sm p-4 rounded-br-2xl flex items-center gap-4">
-            <Link href="/" className="flex items-center shrink-0">
-              <Image
-                src="/logo/logo.png"
-                alt="Print Duka"
-                width={240}
-                height={108}
-                className="h-16 w-auto"
-                priority
-              />
-            </Link>
-
-            <nav className="hidden lg:flex items-center justify-end gap-2 w-full">
-              {navigation.map((item) => (
-                <Button
-                  key={item.name}
-                  variant="link"
-                  asChild
-                  className="cursor-pointer hover:text-primary transition-colors"
-                >
-                  <Link href={item.href}>{item.name}</Link>
-                </Button>
-              ))}
-            </nav>
-
-            {/* Mobile menu */}
-            <Sheet>
-              <SheetTrigger asChild className="lg:hidden ml-auto">
-                <Button variant="ghost" size="icon" className="hover:text-primary transition-colors">
-                  <Menu className="w-5 h-5" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent
-                side="left"
-                className="w-[300px] sm:w-[400px] p-0 bg-background/95 backdrop-blur-md border-r border-border/50"
-              >
-                <SheetHeader className="p-6 text-left border-b border-border/50">
-                  <SheetTitle>
-                    <Image
-                      src="/logo/logo.png"
-                      alt="Print Duka"
-                      width={360}
-                      height={108}
-                      className="h-24 w-auto"
-                    />
-                  </SheetTitle>
-                </SheetHeader>
-                <nav className="flex flex-col p-6 space-y-1">
-                  {navigation.map((item) => (
-                    <Button
-                      key={item.name}
-                      variant="ghost"
-                      asChild
-                      className="justify-start px-2 h-12 text-base font-medium hover:bg-accent/50 hover:text-primary transition-colors"
-                    >
-                      <Link href={item.href}>{item.name}</Link>
-                    </Button>
-                  ))}
-                </nav>
-                <Separator className="mx-6" />
-                <div className="p-6">
-                  <Button asChild className="w-full h-12 bg-brand-blue hover:bg-brand-blue/90 transition-all duration-300 shadow-lg">
-                    <Link href={portalHref}>
-                      {portalLabel}
-                      <ArrowUpRight className="w-4 h-4 ml-2" />
-                    </Link>
-                  </Button>
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
-
-          {/* Desktop CTA */}
-          <div className="hidden md:flex w-1/2 justify-end items-center pr-4 gap-4 ml-auto">
-            <Button
-              asChild
-              variant="secondary"
-              className="cursor-pointer bg-brand-blue text-white p-0 rounded-full shadow-lg hover:shadow-xl hover:bg-brand-blue/90 transition-all duration-300 group"
-            >
-              <Link href={portalHref}>
-                <span className="pl-4 py-2 text-sm font-medium">{portalLabel}</span>
-                <div className="rounded-full flex items-center justify-center m-auto bg-white w-10 h-10 ml-2 group-hover:scale-110 transition-transform duration-300">
-                  <ArrowUpRight className="w-5 h-5 text-brand-blue" />
-                </div>
-              </Link>
-            </Button>
-          </div>
-        </header>
-
+    <>
+      <Navbar portalLabel={portalLabel} portalHref={portalHref} />
+      <div className="w-full relative container px-2 mx-auto max-w-7xl min-h-screen">
+      <div id="home" className="mt-6 bg-accent/50 rounded-2xl relative overflow-hidden">
         {/* Hero section */}
         <motion.section
           className="w-full px-4 py-24"
@@ -224,29 +121,47 @@ export default function Home() {
         </motion.section>
       </div>
 
-      {/* Services grid */}
-      <div id="services" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 max-w-7xl mx-auto mt-12 pb-16">
-        {services.map((service, index) => (
-          <motion.div
-            key={service.title}
-            className="group relative rounded-3xl min-h-[250px] sm:min-h-[300px] w-full overflow-hidden transition-all duration-500"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={service.image}
-              alt={service.title}
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-            <h2 className="absolute bottom-4 left-0 right-0 text-center text-2xl sm:text-3xl font-bold text-white px-4">
-              {service.title}
-            </h2>
-          </motion.div>
-        ))}
-      </div>
+      {/* Documentary */}
+      <DocumentarySection />
+
+      {/* Services grid — 2 columns x 2 rows */}
+      <section id="services" className="py-8 sm:py-12">
+        <div className="mx-auto max-w-2xl text-center px-4">
+          <span className="inline-flex items-center gap-2 rounded-full border border-brand-blue/20 bg-brand-blue/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-brand-blue">
+            Our Services
+          </span>
+          <h2 className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+            What We Print
+          </h2>
+          <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
+            From signage to stationery — everything your brand needs, printed
+            to the highest standard.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto mt-10 px-4 sm:px-6">
+          {services.map((service, index) => (
+            <motion.div
+              key={service.title}
+              className="group relative rounded-3xl min-h-[280px] sm:min-h-[340px] w-full overflow-hidden transition-all duration-500"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={service.image}
+                alt={service.title}
+                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+              <h3 className="absolute bottom-4 left-0 right-0 text-center text-2xl sm:text-3xl font-bold text-white px-4">
+                {service.title}
+              </h3>
+            </motion.div>
+          ))}
+        </div>
+      </section>
 
       {/* Logo Cloud */}
       <LogoCloud />
@@ -254,8 +169,8 @@ export default function Home() {
       {/* Features Section */}
       <FeaturesSection />
 
-      {/* Hover Slider Section */}
-      <HoverSliderSection />
+      {/* Featured Work Section */}
+      <FeaturedWorkSection />
 
       {/* Call to Action Section */}
       <CallToActionSection />
@@ -265,7 +180,8 @@ export default function Home() {
 
       {/* Footer */}
       <FooterSection />
-    </div>
+      </div>
+    </>
   );
 }
 
