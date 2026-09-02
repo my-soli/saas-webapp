@@ -35,13 +35,10 @@ export default function CreateQuotePage() {
 
 const DEFAULT_NOTES = "Looking forward for your business.";
 const DEFAULT_TERMS =
-`1. Payment is due within 14 days from the invoice date, unless otherwise agreed in writing.
-2. Where applicable, a 70% advance payment is required before production commences.
-3. A valid Purchase Order (PO) may be accepted in place of an advance payment, subject to agreed credit terms.
-4. Overdue accounts may attract additional charges in accordance with our payment policy.
-5. Any work or items outside the agreed scope will be charged separately.
-6. Final artwork, files, or produced items remain the property of Print Duka Limited until full payment is received.
-7. Any invoice queries or disputes should be raised within 7 days of the invoice date.`;
+`1. A 70% advance payment or a valid purchase order (PO) is required to initiate production.
+2. The remaining payment must be settled within 14 days after the items are delivered.
+3. The quoted price remains valid for 30 days from the date of the initial quotation.
+4. Late payments may incur additional charges as per our policy.`;
 const DEFAULT_PAYMENT_OPTIONS =
 `Account transfer
 Bank: I&M Bank Limited
