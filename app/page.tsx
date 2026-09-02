@@ -153,7 +153,7 @@ export default function Home() {
           {services.map((service, index) => (
             <motion.div
               key={service.title}
-              className="group relative rounded-3xl min-h-[220px] sm:min-h-[260px] w-full overflow-hidden transition-all duration-500"
+              className="group relative rounded-3xl min-h-[220px] sm:min-h-[260px] w-full overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: index * 0.08, ease: "easeOut" }}

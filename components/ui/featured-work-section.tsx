@@ -45,7 +45,7 @@ export default function FeaturedWorkSection() {
                         <motion.a
                             key={project.title}
                             href="mailto:query@printduka.co.ke"
-                            className="group relative block aspect-[4/3] overflow-hidden rounded-3xl"
+                            className="group relative block aspect-[4/3] overflow-hidden rounded-3xl transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
                             initial={{ opacity: 0, y: 24 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.6, delay: index * 0.08, ease: "easeOut" }}

@@ -1,22 +1,20 @@
 "use client";
 
-import { Users, Sparkles, Clock } from "lucide-react";
-
 const PROCESS_STEPS = ["Design", "Print", "Brand", "Finish", "Deliver"];
 
 const FEATURES = [
     {
-        icon: Users,
+        number: "01",
         title: "One team.",
         description: "Design and production under one roof.",
     },
     {
-        icon: Sparkles,
+        number: "02",
         title: "Quality you can see.",
         description: "Colour, finishing and detail matter.",
     },
     {
-        icon: Clock,
+        number: "03",
         title: "Built around your deadline.",
         description: "Because sometimes you needed it yesterday.",
     },
@@ -77,19 +75,17 @@ export default function FeaturesSection() {
                     <img src="/banner/van.jpg" alt="Print Duka Printing Services" className="max-w-xs sm:max-w-sm lg:max-w-md transition-all duration-300 rounded-2xl shadow-xl" />
                 </section>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 px-4 md:px-16 lg:px-24 xl:px-32 pb-20">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-8 px-4 md:px-16 lg:px-24 xl:px-32 pb-20">
                     {FEATURES.map((feature) => (
-                        <div
-                            key={feature.title}
-                            className="flex flex-col items-center text-center sm:items-start sm:text-left gap-3 rounded-2xl border border-slate-200/70 bg-white/60 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-blue/30 hover:shadow-md"
-                        >
-                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue">
-                                <feature.icon className="h-5 w-5" />
-                            </span>
-                            <div>
-                                <h3 className="text-lg font-semibold text-slate-900">{feature.title}</h3>
-                                <p className="mt-1.5 text-sm text-slate-600">{feature.description}</p>
+                        <div key={feature.title} className="text-center sm:text-left">
+                            <div className="flex items-center justify-center sm:justify-start gap-2.5">
+                                <span className="h-px w-6 bg-brand-yellow" />
+                                <span className="text-3xl sm:text-4xl font-light text-brand-blue/25">
+                                    {feature.number}
+                                </span>
                             </div>
+                            <h3 className="mt-3 text-lg font-semibold text-slate-900">{feature.title}</h3>
+                            <p className="mt-1.5 text-sm text-slate-600">{feature.description}</p>
                         </div>
                     ))}
                 </div>
