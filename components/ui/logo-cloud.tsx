@@ -2,42 +2,55 @@ export default function LogoCloud() {
     // Add more brands here any time — the marquee duplicates this list
     // automatically to loop seamlessly, no other changes needed.
     const logos = [
-        {
-            name: "Safaricom",
-            url: "/logo/SAF-MAIN-LOGO.png",
-        },
-        {
-            name: "Hotpoint",
-            url: "/logo/hotpoint.png",
-        },
-        {
-            name: "Asshut",
-            url: "/logo/asshut.png",
-        },
-        {
-            name: "IM",
-            url: "/logo/im.png",
-        },
-        {
-            name: "JTL",
-            url: "/logo/jtl.png",
-        },
-        {
-            name: "Njoodada",
-            url: "/logo/njoodada.jpg",
-        },
-        {
-            name: "Tumaini Innovation Center",
-            url: "/logo/tumaini-innovation-center.png",
-        },
-        {
-            name: "Victorial",
-            url: "/logo/victorial.png",
-        },
-        {
-            name: "European Union",
-            url: "/logo/Flag-European-Union.webp",
-        },
+        { name: "Africa's Voices", url: "/logo/clients/africas-voices.png" },
+        { name: "Afroinnovation", url: "/logo/clients/afroinnovation.png" },
+        { name: "AHK", url: "/logo/clients/ahk.png" },
+        { name: "Alliance Française", url: "/logo/clients/alliance-francaise.png" },
+        { name: "Artisan Makers Market", url: "/logo/clients/artisan-makers-market.png" },
+        { name: "Ashut", url: "/logo/clients/ashut.png" },
+        { name: "BDDL", url: "/logo/clients/bddl.jpg" },
+        { name: "Bolt", url: "/logo/clients/bolt.png" },
+        { name: "BuuPass", url: "/logo/clients/buupass.png" },
+        { name: "CHRIPS", url: "/logo/clients/chrips.jpg" },
+        { name: "CrissCross", url: "/logo/clients/crisscross.png" },
+        { name: "Dalberg", url: "/logo/clients/dalberg.png" },
+        { name: "European Union", url: "/logo/clients/eu.png" },
+        { name: "France Embassy", url: "/logo/clients/france-embassy.png" },
+        { name: "Galana Energies", url: "/logo/clients/galana-energies.png" },
+        { name: "Gulfcap Real Estate", url: "/logo/clients/gulfcap-real-estate.png" },
+        { name: "Hackhouse Africa", url: "/logo/clients/hackhouse-africa.png" },
+        { name: "Hotpoint", url: "/logo/clients/hotpoint.png" },
+        { name: "I&M Bank", url: "/logo/clients/im-bank.png" },
+        { name: "Infraco Africa", url: "/logo/clients/infraco-africa.png" },
+        { name: "JTL Faiba", url: "/logo/clients/jtl-faiba.png" },
+        { name: "Kilimani Community Foundation", url: "/logo/clients/kilimani-community-foundation.png" },
+        { name: "Kiota School", url: "/logo/clients/kiota-school.jpg" },
+        { name: "KPMG", url: "/logo/clients/kpmg.png" },
+        { name: "Kraftory", url: "/logo/clients/kraftory.jpg" },
+        { name: "Kunta Content", url: "/logo/clients/kunta-content.jpg" },
+        { name: "Maa Trust", url: "/logo/clients/maa-trust.png" },
+        { name: "Macaash", url: "/logo/clients/macaash.png" },
+        { name: "Maiyan Homes", url: "/logo/clients/maiyan-homes.jpg" },
+        { name: "Networks Padel Village", url: "/logo/clients/networks-padel-village.jpg" },
+        { name: "NTU", url: "/logo/clients/ntu.png" },
+        { name: "Oxford University Press", url: "/logo/clients/oxford-university-press.png" },
+        { name: "Oyana School", url: "/logo/clients/oyana-school.png" },
+        { name: "Purpink", url: "/logo/clients/purpink.png" },
+        { name: "Rubi Ranch", url: "/logo/clients/rubi-ranch.png" },
+        { name: "Rubis Energy", url: "/logo/clients/rubis-energy.png" },
+        { name: "SIB Bank", url: "/logo/clients/sib-bank.jpg" },
+        { name: "Sling Money", url: "/logo/clients/sling-money.png" },
+        { name: "SOMO", url: "/logo/clients/somo.png" },
+        { name: "Startinev", url: "/logo/clients/startinev.jpg" },
+        { name: "Stitch Money", url: "/logo/clients/stitch-money.jpg" },
+        { name: "Tessen", url: "/logo/clients/tessen.png" },
+        { name: "TV47", url: "/logo/clients/tv47.jpg" },
+        { name: "Uncover Africa", url: "/logo/clients/uncover-africa.jpg" },
+        { name: "United Nations", url: "/logo/clients/united-nations.png" },
+        { name: "VAAL", url: "/logo/clients/vaal.png" },
+        { name: "Victoria Furniture", url: "/logo/clients/victoria-furniture.png" },
+        { name: "Waridi Health", url: "/logo/clients/waridi-health.png" },
+        { name: "Young Engineers", url: "/logo/clients/young-engineers.png" },
     ];
 
     const industries = [
@@ -63,7 +76,7 @@ export default function LogoCloud() {
                     to { transform: translateX(-50%); }
                 }
                 .pd-marquee-track {
-                    animation: pd-marquee 32s linear infinite;
+                    animation: pd-marquee 170s linear infinite;
                 }
                 .pd-marquee-track:hover {
                     animation-play-state: paused;
@@ -96,7 +109,7 @@ export default function LogoCloud() {
                             <img
                                 src={logo.url}
                                 alt={logo.name}
-                                className={logo.name === "Safaricom" ? "h-16 sm:h-20 w-auto object-contain" : "h-8 sm:h-10 w-auto object-contain"}
+                                className="h-8 sm:h-10 w-auto object-contain"
                             />
                         </div>
                     ))}
