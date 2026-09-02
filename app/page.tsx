@@ -11,27 +11,37 @@ import FeaturesSection from "@/components/ui/features-section";
 import FeaturedWorkSection from "@/components/ui/featured-work-section";
 import ContactCTASection from "@/components/ui/contact-cta-section";
 import FooterSection from "@/components/ui/footer-section";
-import CallToActionSection from "@/components/ui/call-to-action-section";
+import { Palette, Printer, Building2, Shirt, Package, ClipboardList } from "lucide-react";
 
 const services = [
   {
-    title: "Signage & Banners",
-    description: "Large format banners, posters & signage",
-    image: "/banner/banner.jpg",
-  },
-  {
-    title: "Clothing",
-    description: "Branded apparel & custom garments",
-    image: "/banner/clothing.png",
-  },
-  {
-    title: "Marketing Material",
-    description: "Brochures, flyers & promotional print",
+    title: "Design & Artwork",
+    icon: Palette,
     image: "/banner/marketing.jpg",
   },
   {
-    title: "Office & Stationery",
-    description: "Business essentials & promotional products",
+    title: "Printing",
+    icon: Printer,
+    image: "/banner/banner.jpg",
+  },
+  {
+    title: "Branding & Signage",
+    icon: Building2,
+    image: "/banner/vinyl.jpg",
+  },
+  {
+    title: "Apparel & Merchandise",
+    icon: Shirt,
+    image: "/banner/clothing.png",
+  },
+  {
+    title: "Packaging",
+    icon: Package,
+    image: "/banner/inkwise.jpg",
+  },
+  {
+    title: "Stationery & Marketing Materials",
+    icon: ClipboardList,
     image: "/banner/stationary.jpg",
   },
 ];
@@ -105,7 +115,7 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
             >
-              We are a printing & design company with a passion for bringing ideas to life on paper.
+              From design to production, we help brands look good, show up boldly and stay memorable.
             </motion.p>
             <motion.div
               className="flex flex-col sm:flex-row gap-4 justify-center"
@@ -114,7 +124,7 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.55, ease: "easeOut" }}
             >
               <Button asChild size="lg" className="bg-brand-blue hover:bg-brand-blue/90 text-white px-8 rounded-full shadow-lg hover:shadow-xl transition-all">
-                <a href="mailto:query@printduka.co.ke">Get Quote</a>
+                <a href="mailto:query@printduka.co.ke">Get a Quote</a>
               </Button>
             </motion.div>
           </div>
@@ -124,7 +134,7 @@ export default function Home() {
       {/* Documentary */}
       <DocumentarySection />
 
-      {/* Services grid — 2 columns x 2 rows */}
+      {/* Services grid — 6 solution pillars */}
       <section id="services" className="py-8 sm:py-12">
         <div className="mx-auto max-w-2xl text-center px-4">
           <span className="inline-flex items-center gap-2 rounded-full border border-brand-blue/20 bg-brand-blue/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-brand-blue">
@@ -139,14 +149,14 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-4xl mx-auto mt-10 px-4 sm:px-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-w-6xl mx-auto mt-10 px-4 sm:px-6">
           {services.map((service, index) => (
             <motion.div
               key={service.title}
-              className="group relative rounded-3xl min-h-[280px] sm:min-h-[340px] w-full overflow-hidden transition-all duration-500"
+              className="group relative rounded-3xl min-h-[220px] sm:min-h-[260px] w-full overflow-hidden transition-all duration-500"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: index * 0.1, ease: "easeOut" }}
+              transition={{ duration: 0.6, delay: index * 0.08, ease: "easeOut" }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -155,12 +165,25 @@ export default function Home() {
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-              <h3 className="absolute bottom-4 left-0 right-0 text-center text-2xl sm:text-3xl font-bold text-white px-4">
+              <span className="absolute top-4 left-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-brand-blue backdrop-blur-sm">
+                <service.icon className="h-4.5 w-4.5" />
+              </span>
+              <h3 className="absolute bottom-4 left-0 right-0 text-center text-xl sm:text-2xl font-bold text-white px-4">
                 {service.title}
               </h3>
             </motion.div>
           ))}
         </div>
+
+        <p className="mt-10 text-center text-base sm:text-lg text-muted-foreground">
+          Need something specific?{" "}
+          <a
+            href="/contact"
+            className="font-semibold text-brand-blue hover:text-brand-blue/80 transition-colors"
+          >
+            Reach out to us →
+          </a>
+        </p>
       </section>
 
       {/* Logo Cloud */}
@@ -171,9 +194,6 @@ export default function Home() {
 
       {/* Featured Work Section */}
       <FeaturedWorkSection />
-
-      {/* Call to Action Section */}
-      <CallToActionSection />
 
       {/* Contact CTA */}
       <ContactCTASection />

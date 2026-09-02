@@ -28,9 +28,17 @@ export default function DocumentarySection() {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
-            <span className="inline-flex items-center gap-2 rounded-full border border-brand-blue/20 bg-brand-blue/5 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-brand-blue">
-              Our Story
-            </span>
+            <a
+              href={AWARDS_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="group inline-flex items-center gap-2 rounded-full border border-brand-yellow/30 bg-brand-yellow/10 px-4 py-2 text-xs sm:text-sm font-bold uppercase tracking-wide text-foreground hover:bg-brand-yellow/20 transition-colors"
+            >
+              <Trophy className="h-4 w-4 shrink-0 text-brand-yellow" />
+              Best Printing &amp; Branding Company — Nairobi 2026
+              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </a>
+
             <h2 className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.1] text-foreground">
               Every Print Has a
               <br />
@@ -43,16 +51,14 @@ export default function DocumentarySection() {
             </p>
 
             <div className="mt-8">
-              <a
-                href={AWARDS_URL}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                onClick={() => setPlaying(true)}
                 className="group inline-flex items-center gap-2 text-sm font-semibold text-foreground hover:text-brand-blue transition-colors"
               >
-                <Trophy className="h-4 w-4 text-brand-yellow" />
-                View our awards
-                <ArrowUpRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              </a>
+                See how we got here
+                <span className="text-brand-blue">→ Watch our story</span>
+              </button>
             </div>
           </motion.div>
 

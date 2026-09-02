@@ -63,6 +63,18 @@ export async function fetchProductTags(): Promise<ProductTag[]> {
     return Array.isArray(data) ? data : data.results;
 }
 
+export async function createProductTag(name: string): Promise<ProductTag> {
+    const csrf = await getCsrfToken();
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-tags/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        credentials: "include",
+        body: JSON.stringify({ name }),
+    });
+    if (!response.ok) throw new Error("Failed to create tag");
+    return response.json() as Promise<ProductTag>;
+}
+
 // ── Product Categories ────────────────────────────────────────────────────────
 
 export async function createProductCategory(data: { name: string; description: string; image?: File | null }): Promise<ProductCategory> {

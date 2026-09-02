@@ -3,27 +3,23 @@
 import { motion } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
 
-// Dummy project names — swap for real client/project titles when available.
+// TODO: swap these for real project photography once available — image
+// choices below are generic stand-ins matched to each project's category.
 const projects = [
     {
-        title: "Skyline Retail — Storefront Signage",
-        category: "Signage & Banners",
-        image: "/banner/banner.jpg",
-    },
-    {
-        title: "Horizon FC — Team Kit Rollout",
-        category: "Clothing",
+        title: "I&M Cohort Gifting",
+        category: "Design • Branding • Production",
         image: "/banner/clothing.png",
     },
     {
-        title: "Metro Fleet — Vehicle Wraps",
-        category: "Vehicle Branding",
-        image: "/banner/vinyl.jpg",
+        title: "Hotpoint",
+        category: "Signage • Print • Branding",
+        image: "/banner/banner.jpg",
     },
     {
-        title: "Northgate Group — Corporate Stationery",
-        category: "Stationery",
-        image: "/banner/letter%20head.png",
+        title: "XYZ",
+        category: "Packaging • Print",
+        image: "/banner/inkwise.jpg",
     },
 ];
 
@@ -36,7 +32,7 @@ export default function FeaturedWorkSection() {
                         Our Work
                     </span>
                     <h2 className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
-                        Featured Work
+                        Work We&apos;ve Brought to Life
                     </h2>
                     <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
                         A look at some of the brands we&apos;ve helped bring to life —
@@ -44,7 +40,7 @@ export default function FeaturedWorkSection() {
                     </p>
                 </div>
 
-                <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 gap-6 lg:gap-8">
+                <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                     {projects.map((project, index) => (
                         <motion.a
                             key={project.title}
@@ -76,6 +72,15 @@ export default function FeaturedWorkSection() {
                             </div>
                         </motion.a>
                     ))}
+                </div>
+
+                <div className="mt-14 flex justify-center">
+                    <a
+                        href="mailto:query@printduka.co.ke"
+                        className="inline-flex items-center rounded-full bg-brand-blue px-8 py-3 text-sm font-semibold uppercase tracking-wide text-white shadow-sm shadow-brand-blue/20 transition-all duration-300 hover:shadow-lg hover:shadow-brand-blue/30 hover:bg-brand-blue/95"
+                    >
+                        Get a Quote
+                    </a>
                 </div>
             </div>
         </section>

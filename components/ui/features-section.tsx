@@ -1,15 +1,33 @@
 "use client";
 
-import { useState } from 'react';
+import { Users, Sparkles, Clock } from "lucide-react";
+
+const PROCESS_STEPS = ["Design", "Print", "Brand", "Finish", "Deliver"];
+
+const FEATURES = [
+    {
+        icon: Users,
+        title: "One team.",
+        description: "Design and production under one roof.",
+    },
+    {
+        icon: Sparkles,
+        title: "Quality you can see.",
+        description: "Colour, finishing and detail matter.",
+    },
+    {
+        icon: Clock,
+        title: "Built around your deadline.",
+        description: "Because sometimes you needed it yesterday.",
+    },
+];
 
 export default function FeaturesSection() {
-    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
     return (
         <>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
-            
+
                 * {
                     font-family: 'Poppins', sans-serif;
                 }
@@ -26,12 +44,24 @@ export default function FeaturesSection() {
 
                 <section className="flex flex-col max-md:gap-20 md:flex-row pb-20 items-center justify-between pt-16 px-4 md:px-16 lg:px-24 xl:px-32">
                     <div className="flex flex-col items-center md:items-start">
-                        <h1 className="text-center md:text-left text-5xl leading-[68px] md:text-6xl md:leading-[84px] font-medium max-w-xl text-slate-900">
-                            Crafted for Brands. <span className="text-brand-yellow">Made for People.</span>
+                        <h1 className="text-center md:text-left text-4xl leading-tight md:text-5xl md:leading-[1.15] font-medium max-w-xl text-slate-900">
+                            From Idea to <span className="text-brand-yellow">Finished Product.</span>
                         </h1>
                         <p className="text-center md:text-left text-lg text-slate-700 max-w-lg mt-2">
-                            Every flyer, card, banner, and gift box we print is a reflection of something real, a brand with ambition, a person with something to say. We treat it that way.
+                            You don&apos;t need five different suppliers.
                         </p>
+
+                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-2 gap-y-2 mt-6 text-sm font-semibold text-brand-blue">
+                            {PROCESS_STEPS.map((step, i) => (
+                                <span key={step} className="flex items-center gap-2">
+                                    <span className="rounded-full bg-brand-blue/10 px-4 py-1.5">{step}</span>
+                                    {i < PROCESS_STEPS.length - 1 && (
+                                        <span className="text-slate-400">→</span>
+                                    )}
+                                </span>
+                            ))}
+                        </div>
+
                         <div className="flex items-center gap-4 mt-8 text-sm">
                             <a href="mailto:query@printduka.co.ke" className="bg-brand-blue hover:bg-brand-blue/90 text-white active:scale-95 rounded-md px-7 h-11 flex items-center justify-center transition">
                                 Get Quote
@@ -46,6 +76,23 @@ export default function FeaturesSection() {
                     </div>
                     <img src="/banner/van.jpg" alt="Print Duka Printing Services" className="max-w-xs sm:max-w-sm lg:max-w-md transition-all duration-300 rounded-2xl shadow-xl" />
                 </section>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 px-4 md:px-16 lg:px-24 xl:px-32 pb-20">
+                    {FEATURES.map((feature) => (
+                        <div
+                            key={feature.title}
+                            className="flex flex-col items-center text-center sm:items-start sm:text-left gap-3 rounded-2xl border border-slate-200/70 bg-white/60 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-blue/30 hover:shadow-md"
+                        >
+                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue">
+                                <feature.icon className="h-5 w-5" />
+                            </span>
+                            <div>
+                                <h3 className="text-lg font-semibold text-slate-900">{feature.title}</h3>
+                                <p className="mt-1.5 text-sm text-slate-600">{feature.description}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
             </div>
         </>
     );

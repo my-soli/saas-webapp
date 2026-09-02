@@ -101,8 +101,11 @@ export default function StoreNavbar(): ReactElement {
                         />
                     </Link>
 
-                    {/* Desktop category nav */}
-                    <nav className="hidden lg:flex items-center gap-0.5 ml-4">
+                    {/* Desktop category nav — min-w-0 + overflow-x-auto lets this shrink and
+                        scroll internally instead of overflowing the header and pushing the
+                        search box and right-side actions off-screen when there are many/long
+                        category names. */}
+                    <nav className="hidden lg:flex items-center gap-0.5 ml-4 min-w-0 shrink overflow-x-auto scrollbar-none">
                         <Link
                             href="/store"
                             className={cn(
@@ -169,7 +172,7 @@ export default function StoreNavbar(): ReactElement {
                     </nav>
 
                     {/* Search */}
-                    <div className="flex-1 max-w-sm mx-auto hidden sm:block">
+                    <div className="flex-1 min-w-[160px] max-w-sm mx-auto hidden sm:block shrink">
                         <div className="relative">
                             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                             <input
@@ -183,7 +186,7 @@ export default function StoreNavbar(): ReactElement {
                     </div>
 
                     {/* Right actions */}
-                    <div className="flex items-center gap-2 ml-auto">
+                    <div className="flex items-center gap-2 ml-auto shrink-0">
                         <button type="button" className="sm:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100">
                             <SearchIcon className="h-5 w-5" />
                         </button>

@@ -1,17 +1,19 @@
 "use client";
 
 import type { ReactElement } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { CheckIcon, TagIcon } from "lucide-react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { CheckIcon, PlusIcon, TagIcon } from "lucide-react";
 import type { ProductFormValues } from "@/types/products";
 import {
+    createProductTag,
     fetchPrintCategories,
     fetchProductCategories,
     fetchProductFamilies,
     fetchProductSubCategories,
     fetchProductTags,
 } from "@/services/product-catalog-setup";
-import FormField, { selectCls } from "./FormField";
+import FormField, { inputCls, selectCls } from "./FormField";
 
 interface ClassificationTabProps {
     values: ProductFormValues;
@@ -19,6 +21,10 @@ interface ClassificationTabProps {
 }
 
 export default function ClassificationTab({ values, onValuesChange }: ClassificationTabProps): ReactElement {
+    const queryClient = useQueryClient();
+    const [newTagName, setNewTagName] = useState("");
+    const [tagError, setTagError] = useState("");
+
     const set = <K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]): void => {
         onValuesChange({ ...values, [key]: value });
     };
@@ -56,6 +62,17 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
         staleTime: 5 * 60 * 1000,
     });
 
+    const createTagMutation = useMutation({
+        mutationFn: createProductTag,
+        onSuccess: (tag) => {
+            queryClient.invalidateQueries({ queryKey: ["product-tags"] });
+            set("tag_ids", [...values.tag_ids, tag.id]);
+            setNewTagName("");
+            setTagError("");
+        },
+        onError: () => setTagError("Failed to create tag. It may already exist."),
+    });
+
     const handleCategoryChange = (categoryId: string): void => {
         onValuesChange({ ...values, primary_category: categoryId, sub_category: "" });
     };
@@ -65,6 +82,19 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
             ? values.tag_ids.filter((id) => id !== tagId)
             : [...values.tag_ids, tagId];
         set("tag_ids", next);
+    };
+
+    const handleCreateTag = (): void => {
+        const name = newTagName.trim();
+        if (!name || createTagMutation.isPending) return;
+        const existing = availableTags.find((t) => t.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+            if (!values.tag_ids.includes(existing.id)) set("tag_ids", [...values.tag_ids, existing.id]);
+            setNewTagName("");
+            setTagError("");
+            return;
+        }
+        createTagMutation.mutate(name);
     };
 
     return (
@@ -118,7 +148,8 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
                 </select>
             </FormField>
 
-            <FormField label="Tags" hint="Keywords that help customers find and filter this product on the storefront">
+            <FormField label="Tags" hint="Keywords that help customers find and filter this product on the storefront — also used as SEO search terms">
+              <div>
                 <div className="flex flex-wrap gap-2 pt-1">
                     {availableTags.map((tag) => {
                         const selected = values.tag_ids.includes(tag.id);
@@ -135,8 +166,34 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
                             </button>
                         );
                     })}
-                    {availableTags.length === 0 && <p className="text-xs text-gray-400">No tags available</p>}
+                    {availableTags.length === 0 && <p className="text-xs text-gray-400">No tags yet — add your first keyword below.</p>}
                 </div>
+                <div className="mt-3 flex items-center gap-2">
+                    <input
+                        type="text"
+                        className={`${inputCls} flex-1`}
+                        placeholder="Type a keyword and press Enter (e.g. business cards, matte finish)"
+                        value={newTagName}
+                        onChange={(e) => { setNewTagName(e.target.value); setTagError(""); }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleCreateTag();
+                            }
+                        }}
+                    />
+                    <button
+                        type="button"
+                        onClick={handleCreateTag}
+                        disabled={!newTagName.trim() || createTagMutation.isPending}
+                        className="inline-flex items-center gap-1 rounded-lg bg-brand-blue px-3 py-2 text-xs font-semibold text-white hover:bg-brand-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <PlusIcon className="h-3.5 w-3.5" />
+                        {createTagMutation.isPending ? "Adding…" : "Add Tag"}
+                    </button>
+                </div>
+                {tagError && <p className="mt-1.5 text-xs text-red-500">{tagError}</p>}
+              </div>
             </FormField>
         </div>
     );

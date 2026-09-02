@@ -40,6 +40,19 @@ export default function LogoCloud() {
         },
     ];
 
+    const industries = [
+        "Banking",
+        "FMCG",
+        "Technology",
+        "Tours and Travel",
+        "NGOs",
+        "Retail",
+        "Events",
+        "Corporate",
+        "Real Estate",
+        "Agriculture",
+    ];
+
     const track = [...logos, ...logos];
 
     return (
@@ -57,9 +70,14 @@ export default function LogoCloud() {
                 }
             `}</style>
 
-            <h2 className="text-center text-sm sm:text-base font-semibold uppercase tracking-wider text-muted-foreground">
-                Trusted by leading brands across the world
-            </h2>
+            <div className="mx-auto max-w-2xl text-center px-4">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                    Trusted by 50+ brands
+                </h2>
+                <p className="mt-2 text-sm sm:text-base text-muted-foreground">
+                    From growing businesses to global organisations.
+                </p>
+            </div>
 
             <div
                 className="relative mt-12 w-full"
@@ -81,6 +99,22 @@ export default function LogoCloud() {
                                 className={logo.name === "Safaricom" ? "h-16 sm:h-20 w-auto object-contain" : "h-8 sm:h-10 w-auto object-contain"}
                             />
                         </div>
+                    ))}
+                </div>
+            </div>
+
+            <div className="mx-auto mt-12 max-w-3xl px-4 text-center">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Industries we&apos;ve worked across
+                </p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+                    {industries.map((industry) => (
+                        <span
+                            key={industry}
+                            className="rounded-full border border-brand-blue/20 bg-brand-blue/5 px-3.5 py-1.5 text-xs sm:text-sm font-medium text-brand-blue"
+                        >
+                            {industry}
+                        </span>
                     ))}
                 </div>
             </div>
