@@ -34,32 +34,32 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
     const { data: printCategories = [] } = useQuery({
         queryKey: ["print-categories"],
         queryFn: fetchPrintCategories,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
     });
 
     const { data: productCategories = [] } = useQuery({
         queryKey: ["product-categories"],
         queryFn: fetchProductCategories,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
     });
 
     const { data: subCategories = [] } = useQuery({
         queryKey: ["product-subcategories", selectedCategoryId],
         queryFn: () => fetchProductSubCategories(selectedCategoryId),
         enabled: Boolean(selectedCategoryId),
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
     });
 
     const { data: productFamilies = [] } = useQuery({
         queryKey: ["product-families"],
         queryFn: fetchProductFamilies,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
     });
 
     const { data: availableTags = [] } = useQuery({
         queryKey: ["product-tags"],
         queryFn: fetchProductTags,
-        staleTime: 5 * 60 * 1000,
+        staleTime: 0,
     });
 
     const createTagMutation = useMutation({
@@ -70,7 +70,21 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
             setNewTagName("");
             setTagError("");
         },
-        onError: () => setTagError("Failed to create tag. It may already exist."),
+        onError: async (_err, name) => {
+            // Our local `availableTags` list can be behind the server's (stale
+            // cache, or the tag was just created by someone else) — the create
+            // POST 400s on the backend's uniqueness constraint. Re-fetch and
+            // select the match instead of dead-ending with an error.
+            const fresh = await queryClient.fetchQuery({ queryKey: ["product-tags"], queryFn: fetchProductTags });
+            const existing = fresh.find((t) => t.name.toLowerCase() === name.toLowerCase());
+            if (existing) {
+                if (!values.tag_ids.includes(existing.id)) set("tag_ids", [...values.tag_ids, existing.id]);
+                setNewTagName("");
+                setTagError("");
+            } else {
+                setTagError("Failed to create tag. Please try again.");
+            }
+        },
     });
 
     const handleCategoryChange = (categoryId: string): void => {

@@ -5,7 +5,13 @@ import type { ReactElement, ChangeEvent, DragEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import { StarIcon, Trash2Icon, UploadCloudIcon, CheckCircleIcon } from "lucide-react";
+import { toast } from "sonner";
 import { getCsrfToken } from "@/lib/api/auth";
+
+async function extractErrorMessage(response: Response, fallback: string): Promise<string> {
+    const body = await response.json().catch(() => null) as { detail?: string; image?: string[] } | null;
+    return body?.detail || body?.image?.[0] || `${fallback} (${response.status})`;
+}
 
 const PROXY_BASE = typeof window !== 'undefined' ? '' : (process.env.NEXTAUTH_URL || 'http://localhost:3000');
 
@@ -46,7 +52,7 @@ async function uploadImage(productId: number, file: File, isPrimary: boolean): P
         headers: { "X-CSRFToken": csrf },
         body: formData,
     });
-    if (!response.ok) throw new Error("Upload failed");
+    if (!response.ok) throw new Error(await extractErrorMessage(response, "Upload failed"));
     return response.json() as Promise<ProductImage>;
 }
 
@@ -58,7 +64,7 @@ async function setPrimary(imageId: number): Promise<ProductImage> {
         headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
         body: JSON.stringify({ is_primary: true }),
     });
-    if (!response.ok) throw new Error("Failed to set primary");
+    if (!response.ok) throw new Error(await extractErrorMessage(response, "Failed to set primary"));
     return response.json() as Promise<ProductImage>;
 }
 
@@ -69,7 +75,7 @@ async function deleteImage(imageId: number): Promise<void> {
         credentials: "include",
         headers: { "X-CSRFToken": csrf },
     });
-    if (!response.ok) throw new Error("Failed to delete image");
+    if (!response.ok) throw new Error(await extractErrorMessage(response, "Failed to delete image"));
 }
 
 interface ProductImageManagerProps {
@@ -91,16 +97,19 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
         mutationFn: ({ file, isPrimary }: { file: File; isPrimary: boolean }) =>
             uploadImage(productId, file, isPrimary),
         onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
+        onError: (err: Error) => toast.error(err.message || "Upload failed"),
     });
 
     const primaryMutation = useMutation({
         mutationFn: (imageId: number) => setPrimary(imageId),
         onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
+        onError: (err: Error) => toast.error(err.message || "Failed to set primary"),
     });
 
     const deleteMutation = useMutation({
         mutationFn: (imageId: number) => deleteImage(imageId),
         onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
+        onError: (err: Error) => toast.error(err.message || "Failed to delete image"),
     });
 
     const handleFiles = (files: FileList | null): void => {
