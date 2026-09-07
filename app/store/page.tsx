@@ -136,11 +136,11 @@ const ProductCard = memo(function ProductCard({ product }: { product: CatalogPro
                             {product.primary_category_name}
                         </span>
                     )}
-                    <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2">
+                    <h3 className="font-bold text-gray-900 text-sm leading-snug line-clamp-2 break-words">
                         {product.name}
                     </h3>
                     {product.short_description && (
-                        <p className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed">
+                        <p className="text-[11px] text-gray-500 line-clamp-2 leading-relaxed break-words">
                             {product.short_description}
                         </p>
                     )}

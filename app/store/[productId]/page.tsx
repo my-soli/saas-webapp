@@ -203,7 +203,7 @@ export default function ProductDetailPage(): ReactElement {
                             )}
                             <h1 className="text-2xl font-bold text-gray-900 leading-snug">{product.name}</h1>
                             {product.short_description && (
-                                <p className="mt-2 text-sm text-gray-500 leading-relaxed">{product.short_description}</p>
+                                <p className="mt-2 text-sm text-gray-500 leading-relaxed break-words">{product.short_description}</p>
                             )}
                         </div>
 
