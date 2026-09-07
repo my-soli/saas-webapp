@@ -18,6 +18,8 @@ export interface CatalogProduct {
     product_type: string;
     tags: Array<{ id: number; name: string; slug: string }>;
     pricing_mode: ProductPricingMode;
+    starting_price: string | null;
+    starting_price_moq: number | null;
     is_visible: boolean;
     visibility: string;
     feature_product: boolean;

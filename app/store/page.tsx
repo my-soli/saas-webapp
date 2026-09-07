@@ -66,6 +66,13 @@ function getMinPrice(product: CatalogProduct): number | null {
     return null;
 }
 
+function getStartingPrice(product: CatalogProduct): { price: number; moq: number | null } | null {
+    if (!product.starting_price) return null;
+    const price = parseFloat(product.starting_price);
+    if (isNaN(price)) return null;
+    return { price, moq: product.starting_price_moq };
+}
+
 function getBadge(product: CatalogProduct): { label: string; cls: string } | null {
     if (product.bestseller_badge) return { label: "Best Seller", cls: "bg-brand-yellow text-brand-black" };
     if (product.new_arrival) return { label: "New", cls: "bg-brand-green text-white" };
@@ -78,6 +85,7 @@ const ProductCard = memo(function ProductCard({ product }: { product: CatalogPro
     const [favorited, setFavorited] = useState<boolean>(false);
     const [imgError, setImgError] = useState<boolean>(false);
     const minPrice = getMinPrice(product);
+    const startingPrice = getStartingPrice(product);
     const badge = getBadge(product);
 
     return (
@@ -138,7 +146,16 @@ const ProductCard = memo(function ProductCard({ product }: { product: CatalogPro
                     )}
 
                     <div className="mt-auto pt-3 flex items-center justify-between gap-2">
-                        {product.pricing_mode === "auto_calculate" ? (
+                        {startingPrice !== null ? (
+                            <div>
+                                <span className="text-[10px] text-gray-400 block">
+                                    Starting from{startingPrice.moq ? ` (${startingPrice.moq} pcs)` : ""}
+                                </span>
+                                <span className="text-base font-extrabold text-brand-blue">
+                                    {formatKES(startingPrice.price)}
+                                </span>
+                            </div>
+                        ) : product.pricing_mode === "auto_calculate" ? (
                             <div>
                                 {minPrice !== null ? (
                                     <>

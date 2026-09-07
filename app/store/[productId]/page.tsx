@@ -207,6 +207,15 @@ export default function ProductDetailPage(): ReactElement {
                             )}
                         </div>
 
+                        {/* Starting-from teaser — independent of the live/quote pricing below */}
+                        {product.starting_price && (
+                            <p className="text-sm text-gray-500">
+                                Starting from{" "}
+                                <span className="text-lg font-bold text-brand-blue">{formatKES(product.starting_price)}</span>
+                                {product.starting_price_moq && ` for ${product.starting_price_moq} pcs`}
+                            </p>
+                        )}
+
                         {/* Live price */}
                         {!isQuoteOnly && (
                             <div className="flex items-baseline gap-2">

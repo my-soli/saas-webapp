@@ -64,6 +64,37 @@ export default function PricingTab({ values, onValuesChange, isNew = false }: Pr
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
+                    label="Starting-From Price"
+                    hint="Indicative teaser price shown on the storefront, e.g. “Starting from KES 2,000” — independent of the exact spec-group pricing. Leave blank to hide."
+                >
+                    <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className={inputCls}
+                        placeholder="e.g. 2000"
+                        value={values.starting_price}
+                        onChange={(e) => set("starting_price", e.target.value)}
+                    />
+                </FormField>
+                <FormField
+                    label="Starting-Price MOQ"
+                    hint="Minimum order quantity the starting price applies to — shown as “for 10 pcs” alongside the price"
+                >
+                    <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className={inputCls}
+                        placeholder="e.g. 10"
+                        value={values.starting_price_moq}
+                        onChange={(e) => set("starting_price_moq", e.target.value)}
+                    />
+                </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
                     label="Status"
                     hint={isNew ? "New products are always saved as Draft — publish them after adding spec groups and pricing" : "Draft: only visible to admins. Published: live on the store. Archived: hidden and inactive."}
                 >

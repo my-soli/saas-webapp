@@ -158,6 +158,8 @@ export interface Product {
     product_type: ProductType;
     tags: ProductTag[];
     pricing_mode: ProductPricingMode;
+    starting_price: string | null;
+    starting_price_moq: number | null;
     status: ProductStatus;
     is_visible: boolean;
     visibility: ProductVisibility;
@@ -226,6 +228,8 @@ export interface ProductFormValues {
     tag_ids: number[];
     product_type: ProductType;
     pricing_mode: ProductPricingMode;
+    starting_price: string;
+    starting_price_moq: string;
     status: ProductStatus;
     is_visible: boolean;
     visibility: ProductVisibility;
@@ -268,6 +272,8 @@ export interface CreateProductPayload {
     tag_ids: number[];
     product_type: ProductType;
     pricing_mode: ProductPricingMode;
+    starting_price: string | null;
+    starting_price_moq: number | null;
     status: ProductStatus;
     is_visible: boolean;
     visibility: ProductVisibility;
