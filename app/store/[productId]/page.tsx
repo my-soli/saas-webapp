@@ -32,6 +32,7 @@ import {
 } from "@/features/store/utils";
 import type { GroupStates, SpecGroupSelectionState } from "@/features/store/types";
 import { formatKES } from "@/lib/format";
+import { useQuoteCart } from "@/features/store/quote-cart-context";
 
 export default function ProductDetailPage(): ReactElement {
     const params = useParams();
@@ -50,6 +51,21 @@ export default function ProductDetailPage(): ReactElement {
     const [priceError, setPriceError] = useState<string | null>(null);
     const [isPricing, setIsPricing] = useState<boolean>(false);
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { addItem } = useQuoteCart();
+    const [quoteQuantity, setQuoteQuantity] = useState<number>(1);
+    const [added, setAdded] = useState<boolean>(false);
+
+    const handleAddToQuote = (): void => {
+        if (!product) return;
+        addItem({
+            productId: product.id,
+            name: product.name,
+            imageUrl: product.primary_image_url,
+            quantity: quoteQuantity,
+        });
+        setAdded(true);
+        setTimeout(() => setAdded(false), 2000);
+    };
 
     useEffect(() => {
         if (product) {
@@ -251,15 +267,35 @@ export default function ProductDetailPage(): ReactElement {
                             <div className="rounded-2xl bg-gray-50 p-5 space-y-3">
                                 <p className="text-sm font-semibold text-gray-800">Custom quote required</p>
                                 <p className="text-sm text-gray-500">
-                                    Our team will respond within 2 hours with a tailored price.
+                                    Add it to your quote request with the quantity you need — our team will confirm
+                                    availability and get back to you with a tailored price.
                                 </p>
-                                <Link
-                                    href="/contact"
+                                <div className="flex items-center gap-3">
+                                    <label className="text-sm text-gray-600" htmlFor="quote-quantity">Quantity</label>
+                                    <input
+                                        id="quote-quantity"
+                                        type="number"
+                                        min={1}
+                                        value={quoteQuantity}
+                                        onChange={(e) => setQuoteQuantity(Math.max(1, Number(e.target.value) || 1))}
+                                        className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddToQuote}
                                     className="inline-flex items-center gap-2 bg-brand-orange px-5 py-2.5 rounded-xl text-sm font-bold text-white hover:bg-brand-orange/90 transition-colors"
                                 >
                                     <MessageSquareIcon className="h-4 w-4" />
-                                    Request a Quote
-                                </Link>
+                                    {added ? "Added to Quote ✓" : "Add to Quote"}
+                                </button>
+                                {added && (
+                                    <p className="text-xs text-gray-500">
+                                        <Link href="/store/quote-request" className="font-semibold text-brand-blue hover:underline">
+                                            View your quote request →
+                                        </Link>
+                                    </p>
+                                )}
                             </div>
                         ) : (
                             <div className="space-y-1">

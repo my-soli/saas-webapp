@@ -15,6 +15,7 @@ import {
     XIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQuoteCart } from "@/features/store/quote-cart-context";
 
 const MAX_NAV_CATS = 5;
 
@@ -43,6 +44,7 @@ export default function StoreNavbar(): ReactElement {
     const [mobileOpen, setMobileOpen] = useState<boolean>(false);
     const moreRef = useRef<HTMLDivElement>(null);
     const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const { count: cartCount } = useQuoteCart();
 
     const { data: categories = [] } = useQuery<ProductCategory[]>({
         queryKey: ["product-categories"],
@@ -197,13 +199,18 @@ export default function StoreNavbar(): ReactElement {
                             <UserIcon className="h-4 w-4" />
                             Sign In
                         </Link>
-                        <button
-                            type="button"
+                        <Link
+                            href="/store/quote-request"
                             className="relative p-2 rounded-xl bg-brand-blue text-white hover:bg-brand-blue/90 transition-colors"
-                            aria-label="Cart"
+                            aria-label="Quote cart"
                         >
                             <ShoppingCartIcon className="h-5 w-5" />
-                        </button>
+                            {cartCount > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-yellow px-1 text-[10px] font-bold text-brand-black">
+                                    {cartCount}
+                                </span>
+                            )}
+                        </Link>
                         {/* Mobile menu toggle */}
                         <button
                             type="button"
