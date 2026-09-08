@@ -8,7 +8,6 @@ import Navbar from "@/components/ui/navbar";
 import DocumentarySection from "@/components/ui/documentary-section";
 import LogoCloud from "@/components/ui/logo-cloud";
 import FeaturesSection from "@/components/ui/features-section";
-import FeaturedWorkSection from "@/components/ui/featured-work-section";
 import ContactCTASection from "@/components/ui/contact-cta-section";
 import FooterSection from "@/components/ui/footer-section";
 import { Palette, Printer, Building2, Shirt, Package, ClipboardList } from "lucide-react";
@@ -191,9 +190,6 @@ export default function Home() {
 
       {/* Features Section */}
       <FeaturesSection />
-
-      {/* Featured Work Section */}
-      <FeaturedWorkSection />
 
       {/* Contact CTA */}
       <ContactCTASection />

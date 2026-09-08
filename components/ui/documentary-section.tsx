@@ -10,10 +10,7 @@ const DOCUMENTARY_CHANNEL = "Print Duka";
 // YouTube's own thumbnail for this video (via the oEmbed API), so the cover
 // matches exactly what's shown on YouTube itself.
 const DOCUMENTARY_POSTER = `https://i.ytimg.com/vi/${DOCUMENTARY_YOUTUBE_ID}/maxresdefault.jpg`;
-// TODO: dummy placeholder — replace with the real URL to wherever the award
-// was announced (awarding body's site, press release, LinkedIn post, etc.)
-// once that's available.
-const AWARDS_URL = "https://example.com/print-duka-award";
+const AWARDS_URL = "https://meamarkets.digital/winners/print-duka/";
 
 export default function DocumentarySection() {
   const [playing, setPlaying] = useState(false);
@@ -40,24 +37,34 @@ export default function DocumentarySection() {
             </a>
 
             <h2 className="mt-5 text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight leading-[1.1] text-foreground">
-              Every Print Has a
+              We&apos;re officially
               <br />
-              <span className="text-brand-yellow">Story Behind It.</span>
+              <span className="text-brand-yellow">Nairobi&apos;s Best.</span>
             </h2>
             <p className="mt-5 max-w-md text-base sm:text-lg text-muted-foreground leading-relaxed">
-              Step inside our workshop and see how an idea becomes a finished
-              piece — from first sketch to final finish, told by the people
-              who make it happen every day.
+              Print Duka has been named Best Printing &amp; Branding Company
+              in Nairobi 2026 at the Africa Market Excellence Awards.
+            </p>
+            <p className="mt-4 max-w-md text-base sm:text-lg text-muted-foreground leading-relaxed">
+              A recognition of the work we&apos;ve been building, the team
+              behind it, and the clients who have trusted us along the way.
             </p>
 
-            <div className="mt-8">
+            <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+              <a
+                href={AWARDS_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-foreground hover:text-brand-blue transition-colors"
+              >
+                Read the Award <span className="text-brand-blue">→</span>
+              </a>
               <button
                 type="button"
                 onClick={() => setPlaying(true)}
-                className="group inline-flex items-center gap-2 text-sm font-semibold text-foreground hover:text-brand-blue transition-colors"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-foreground hover:text-brand-blue transition-colors"
               >
-                See how we got here
-                <span className="text-brand-blue">→ Watch our story</span>
+                Watch The Making of Nairobi&apos;s Best <span className="text-brand-blue">→</span>
               </button>
             </div>
           </motion.div>
