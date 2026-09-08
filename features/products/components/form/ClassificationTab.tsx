@@ -111,6 +111,13 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
         createTagMutation.mutate(name);
     };
 
+    const toggleAdditionalPrintCategory = (id: number): void => {
+        const next = values.additional_print_category_ids.includes(id)
+            ? values.additional_print_category_ids.filter((pcId) => pcId !== id)
+            : [...values.additional_print_category_ids, id];
+        set("additional_print_category_ids", next);
+    };
+
     return (
         <div className="max-w-2xl space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -130,6 +137,33 @@ export default function ClassificationTab({ values, onValuesChange }: Classifica
                     </select>
                 </FormField>
             </div>
+
+            {printCategories.length > 1 && (
+                <FormField
+                    label="Other Printing Options"
+                    hint="Select any other print processes this product can also be produced with, besides the primary Print Category above"
+                >
+                    <div className="flex flex-wrap gap-2 pt-1">
+                        {printCategories
+                            .filter((pc) => pc.id.toString() !== values.print_category)
+                            .map((pc) => {
+                                const selected = values.additional_print_category_ids.includes(pc.id);
+                                return (
+                                    <button
+                                        key={pc.id}
+                                        type="button"
+                                        onClick={() => toggleAdditionalPrintCategory(pc.id)}
+                                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${selected ? "bg-brand-blue text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                            }`}
+                                    >
+                                        {selected && <CheckIcon className="h-3 w-3" />}
+                                        {pc.name}
+                                    </button>
+                                );
+                            })}
+                    </div>
+                </FormField>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Category" hint="Primary storefront category that determines where this product appears in the catalog">

@@ -149,6 +149,7 @@ export interface Product {
     technical_specs: string;
     print_category: number | null;
     print_category_name: string | null;
+    additional_print_categories: PrintCategory[];
     primary_category: number | null;
     primary_category_name: string | null;
     sub_category: number | null;
@@ -222,6 +223,7 @@ export interface ProductFormValues {
     maintenance: string;
     technical_specs: string;
     print_category: string;
+    additional_print_category_ids: number[];
     primary_category: string;
     sub_category: string;
     product_family: string;
@@ -266,6 +268,7 @@ export interface CreateProductPayload {
     maintenance: string;
     technical_specs: string;
     print_category: number | null;
+    additional_print_category_ids: number[];
     primary_category: number | null;
     sub_category: number | null;
     product_family: number | null;
