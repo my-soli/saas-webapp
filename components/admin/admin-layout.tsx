@@ -58,7 +58,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                     <span className="text-sm font-semibold">Print Duka - Admin</span>
                 </header>
 
-                <main className="flex-1 bg-gray-50">
+                {/* pb-36 keeps page content (e.g. table pagination controls) clear of
+                    the fixed Ask AI button (bottom-6) and search pill (bottom-24) that
+                    float over the bottom-right corner of every admin page. */}
+                <main className="flex-1 bg-gray-50 pb-36">
                     {children}
                 </main>
             </div>

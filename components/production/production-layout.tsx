@@ -38,7 +38,9 @@ export default function ProductionLayout({ children }: ProductionLayoutProps) {
                     <span className="text-sm font-semibold">Print Duka Production</span>
                 </header>
 
-                <main className="flex-1 bg-gray-50">
+                {/* pb-36 keeps page content clear of the fixed Ask AI button
+                    (bottom-6) and search pill (bottom-24) floating bottom-right. */}
+                <main className="flex-1 bg-gray-50 pb-36">
                     {children}
                 </main>
             </div>
