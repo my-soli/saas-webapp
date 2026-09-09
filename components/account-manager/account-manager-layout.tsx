@@ -95,9 +95,9 @@ export default function AccountManagerLayout({ children }: AccountManagerLayoutP
                     <span className="text-sm font-semibold">Print Duka - Account Manager</span>
                 </header>
 
-                {/* pb-36 keeps page content clear of the fixed Ask AI button
+                {/* pb-44 keeps page content clear of the fixed Ask AI button
                     (bottom-6) and search pill (bottom-24) floating bottom-right. */}
-                <main className="flex-1 bg-gray-50 pb-36">
+                <main className="flex-1 bg-gray-50 pb-44">
                     {children}
                 </main>
             </div>
