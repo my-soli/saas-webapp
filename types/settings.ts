@@ -16,6 +16,7 @@ export interface SystemSettings {
     turnaround_expedited?: number;
     quote_validity_days?: number;
     otp_expiry_minutes?: number;
+    default_invoice_terms?: string;
 }
 
 export interface SettingItem {

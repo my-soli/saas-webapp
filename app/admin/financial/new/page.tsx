@@ -22,6 +22,7 @@ import {
     type InvoiceLineItem,
     type ProductSuggestion,
 } from "@/services/financial-invoices";
+import { fetchSettings, updateSettings } from "@/lib/api/settings";
 
 interface DraftLineItem {
     description: string;
@@ -187,6 +188,7 @@ export default function NewInvoicePage(): ReactElement {
     const router = useRouter();
     const { data: clients = [] } = useQuery({ queryKey: ["client-options"], queryFn: fetchClientOptions });
     const { data: suggestedNumber } = useQuery({ queryKey: ["next-invoice-number"], queryFn: fetchNextInvoiceNumber });
+    const { data: settings } = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
 
     const [clientId, setClientId] = useState<number | "">("");
     const [invoiceNumberOverride, setInvoiceNumberOverride] = useState<string | null>(null);
@@ -196,12 +198,22 @@ export default function NewInvoicePage(): ReactElement {
     const [dueDate, setDueDate] = useState(() => computeDueDate(todayISO(), "due_on_receipt") ?? todayISO());
     const [notes, setNotes] = useState(DEFAULT_NOTES);
     const [terms, setTerms] = useState(DEFAULT_TERMS);
+    const [termsTouchedByUser, setTermsTouchedByUser] = useState(false);
+    const [saveTermsAsDefault, setSaveTermsAsDefault] = useState(false);
     const [paymentOptions, setPaymentOptions] = useState(DEFAULT_PAYMENT_OPTIONS);
     const [discount, setDiscount] = useState("0");
     const [showTotalSummary, setShowTotalSummary] = useState(false);
     const [showBulkModal, setShowBulkModal] = useState(false);
     const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
     const [lineItems, setLineItems] = useState<DraftLineItem[]>([{ ...EMPTY_LINE }]);
+
+    // Once the org's saved default terms load, adopt them — unless the admin
+    // already started typing their own terms first.
+    useEffect(() => {
+        if (settings?.default_invoice_terms && !termsTouchedByUser) {
+            setTerms(settings.default_invoice_terms);
+        }
+    }, [settings, termsTouchedByUser]);
 
     // Payment terms/invoice date drive the due-date convenience-fill, recomputed directly in
     // their change handlers (not an effect) — editing Due Date directly afterward is still free.
@@ -249,7 +261,7 @@ export default function NewInvoicePage(): ReactElement {
     }
 
     const saveMutation = useMutation({
-        mutationFn: (status: "draft" | "sent") => {
+        mutationFn: async (status: "draft" | "sent") => {
             const line_items: InvoiceLineItem[] = lineItems
                 .filter((li) => li.description.trim())
                 .map((li) => ({
@@ -258,7 +270,7 @@ export default function NewInvoicePage(): ReactElement {
                     unit_rate: li.unit_rate,
                     tax_rate: li.tax_rate,
                 }));
-            return createInvoice({
+            const invoice = await createInvoice({
                 client: clientId as number,
                 invoice_number: invoiceNumber,
                 invoice_date: invoiceDate,
@@ -271,6 +283,17 @@ export default function NewInvoicePage(): ReactElement {
                 status,
                 line_items,
             });
+            if (saveTermsAsDefault) {
+                // Best-effort — the invoice already saved successfully, so a
+                // failure here shouldn't block navigation or look like the
+                // invoice itself failed.
+                try {
+                    await updateSettings({ default_invoice_terms: terms });
+                } catch {
+                    toast.error("Invoice saved, but couldn't update the default terms. Please try again in Settings.");
+                }
+            }
+            return invoice;
         },
         onSuccess: () => {
             toast.success("Invoice created");
@@ -450,8 +473,20 @@ export default function NewInvoicePage(): ReactElement {
 
                                 <div className="space-y-1">
                                     <label className="text-sm font-medium text-gray-700">Terms &amp; Conditions</label>
-                                    <textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={5}
+                                    <textarea
+                                        value={terms}
+                                        onChange={(e) => { setTerms(e.target.value); setTermsTouchedByUser(true); }}
+                                        rows={5}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent resize-y" />
+                                    <label className="flex items-center gap-2 pt-1 text-xs text-gray-600 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={saveTermsAsDefault}
+                                            onChange={(e) => setSaveTermsAsDefault(e.target.checked)}
+                                            className="rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
+                                        />
+                                        Use this in future for all invoices
+                                    </label>
                                 </div>
 
                                 <div className="space-y-1">
