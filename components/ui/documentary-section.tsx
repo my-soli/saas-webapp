@@ -21,7 +21,7 @@ export default function DocumentarySection() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
           {/* Left — copy */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 1, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, ease: "easeOut" }}
           >
@@ -71,7 +71,7 @@ export default function DocumentarySection() {
 
           {/* Right — YouTube facade card */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 1, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, ease: "easeOut", delay: 0.1 }}
             className="relative aspect-video w-full overflow-hidden rounded-3xl shadow-2xl shadow-brand-blue/10 ring-1 ring-black/5"

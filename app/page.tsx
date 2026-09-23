@@ -10,6 +10,7 @@ import LogoCloud from "@/components/ui/logo-cloud";
 import FeaturesSection from "@/components/ui/features-section";
 import ContactCTASection from "@/components/ui/contact-cta-section";
 import FooterSection from "@/components/ui/footer-section";
+import WallDukaTeaserSection from "@/components/ui/wallduka-teaser-section";
 import { Palette, Printer, Building2, Shirt, Package, ClipboardList } from "lucide-react";
 
 const services = [
@@ -90,14 +91,14 @@ export default function Home() {
         {/* Hero section */}
         <motion.section
           className="w-full px-4 py-24"
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 1, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         >
           <div className="mx-auto text-center">
             <motion.h1
               className="text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight mb-6 leading-tight"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
             >
@@ -110,7 +111,7 @@ export default function Home() {
             </motion.h1>
             <motion.p
               className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-10"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
             >
@@ -118,7 +119,7 @@ export default function Home() {
             </motion.p>
             <motion.div
               className="flex flex-col sm:flex-row gap-4 justify-center"
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 1, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.55, ease: "easeOut" }}
             >
@@ -193,6 +194,9 @@ export default function Home() {
 
       {/* Contact CTA */}
       <ContactCTASection />
+
+      {/* WallDuka teaser */}
+      <WallDukaTeaserSection />
 
       {/* Footer */}
       <FooterSection />
