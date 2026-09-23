@@ -79,6 +79,18 @@ async function handler(
             'X-Tenant-Host': tenantHost,
         };
 
+        // Without this, every request arrives at Django from this server's own
+        // IP, not the visitor's — DRF's AnonRateThrottle then buckets the
+        // entire site's combined anonymous traffic as if it were one visitor,
+        // so unrelated people start getting 429'd once the site as a whole
+        // (not any one person) crosses the per-hour limit. The hosting
+        // platform's edge already sets x-forwarded-for on the request that
+        // reaches this server; forward just the original client IP (first
+        // entry) onward to Django.
+        const incomingXff = request.headers.get('x-forwarded-for');
+        const clientIp = incomingXff?.split(',')[0]?.trim();
+        if (clientIp) forwardHeaders['X-Forwarded-For'] = clientIp;
+
         const contentType = request.headers.get('content-type');
         if (contentType) forwardHeaders['Content-Type'] = contentType;
         if (cookieHeader) forwardHeaders['Cookie'] = cookieHeader;
