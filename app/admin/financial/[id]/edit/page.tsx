@@ -22,6 +22,7 @@ import {
     type InvoiceLineItem,
     type ProductSuggestion,
 } from "@/services/financial-invoices";
+import { updateSettings } from "@/lib/api/settings";
 
 interface DraftLineItem {
     description: string;
@@ -153,6 +154,7 @@ function EditInvoiceForm({ invoice }: { invoice: FinancialInvoice }): ReactEleme
     const [dueDate, setDueDate] = useState(invoice.due_date ?? "");
     const [notes, setNotes] = useState(invoice.notes);
     const [terms, setTerms] = useState(invoice.terms);
+    const [saveTermsAsDefault, setSaveTermsAsDefault] = useState(false);
     const [paymentOptions, setPaymentOptions] = useState(invoice.payment_options);
     const [discount, setDiscount] = useState(String(invoice.discount ?? "0"));
     const [showTotalSummary, setShowTotalSummary] = useState(false);
@@ -213,7 +215,7 @@ function EditInvoiceForm({ invoice }: { invoice: FinancialInvoice }): ReactEleme
     }
 
     const saveMutation = useMutation({
-        mutationFn: () => {
+        mutationFn: async () => {
             const line_items: InvoiceLineItem[] = lineItems
                 .filter((li) => li.description.trim())
                 .map((li) => ({
@@ -222,7 +224,7 @@ function EditInvoiceForm({ invoice }: { invoice: FinancialInvoice }): ReactEleme
                     unit_rate: li.unit_rate,
                     tax_rate: li.tax_rate,
                 }));
-            return updateInvoice(invoice.id, {
+            const updated = await updateInvoice(invoice.id, {
                 client: clientId,
                 invoice_number: invoiceNumber,
                 invoice_date: invoiceDate,
@@ -234,6 +236,17 @@ function EditInvoiceForm({ invoice }: { invoice: FinancialInvoice }): ReactEleme
                 payment_options: paymentOptions,
                 line_items,
             });
+            if (saveTermsAsDefault) {
+                // Best-effort — the invoice already saved successfully, so a
+                // failure here shouldn't block navigation or look like the
+                // invoice itself failed.
+                try {
+                    await updateSettings({ default_invoice_terms: terms });
+                } catch {
+                    toast.error("Invoice saved, but couldn't update the default terms. Please try again in Settings.");
+                }
+            }
+            return updated;
         },
         onSuccess: () => {
             toast.success("Invoice updated");
@@ -384,6 +397,15 @@ function EditInvoiceForm({ invoice }: { invoice: FinancialInvoice }): ReactEleme
                                     <label className="text-sm font-medium text-gray-700">Terms &amp; Conditions</label>
                                     <textarea value={terms} onChange={(e) => setTerms(e.target.value)} rows={5}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent resize-y" />
+                                    <label className="flex items-center gap-2 pt-1 text-xs text-gray-600 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={saveTermsAsDefault}
+                                            onChange={(e) => setSaveTermsAsDefault(e.target.checked)}
+                                            className="rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
+                                        />
+                                        Use this in future for all invoices
+                                    </label>
                                 </div>
 
                                 {/* New section — only added to invoices still being drafted, not
