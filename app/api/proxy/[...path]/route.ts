@@ -140,6 +140,11 @@ async function handler(
             headers: { 'Content-Type': responseContentType },
         });
 
+        const contentDisposition = djangoResponse.headers.get('content-disposition');
+        if (contentDisposition) {
+            res.headers.set('Content-Disposition', contentDisposition);
+        }
+
         // Forward Set-Cookie headers from Django (e.g. sessionid after login)
         const setCookieHeader = djangoResponse.headers.get('set-cookie');
         if (setCookieHeader) {
