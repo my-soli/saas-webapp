@@ -92,6 +92,30 @@ async function deleteImage(imageId: number): Promise<void> {
     if (!response.ok) throw new Error(await extractErrorMessage(response, "Failed to delete image"));
 }
 
+// Common apparel/merchandise colours — click one to fill both the name and
+// swatch hex in one go. "Custom…" falls back to the raw colour picker for
+// anything not on this list.
+const COMMON_COLORS: Array<{ name: string; hex: string }> = [
+    { name: "Black", hex: "#111111" },
+    { name: "White", hex: "#ffffff" },
+    { name: "Grey", hex: "#9ca3af" },
+    { name: "Charcoal", hex: "#374151" },
+    { name: "Navy", hex: "#1e3a5f" },
+    { name: "Royal Blue", hex: "#2563eb" },
+    { name: "Sky Blue", hex: "#7dd3fc" },
+    { name: "Red", hex: "#dc2626" },
+    { name: "Maroon", hex: "#7f1d1d" },
+    { name: "Orange", hex: "#f97316" },
+    { name: "Yellow", hex: "#facc15" },
+    { name: "Gold", hex: "#d4af37" },
+    { name: "Green", hex: "#16a34a" },
+    { name: "Olive", hex: "#65741e" },
+    { name: "Purple", hex: "#7c3aed" },
+    { name: "Pink", hex: "#ec4899" },
+    { name: "Brown", hex: "#78350f" },
+    { name: "Beige", hex: "#d9c6a5" },
+];
+
 interface ColorTagRowProps {
     image: ProductImage;
     onSave: (name: string, hex: string) => void;
@@ -101,6 +125,9 @@ interface ColorTagRowProps {
 function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
     const [name, setName] = useState(image.color_name);
     const [hex, setHex] = useState(image.color_hex || "#cccccc");
+    const [open, setOpen] = useState(false);
+    const [customMode, setCustomMode] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setName(image.color_name);
@@ -114,14 +141,33 @@ function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [name, hex]);
 
+    useEffect(() => {
+        if (!open) return;
+        function handleClickOutside(e: MouseEvent) {
+            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setOpen(false);
+                setCustomMode(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [open]);
+
+    function pickPreset(preset: { name: string; hex: string }) {
+        setName(preset.name);
+        setHex(preset.hex);
+        setOpen(false);
+        setCustomMode(false);
+    }
+
     return (
-        <div className="flex items-center gap-1.5">
-            <input
-                type="color"
-                value={hex}
-                onChange={(e) => setHex(e.target.value)}
-                className="h-6 w-6 shrink-0 cursor-pointer rounded border border-gray-200"
-                title="Swatch colour"
+        <div ref={containerRef} className="relative flex items-center gap-1.5">
+            <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                className="h-6 w-6 shrink-0 cursor-pointer rounded-full border border-gray-300"
+                style={{ backgroundColor: hex }}
+                title="Choose colour"
             />
             <input
                 type="text"
@@ -130,6 +176,39 @@ function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
                 placeholder="Colour name (optional)"
                 className="min-w-0 flex-1 rounded border border-gray-200 px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-blue/40"
             />
+            {open && (
+                <div className="absolute left-0 top-7 z-20 w-44 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
+                    <div className="grid grid-cols-6 gap-1.5">
+                        {COMMON_COLORS.map((c) => (
+                            <button
+                                key={c.name}
+                                type="button"
+                                onClick={() => pickPreset(c)}
+                                title={c.name}
+                                className={`h-5 w-5 rounded-full border transition-shadow ${
+                                    c.hex === hex ? "ring-2 ring-brand-blue ring-offset-1" : "border-gray-300"
+                                }`}
+                                style={{ backgroundColor: c.hex }}
+                            />
+                        ))}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setCustomMode((m) => !m)}
+                        className="mt-2 text-[10px] font-medium text-brand-blue hover:underline"
+                    >
+                        Custom colour…
+                    </button>
+                    {customMode && (
+                        <input
+                            type="color"
+                            value={hex}
+                            onChange={(e) => setHex(e.target.value)}
+                            className="mt-1.5 h-6 w-full cursor-pointer rounded border border-gray-200"
+                        />
+                    )}
+                </div>
+            )}
         </div>
     );
 }
