@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactElement, ChangeEvent, DragEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
@@ -127,7 +128,9 @@ function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
     const [hex, setHex] = useState(image.color_hex || "#cccccc");
     const [open, setOpen] = useState(false);
     const [customMode, setCustomMode] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
+    const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const popoverRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setName(image.color_name);
@@ -144,7 +147,11 @@ function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
     useEffect(() => {
         if (!open) return;
         function handleClickOutside(e: MouseEvent) {
-            if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+            const target = e.target as Node;
+            if (
+                triggerRef.current && !triggerRef.current.contains(target) &&
+                popoverRef.current && !popoverRef.current.contains(target)
+            ) {
                 setOpen(false);
                 setCustomMode(false);
             }
@@ -152,6 +159,14 @@ function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [open]);
+
+    function toggleOpen() {
+        if (!open && triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setPopoverPos({ top: rect.bottom + 4, left: rect.left });
+        }
+        setOpen((o) => !o);
+    }
 
     function pickPreset(preset: { name: string; hex: string }) {
         setName(preset.name);
@@ -161,10 +176,11 @@ function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
     }
 
     return (
-        <div ref={containerRef} className="relative flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
             <button
+                ref={triggerRef}
                 type="button"
-                onClick={() => setOpen((o) => !o)}
+                onClick={toggleOpen}
                 className="h-6 w-6 shrink-0 cursor-pointer rounded-full border border-gray-300"
                 style={{ backgroundColor: hex }}
                 title="Choose colour"
@@ -176,16 +192,20 @@ function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
                 placeholder="Colour name (optional)"
                 className="min-w-0 flex-1 rounded border border-gray-200 px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-blue/40"
             />
-            {open && (
-                <div className="absolute left-0 top-7 z-20 w-44 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
-                    <div className="grid grid-cols-6 gap-1.5">
+            {open && popoverPos && createPortal(
+                <div
+                    ref={popoverRef}
+                    className="fixed z-50 w-48 rounded-lg border border-gray-200 bg-white p-2.5 shadow-xl"
+                    style={{ top: popoverPos.top, left: popoverPos.left }}
+                >
+                    <div className="grid grid-cols-6 gap-2">
                         {COMMON_COLORS.map((c) => (
                             <button
                                 key={c.name}
                                 type="button"
                                 onClick={() => pickPreset(c)}
                                 title={c.name}
-                                className={`h-5 w-5 rounded-full border transition-shadow ${
+                                className={`h-6 w-6 rounded-full border transition-shadow ${
                                     c.hex === hex ? "ring-2 ring-brand-blue ring-offset-1" : "border-gray-300"
                                 }`}
                                 style={{ backgroundColor: c.hex }}
@@ -195,7 +215,7 @@ function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
                     <button
                         type="button"
                         onClick={() => setCustomMode((m) => !m)}
-                        className="mt-2 text-[10px] font-medium text-brand-blue hover:underline"
+                        className="mt-2 text-[11px] font-medium text-brand-blue hover:underline"
                     >
                         Custom colour…
                     </button>
@@ -204,10 +224,11 @@ function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
                             type="color"
                             value={hex}
                             onChange={(e) => setHex(e.target.value)}
-                            className="mt-1.5 h-6 w-full cursor-pointer rounded border border-gray-200"
+                            className="mt-1.5 h-7 w-full cursor-pointer rounded border border-gray-200"
                         />
                     )}
-                </div>
+                </div>,
+                document.body,
             )}
         </div>
     );
