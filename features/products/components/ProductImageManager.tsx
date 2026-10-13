@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactElement, ChangeEvent, DragEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
@@ -25,6 +25,8 @@ interface ProductImage {
     image_type: string;
     is_primary: boolean;
     display_order: number;
+    color_name: string;
+    color_hex: string;
     uploaded_at: string;
 }
 
@@ -68,6 +70,18 @@ async function setPrimary(imageId: number): Promise<ProductImage> {
     return response.json() as Promise<ProductImage>;
 }
 
+async function updateColor(imageId: number, color_name: string, color_hex: string): Promise<ProductImage> {
+    const csrf = await getCsrfToken();
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-images/${imageId}/`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify({ color_name, color_hex }),
+    });
+    if (!response.ok) throw new Error(await extractErrorMessage(response, "Failed to update colour"));
+    return response.json() as Promise<ProductImage>;
+}
+
 async function deleteImage(imageId: number): Promise<void> {
     const csrf = await getCsrfToken();
     const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-images/${imageId}/`, {
@@ -76,6 +90,48 @@ async function deleteImage(imageId: number): Promise<void> {
         headers: { "X-CSRFToken": csrf },
     });
     if (!response.ok) throw new Error(await extractErrorMessage(response, "Failed to delete image"));
+}
+
+interface ColorTagRowProps {
+    image: ProductImage;
+    onSave: (name: string, hex: string) => void;
+}
+
+/** Debounced colour-name + swatch editor for one image. Blank name = no swatch on the storefront. */
+function ColorTagRow({ image, onSave }: ColorTagRowProps): ReactElement {
+    const [name, setName] = useState(image.color_name);
+    const [hex, setHex] = useState(image.color_hex || "#cccccc");
+
+    useEffect(() => {
+        setName(image.color_name);
+        setHex(image.color_hex || "#cccccc");
+    }, [image.color_name, image.color_hex]);
+
+    useEffect(() => {
+        if (name === image.color_name && hex === (image.color_hex || "#cccccc")) return;
+        const timer = setTimeout(() => onSave(name, name ? hex : ""), 500);
+        return () => clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [name, hex]);
+
+    return (
+        <div className="flex items-center gap-1.5">
+            <input
+                type="color"
+                value={hex}
+                onChange={(e) => setHex(e.target.value)}
+                className="h-6 w-6 shrink-0 cursor-pointer rounded border border-gray-200"
+                title="Swatch colour"
+            />
+            <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Colour name (optional)"
+                className="min-w-0 flex-1 rounded border border-gray-200 px-1.5 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-blue/40"
+            />
+        </div>
+    );
 }
 
 interface ProductImageManagerProps {
@@ -112,6 +168,15 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
         onError: (err: Error) => toast.error(err.message || "Failed to delete image"),
     });
 
+    const colorMutation = useMutation({
+        mutationFn: ({ id, name, hex }: { id: number; name: string; hex: string }) => updateColor(id, name, hex),
+        onSuccess: (updated) => {
+            queryClient.setQueryData<ProductImage[]>(queryKey, (old) =>
+                old?.map((i) => (i.id === updated.id ? updated : i)));
+        },
+        onError: (err: Error) => toast.error(err.message || "Failed to update colour"),
+    });
+
     const handleFiles = (files: FileList | null): void => {
         if (!files) return;
         const isPrimaryFirst = images.length === 0;
@@ -142,7 +207,8 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                 <div>
                     <h2 className="text-base font-semibold text-gray-900">Product Images</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
-                        Upload multiple images. Click a thumbnail to set it as primary.
+                        Upload multiple images. Click a thumbnail to set it as primary. Tag an image with a
+                        colour to show it as a colour swatch on the storefront.
                     </p>
                 </div>
             </div>
@@ -180,8 +246,8 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
             {sorted.length > 0 && (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                     {sorted.map((img) => (
+                        <div key={img.id} className="space-y-1.5">
                         <div
-                            key={img.id}
                             className={`relative group rounded-xl overflow-hidden aspect-square bg-gray-100 ${
                                 img.is_primary ? "ring-2 ring-brand-blue ring-offset-2" : "ring-1 ring-gray-200"
                             }`}
@@ -236,6 +302,11 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                                     : <Trash2Icon className="h-3 w-3 text-white" />
                                 }
                             </button>
+                        </div>
+                        <ColorTagRow
+                            image={img}
+                            onSave={(name, hex) => colorMutation.mutate({ id: img.id, name, hex })}
+                        />
                         </div>
                     ))}
                 </div>

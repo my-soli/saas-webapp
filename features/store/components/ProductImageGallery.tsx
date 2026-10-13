@@ -22,8 +22,45 @@ export default function ProductImageGallery({ product }: ProductImageGalleryProp
     const active = sorted[activeIndex] ?? null;
     const displayUrl = active?.image_url ?? product.primary_image_url;
 
+    // One swatch per distinct colour, each pointing at its first image.
+    // Products with no colour-tagged images show no swatch row at all.
+    const colorSwatches: Array<{ name: string; hex: string; index: number }> = [];
+    const seenColors = new Set<string>();
+    sorted.forEach((img, i) => {
+        if (img.color_name && !seenColors.has(img.color_name)) {
+            seenColors.add(img.color_name);
+            colorSwatches.push({ name: img.color_name, hex: img.color_hex, index: i });
+        }
+    });
+    const selectedColorName = active?.color_name || null;
+
     return (
         <div className="space-y-3">
+            {/* Colour swatches */}
+            {colorSwatches.length > 0 && (
+                <div className="space-y-1.5">
+                    <p className="text-xs font-medium text-gray-500">
+                        Colour{selectedColorName ? `: ${selectedColorName}` : ""}
+                    </p>
+                    <div className="flex gap-2 flex-wrap">
+                        {colorSwatches.map((swatch) => (
+                            <button
+                                key={swatch.name}
+                                type="button"
+                                title={swatch.name}
+                                aria-label={swatch.name}
+                                onClick={() => { setActiveIndex(swatch.index); setZoomed(false); }}
+                                className={`w-8 h-8 rounded-full flex-shrink-0 transition-all ${swatch.name === selectedColorName
+                                        ? "ring-2 ring-brand-blue ring-offset-2"
+                                        : "ring-1 ring-gray-300 hover:ring-gray-400"
+                                    }`}
+                                style={{ backgroundColor: swatch.hex || "#e5e7eb" }}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Main image */}
             <div
                 className={`relative bg-gray-50 rounded-2xl overflow-hidden aspect-square ${displayUrl ? "cursor-zoom-in" : ""} ${zoomed ? "cursor-zoom-out" : ""}`}
