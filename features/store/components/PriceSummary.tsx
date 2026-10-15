@@ -59,7 +59,7 @@ export default function PriceSummary({ result, isPending, error, onOrder }: Pric
 
             {/* Trust signals */}
             <p className="text-xs text-gray-400 text-center">
-                Free proofing · Production starts on confirmation
+                Proofing available · Production starts on confirmation
             </p>
         </div>
     );
