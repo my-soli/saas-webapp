@@ -16,7 +16,7 @@ export default function PriceSummary({ result, isPending, error, onOrder }: Pric
     const hasPrice = result && parseFloat(result.final_selling_price) > 0;
 
     return (
-        <div className="pt-4 space-y-4">
+        <div className="pt-4 mt-1 space-y-4 border-t border-gray-100">
             {/* Price row */}
             {hasPrice && !isPending && (
                 <div className="flex items-baseline gap-2">

@@ -217,7 +217,7 @@ export default function ProductDetailPage(): ReactElement {
                                     )}
                                 </div>
                             )}
-                            <h1 className="text-2xl font-bold text-gray-900 leading-snug">{product.name}</h1>
+                            <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 leading-snug">{product.name}</h1>
                             {product.short_description && (
                                 <p className="mt-2 text-sm text-gray-500 leading-relaxed break-words">{product.short_description}</p>
                             )}
@@ -298,7 +298,7 @@ export default function ProductDetailPage(): ReactElement {
                                 )}
                             </div>
                         ) : (
-                            <div className="space-y-1">
+                            <div className="rounded-2xl border border-gray-100 px-5 pb-5">
                                 {visibleGroups.map((group, i) => (
                                     <SpecGroupSection
                                         key={group.id}

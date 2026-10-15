@@ -1,10 +1,63 @@
 "use client";
 
-import type { ReactElement } from "react";
-import { InfoIcon } from "lucide-react";
+import type { ReactElement, ReactNode } from "react";
+import { InfoIcon, CheckIcon } from "lucide-react";
 import { formatKES } from "@/lib/format";
 import type { ProductSpecGroup, SpecOption, SpecOptionRange } from "@/types/products";
 import type { SpecGroupSelectionState } from "../types";
+
+function modifierLabel(mod: string | null | undefined): string | null {
+    if (!mod) return null;
+    const num = parseFloat(mod);
+    if (!num) return null;
+    return num > 0 ? `+${formatKES(num)}` : `−${formatKES(Math.abs(num))}`;
+}
+
+/** Shared selectable card used by every option-based spec group (quantity, single/multi-select, multiplier). */
+function OptionCard({
+    label,
+    sublabel,
+    selected,
+    image,
+    onClick,
+}: {
+    label: string;
+    sublabel?: string | null;
+    selected: boolean;
+    image?: string | null;
+    onClick: () => void;
+}): ReactElement {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={selected}
+            className={`relative flex min-w-[84px] flex-1 basis-[84px] flex-col items-start gap-1 rounded-xl border-2 px-3.5 py-2.5 text-left transition-all sm:flex-none ${
+                selected
+                    ? "border-brand-blue bg-brand-blue/5"
+                    : "border-gray-200 bg-white hover:border-gray-300"
+            }`}
+        >
+            {selected && (
+                <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand-blue">
+                    <CheckIcon className="h-2.5 w-2.5 text-white" strokeWidth={3} />
+                </span>
+            )}
+            {image && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={image} alt="" className="h-9 w-9 rounded-lg object-cover" />
+            )}
+            <span className={`text-sm font-semibold leading-tight ${selected ? "text-brand-blue" : "text-gray-800"}`}>
+                {label}
+            </span>
+            {sublabel && <span className="text-xs text-gray-400 leading-tight">{sublabel}</span>}
+        </button>
+    );
+}
+
+function OptionCardGrid({ children }: { children: ReactNode }): ReactElement {
+    return <div className="flex flex-wrap gap-2">{children}</div>;
+}
 
 function QuantityTierSelector({
     group,
@@ -16,18 +69,17 @@ function QuantityTierSelector({
     onChange: (optionId: number | null) => void;
 }): ReactElement {
     return (
-        <select
-            value={value ?? ""}
-            onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20 transition-all"
-        >
-            <option value="">Select quantity…</option>
+        <OptionCardGrid>
             {group.options.map((opt: SpecOption) => (
-                <option key={opt.id} value={opt.id}>
-                    {opt.quantity_value != null ? `${opt.quantity_value} pcs` : opt.name}
-                </option>
+                <OptionCard
+                    key={opt.id}
+                    label={opt.quantity_value != null ? `${opt.quantity_value} pcs` : opt.name}
+                    sublabel={opt.selling_price ? `${formatKES(opt.selling_price)} each` : null}
+                    selected={value === opt.id}
+                    onClick={() => onChange(opt.id)}
+                />
             ))}
-        </select>
+        </OptionCardGrid>
     );
 }
 
@@ -41,16 +93,18 @@ function SingleSelectModifier({
     onChange: (optionId: number | null) => void;
 }): ReactElement {
     return (
-        <select
-            value={value ?? ""}
-            onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20 transition-all"
-        >
-            <option value="">Select an option…</option>
+        <OptionCardGrid>
             {group.options.map((opt: SpecOption) => (
-                <option key={opt.id} value={opt.id}>{opt.name}</option>
+                <OptionCard
+                    key={opt.id}
+                    label={opt.name}
+                    sublabel={modifierLabel(opt.selling_price_modifier)}
+                    image={opt.preview_image}
+                    selected={value === opt.id}
+                    onClick={() => onChange(opt.id)}
+                />
             ))}
-        </select>
+        </OptionCardGrid>
     );
 }
 
@@ -72,19 +126,18 @@ function MultiSelectModifier({
     };
 
     return (
-        <div className="space-y-1.5">
+        <OptionCardGrid>
             {group.options.map((opt: SpecOption) => (
-                <label key={opt.id} className="flex items-center gap-2.5 cursor-pointer">
-                    <input
-                        type="checkbox"
-                        checked={value.includes(opt.id)}
-                        onChange={() => toggle(opt.id)}
-                        className="h-4 w-4 rounded border-gray-300 text-brand-blue accent-brand-blue"
-                    />
-                    <span className="text-sm text-gray-800">{opt.name}</span>
-                </label>
+                <OptionCard
+                    key={opt.id}
+                    label={opt.name}
+                    sublabel={modifierLabel(opt.selling_price_modifier)}
+                    image={opt.preview_image}
+                    selected={value.includes(opt.id)}
+                    onClick={() => toggle(opt.id)}
+                />
             ))}
-        </div>
+        </OptionCardGrid>
     );
 }
 
@@ -249,18 +302,17 @@ function MultiplierSelector({
     onChange: (optionId: number | null) => void;
 }): ReactElement {
     return (
-        <select
-            value={value ?? ""}
-            onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/20 transition-all"
-        >
-            <option value="">Select multiplier…</option>
+        <OptionCardGrid>
             {group.options.map((opt: SpecOption) => (
-                <option key={opt.id} value={opt.id}>
-                    ×{opt.multiplier_value ?? opt.name} — {opt.name}
-                </option>
+                <OptionCard
+                    key={opt.id}
+                    label={opt.name}
+                    sublabel={opt.multiplier_value ? `×${opt.multiplier_value}` : null}
+                    selected={value === opt.id}
+                    onClick={() => onChange(opt.id)}
+                />
             ))}
-        </select>
+        </OptionCardGrid>
     );
 }
 
@@ -341,13 +393,16 @@ interface SpecGroupSectionProps {
     onUpdate: (update: Partial<SpecGroupSelectionState>) => void;
 }
 
-export default function SpecGroupSection({ group, state, onUpdate }: SpecGroupSectionProps): ReactElement {
+export default function SpecGroupSection({ group, stepNumber, state, onUpdate }: SpecGroupSectionProps): ReactElement {
     return (
-        <div className="py-3.5 space-y-2">
+        <div className="py-4 space-y-2.5 border-b border-gray-100 last:border-b-0">
             <div className="flex items-center justify-between gap-2">
-                <label className="text-sm font-semibold text-gray-800">
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                    <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 text-[11px] font-bold text-gray-500">
+                        {stepNumber}
+                    </span>
                     {group.display_label || group.name}
-                    {group.is_required && <span className="text-red-400 ml-1 font-normal">*</span>}
+                    {group.is_required && <span className="text-red-400 font-normal">*</span>}
                 </label>
                 {group.help_text && (
                     <span className="text-xs text-gray-400 text-right flex-shrink-0 max-w-[160px] leading-tight">{group.help_text}</span>
