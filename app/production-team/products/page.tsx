@@ -33,9 +33,21 @@ export default function PTProductsPage(): ReactElement {
     const [pricingMode, setPricingMode] = useState<ProductPricingMode | "all">("all");
     const [printCategory, setPrintCategory] = useState<string>("");
     const [category, setCategory] = useState<string>("");
-    const [page, setPage] = useState<number>(1);
+    // Remembered per list (admin/business/production-team each have their own
+    // products list) so returning via a sidebar link — not browser back —
+    // still lands on the page the admin was on, instead of resetting to 1.
+    const pageStorageKey = `products-list-page:${basePath}`;
+    const [page, setPage] = useState<number>(() => {
+        if (typeof window === "undefined") return 1;
+        const stored = Number(sessionStorage.getItem(pageStorageKey));
+        return stored > 0 ? stored : 1;
+    });
     const [pageSize, setPageSize] = useState<number>(20);
     const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+    useEffect((): void => {
+        sessionStorage.setItem(pageStorageKey, String(page));
+    }, [page, pageStorageKey]);
 
     useEffect((): (() => void) => {
         const timer = setTimeout(() => setDebouncedSearch(search), 400);
