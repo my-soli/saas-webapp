@@ -18,7 +18,7 @@ export default function EditProductHeader({ product, basePath }: EditProductHead
                 <nav className="flex items-center gap-2 text-xs text-gray-400 mb-3">
                     <a href="/admin" className="hover:text-brand-blue">Admin</a>
                     <span>/</span>
-                    <button type="button" onClick={() => router.back()} className="hover:text-brand-blue">Products</button>
+                    <button type="button" onClick={() => router.push(basePath)} className="hover:text-brand-blue">Products</button>
                     <span>/</span>
                     <span className="text-gray-700">{product.name}</span>
                     <span>/</span>
@@ -28,7 +28,7 @@ export default function EditProductHeader({ product, basePath }: EditProductHead
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
-                            onClick={() => router.back()}
+                            onClick={() => router.push(basePath)}
                             aria-label="Back to products"
                             title="Back to products"
                             className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 hover:text-brand-blue transition-colors"
