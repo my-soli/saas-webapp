@@ -136,7 +136,7 @@ export default function QuoteRequestPage(): ReactElement {
                     <div key={item.productId} className="flex gap-4 rounded-2xl border border-gray-100 bg-white p-4">
                         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100">
                             {item.imageUrl ? (
-                                <Image src={item.imageUrl} alt={item.name} fill className="object-cover" sizes="80px" />
+                                <Image src={item.imageUrl} alt={item.name} fill className="object-contain bg-gray-50" sizes="80px" />
                             ) : (
                                 <div className="flex h-full items-center justify-center text-gray-300">
                                     <ShoppingCartIcon className="h-6 w-6" />

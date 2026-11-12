@@ -357,7 +357,7 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                                     src={img.image_url}
                                     alt={img.alt_text}
                                     fill
-                                    className="object-cover"
+                                    className="object-contain"
                                     sizes="(max-width: 640px) 33vw, 25vw"
                                 />
                             ) : (
