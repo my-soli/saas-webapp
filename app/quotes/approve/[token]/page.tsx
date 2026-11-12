@@ -11,12 +11,18 @@ interface LineItem {
     quantity: number;
     unit_price: string | number;
     line_total: string | number;
+    variable_amount?: string | number;
+    discount_amount?: string | number;
+    discount_type?: "percent" | "fixed" | string;
 }
 
 interface PublicQuoteDetail {
     quote_id: string;
     line_items: LineItem[];
     total_amount: string | number | null;
+    shipping_charges?: string | number | null;
+    adjustment_amount?: string | number | null;
+    adjustment_reason?: string;
     include_vat: boolean;
     tax_rate: number | null;
     quote_date: string;
@@ -184,10 +190,22 @@ export default function QuoteApprovePage() {
     }
 
     const lineItems = quote?.line_items ?? [];
+    // Pre-discount unit rate (incl. variable add-on) and the line's discount value —
+    // same maths as QuoteLineItem.save() on the backend.
+    const grossRate = (item: LineItem) => (Number(item.unit_price) || 0) + (Number(item.variable_amount) || 0);
+    const lineDiscount = (item: LineItem) => {
+        const amt = Number(item.discount_amount) || 0;
+        if (amt <= 0) return 0;
+        return item.discount_type === "percent" ? grossRate(item) * (Number(item.quantity) || 0) * (amt / 100) : amt;
+    };
+    const discountTotal = lineItems.reduce((s, item) => s + lineDiscount(item), 0);
+    const hasDiscount = discountTotal > 0;
     const subtotal = lineItems.reduce((s, item) => s + parseFloat(String(item.line_total ?? 0)), 0);
     const taxRate = Number(quote?.tax_rate ?? 16);
     const vatAmount = quote?.include_vat ? subtotal * (taxRate / 100) : 0;
-    const total = subtotal + vatAmount;
+    const shipping = Number(quote?.shipping_charges) || 0;
+    const adjustment = Number(quote?.adjustment_amount) || 0;
+    const total = subtotal + vatAmount + shipping + adjustment;
 
     return (
         <div className="min-h-screen bg-gray-100 py-8 px-4">
@@ -258,6 +276,9 @@ export default function QuoteApprovePage() {
                                     <th className="text-left py-2 px-3">Item &amp; Description</th>
                                     <th className="text-right py-2 px-3">Qty</th>
                                     <th className="text-right py-2 px-3">Rate</th>
+                                    {hasDiscount && (
+                                        <th className="text-right py-2 px-3">Discount</th>
+                                    )}
                                     {quote?.include_vat && (
                                         <th className="text-right py-2 px-3">VAT</th>
                                     )}
@@ -278,7 +299,19 @@ export default function QuoteApprovePage() {
                                                 )}
                                             </td>
                                             <td className="py-2.5 px-3 text-right text-gray-700">{Number(item.quantity).toFixed(2)}</td>
-                                            <td className="py-2.5 px-3 text-right text-gray-700">{fmtNum(item.unit_price)}</td>
+                                            <td className="py-2.5 px-3 text-right text-gray-700">{fmtNum(grossRate(item))}</td>
+                                            {hasDiscount && (
+                                                <td className="py-2.5 px-3 text-right text-gray-700">
+                                                    {lineDiscount(item) > 0 ? (
+                                                        <>
+                                                            <p>-{fmtNum(lineDiscount(item))}</p>
+                                                            {item.discount_type === "percent" && (
+                                                                <p className="text-xs text-gray-400 mt-0.5">{Number(item.discount_amount)}%</p>
+                                                            )}
+                                                        </>
+                                                    ) : "–"}
+                                                </td>
+                                            )}
                                             {quote?.include_vat && (
                                                 <td className="py-2.5 px-3 text-right text-gray-700">
                                                     <p>{fmtNum(vatAmt)}</p>
@@ -297,6 +330,18 @@ export default function QuoteApprovePage() {
                     <div className="border-t border-gray-300 pt-2 mb-6">
                         <div className="flex justify-end">
                             <div className="w-56 text-sm space-y-1">
+                                {hasDiscount && (
+                                    <>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Gross Amount</span>
+                                            <span className="text-gray-700">{fmtNum(subtotal + discountTotal)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-gray-500">Discount</span>
+                                            <span className="text-red-600">-{fmtNum(discountTotal)}</span>
+                                        </div>
+                                    </>
+                                )}
                                 <div className="flex justify-between">
                                     <span className="text-gray-500 font-medium">Sub Total</span>
                                     <span className="text-gray-700">{fmtNum(subtotal)}</span>
@@ -305,6 +350,18 @@ export default function QuoteApprovePage() {
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">VAT ({taxRate.toFixed(0)}%)</span>
                                         <span className="text-gray-700">{fmtNum(vatAmount)}</span>
+                                    </div>
+                                )}
+                                {shipping !== 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">Shipping</span>
+                                        <span className="text-gray-700">{fmtNum(shipping)}</span>
+                                    </div>
+                                )}
+                                {adjustment !== 0 && (
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-500">{quote?.adjustment_reason || "Adjustment"}</span>
+                                        <span className="text-gray-700">{fmtNum(adjustment)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between border-t border-gray-900 pt-1 font-bold text-base">

@@ -351,7 +351,7 @@ function EditInvoiceForm({ invoice }: { invoice: FinancialInvoice }): ReactEleme
                                                         className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-right focus:ring-2 focus:ring-brand-blue focus:border-transparent" />
                                                 </td>
                                                 <td className="px-3 py-2 align-top">
-                                                    <input type="number" min={0} step="0.01" value={li.unit_rate} onChange={(e) => updateLine(idx, "unit_rate", e.target.value)}
+                                                    <input type="number" step="0.01" value={li.unit_rate} onChange={(e) => updateLine(idx, "unit_rate", e.target.value)}
                                                         className="w-full px-2 py-1.5 border border-gray-200 rounded-md text-sm text-right focus:ring-2 focus:ring-brand-blue focus:border-transparent" />
                                                 </td>
                                                 <td className="px-3 py-2 align-top">

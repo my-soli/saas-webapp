@@ -82,7 +82,7 @@ export default function ProductImageGallery({ product }: ProductImageGalleryProp
                         src={displayUrl}
                         alt={active?.alt_text || product.name}
                         fill
-                        className={`object-cover transition-transform duration-300 ${zoomed ? "scale-150" : "scale-100"}`}
+                        className={`object-contain transition-transform duration-300 ${zoomed ? "scale-150" : "scale-100"}`}
                         sizes="(max-width: 1024px) 100vw, 50vw"
                         priority
                     />
@@ -142,7 +142,7 @@ export default function ProductImageGallery({ product }: ProductImageGalleryProp
                                     alt={img.alt_text || product.name}
                                     width={64}
                                     height={64}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain bg-gray-50"
                                 />
                             ) : (
                                 <div className="w-full h-full bg-gray-100" />
