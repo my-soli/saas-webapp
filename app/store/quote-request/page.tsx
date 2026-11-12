@@ -56,7 +56,9 @@ export default function QuoteRequestPage(): ReactElement {
                     product_id: String(item.productId),
                     product_name: item.name,
                     quantity: item.quantity,
-                    notes: item.notes,
+                    // Colour picked on the product page travels in the line's notes,
+                    // which the sales team already sees on the request.
+                    notes: [item.color && `Colour: ${item.color}`, item.notes.trim()].filter(Boolean).join(" — "),
                 })),
                 specialNotes.trim(),
             );
@@ -133,7 +135,7 @@ export default function QuoteRequestPage(): ReactElement {
             {/* Cart items */}
             <div className="mt-8 space-y-4">
                 {items.map((item) => (
-                    <div key={item.productId} className="flex gap-4 rounded-2xl border border-gray-100 bg-white p-4">
+                    <div key={item.key} className="flex gap-4 rounded-2xl border border-gray-100 bg-white p-4">
                         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-gray-100">
                             {item.imageUrl ? (
                                 <Image src={item.imageUrl} alt={item.name} fill className="object-contain bg-gray-50" sizes="80px" />
@@ -145,10 +147,15 @@ export default function QuoteRequestPage(): ReactElement {
                         </div>
                         <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-2">
-                                <h3 className="font-semibold text-gray-900 text-sm">{item.name}</h3>
+                                <div className="min-w-0">
+                                    <h3 className="font-semibold text-gray-900 text-sm">{item.name}</h3>
+                                    {item.color && (
+                                        <p className="mt-0.5 text-xs text-gray-500">Colour: <span className="font-medium text-gray-700">{item.color}</span></p>
+                                    )}
+                                </div>
                                 <button
                                     type="button"
-                                    onClick={() => removeItem(item.productId)}
+                                    onClick={() => removeItem(item.key)}
                                     className="text-gray-300 hover:text-brand-red transition-colors shrink-0"
                                     aria-label={`Remove ${item.name}`}
                                 >
@@ -156,13 +163,13 @@ export default function QuoteRequestPage(): ReactElement {
                                 </button>
                             </div>
                             <div className="mt-2 flex items-center gap-2">
-                                <label className="text-xs text-gray-500" htmlFor={`qty-${item.productId}`}>Qty</label>
+                                <label className="text-xs text-gray-500" htmlFor={`qty-${item.key}`}>Qty</label>
                                 <input
-                                    id={`qty-${item.productId}`}
+                                    id={`qty-${item.key}`}
                                     type="number"
                                     min={1}
                                     value={item.quantity}
-                                    onChange={(e) => updateQuantity(item.productId, Number(e.target.value) || 1)}
+                                    onChange={(e) => updateQuantity(item.key, Number(e.target.value) || 1)}
                                     className="w-20 rounded-lg border border-gray-200 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
                                 />
                             </div>
@@ -170,7 +177,7 @@ export default function QuoteRequestPage(): ReactElement {
                                 type="text"
                                 placeholder="Notes for this item (size, colour, etc.) — optional"
                                 value={item.notes}
-                                onChange={(e) => updateNotes(item.productId, e.target.value)}
+                                onChange={(e) => updateNotes(item.key, e.target.value)}
                                 className="mt-2 w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs text-gray-600 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
                             />
                         </div>

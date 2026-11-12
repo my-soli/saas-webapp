@@ -24,6 +24,7 @@ import SpecGroupSection from "@/features/store/components/SpecGroupSection";
 import PriceSummary from "@/features/store/components/PriceSummary";
 import ProductInfoTable from "@/features/store/components/ProductInfoTable";
 import ProductFAQSection from "@/features/store/components/ProductFAQSection";
+import ColorPicker, { getProductColors } from "@/features/store/components/ColorPicker";
 import {
     buildInitialState,
     buildSelectionsPayload,
@@ -55,13 +56,33 @@ export default function ProductDetailPage(): ReactElement {
     const [quoteQuantity, setQuoteQuantity] = useState<number>(1);
     const [added, setAdded] = useState<boolean>(false);
 
+    // Colour is required whenever the product has colour-tagged images.
+    const colors = product ? getProductColors(product) : [];
+    const colorRequired = colors.length > 0;
+    const [selectedColor, setSelectedColor] = useState<string | null>(null);
+    const [showColorError, setShowColorError] = useState<boolean>(false);
+    const colorMissing = colorRequired && !selectedColor;
+
+    useEffect(() => {
+        setSelectedColor(null);
+        setShowColorError(false);
+    }, [productId]);
+
     const handleAddToQuote = (): void => {
         if (!product) return;
+        if (colorMissing) {
+            setShowColorError(true);
+            return;
+        }
+        const colorImage = selectedColor
+            ? product.images.find((img) => img.color_name === selectedColor && img.image_url)
+            : undefined;
         addItem({
             productId: product.id,
             name: product.name,
-            imageUrl: product.primary_image_url,
+            imageUrl: colorImage?.image_url ?? product.primary_image_url,
             quantity: quoteQuantity,
+            color: selectedColor ?? "",
         });
         setAdded(true);
         setTimeout(() => setAdded(false), 2000);
@@ -148,6 +169,10 @@ export default function ProductDetailPage(): ReactElement {
     const isQuoteOnly = product.pricing_mode === "quote_only";
 
     const handleOrder = (): void => {
+        if (colorMissing) {
+            setShowColorError(true);
+            return;
+        }
         void (async () => {
             setIsPricing(true);
             setPriceError(null);
@@ -198,7 +223,7 @@ export default function ProductDetailPage(): ReactElement {
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_480px] gap-8 lg:gap-16 items-start">
 
                     {/* LEFT — image gallery */}
-                    <ProductImageGallery product={product} />
+                    <ProductImageGallery product={product} selectedColor={selectedColor} />
 
                     {/* RIGHT — config + purchase */}
                     <div className="lg:sticky lg:top-6 space-y-5">
@@ -260,6 +285,19 @@ export default function ProductDetailPage(): ReactElement {
                                     </span>
                                 ))}
                             </div>
+                        )}
+
+                        {/* Colour (required when the product has colour-tagged images) */}
+                        {colorRequired && (
+                            <ColorPicker
+                                colors={colors}
+                                selected={selectedColor}
+                                onSelect={(name) => {
+                                    setSelectedColor(name);
+                                    setShowColorError(false);
+                                }}
+                                showError={showColorError}
+                            />
                         )}
 
                         {/* Configuration or quote */}

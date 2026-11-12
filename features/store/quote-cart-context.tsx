@@ -6,24 +6,32 @@ import type { ReactElement, ReactNode } from "react";
 const STORAGE_KEY = "printduka_quote_cart";
 
 export interface QuoteCartItem {
+    /** Unique per product + colour, so the same product in two colours is two lines. */
+    key: string;
     productId: number;
     name: string;
     imageUrl: string | null;
     quantity: number;
     notes: string;
+    /** Colour chosen on the product page (blank when the product has no colours). */
+    color: string;
 }
+
+type NewQuoteCartItem = Omit<QuoteCartItem, "notes" | "key" | "color"> & { color?: string };
 
 interface QuoteCartContextValue {
     items: QuoteCartItem[];
     count: number;
-    addItem: (item: Omit<QuoteCartItem, "notes">) => void;
-    updateQuantity: (productId: number, quantity: number) => void;
-    updateNotes: (productId: number, notes: string) => void;
-    removeItem: (productId: number) => void;
+    addItem: (item: NewQuoteCartItem) => void;
+    updateQuantity: (key: string, quantity: number) => void;
+    updateNotes: (key: string, notes: string) => void;
+    removeItem: (key: string) => void;
     clearCart: () => void;
 }
 
 const QuoteCartContext = createContext<QuoteCartContextValue | null>(null);
+
+const itemKey = (productId: number, color: string): string => `${productId}:${color}`;
 
 function readStoredCart(): QuoteCartItem[] {
     if (typeof window === "undefined") return [];
@@ -31,7 +39,17 @@ function readStoredCart(): QuoteCartItem[] {
         const raw = window.localStorage.getItem(STORAGE_KEY);
         if (!raw) return [];
         const parsed = JSON.parse(raw) as unknown;
-        return Array.isArray(parsed) ? (parsed as QuoteCartItem[]) : [];
+        if (!Array.isArray(parsed)) return [];
+        // Carts saved before colours existed have no key/color — fill them in.
+        return (parsed as Array<Partial<QuoteCartItem> & { productId: number }>).map((i) => ({
+            productId: i.productId,
+            name: i.name ?? "",
+            imageUrl: i.imageUrl ?? null,
+            quantity: i.quantity ?? 1,
+            notes: i.notes ?? "",
+            color: i.color ?? "",
+            key: i.key ?? itemKey(i.productId, i.color ?? ""),
+        }));
     } catch {
         return [];
     }
@@ -55,30 +73,28 @@ export function QuoteCartProvider({ children }: { children: ReactNode }): ReactE
         }
     }, [items, hydrated]);
 
-    const addItem = useCallback((item: Omit<QuoteCartItem, "notes">) => {
+    const addItem = useCallback((item: NewQuoteCartItem) => {
+        const color = item.color ?? "";
+        const key = itemKey(item.productId, color);
         setItems((prev) => {
-            const existing = prev.find((i) => i.productId === item.productId);
+            const existing = prev.find((i) => i.key === key);
             if (existing) {
-                return prev.map((i) =>
-                    i.productId === item.productId ? { ...i, quantity: i.quantity + item.quantity } : i,
-                );
+                return prev.map((i) => (i.key === key ? { ...i, quantity: i.quantity + item.quantity } : i));
             }
-            return [...prev, { ...item, notes: "" }];
+            return [...prev, { ...item, color, key, notes: "" }];
         });
     }, []);
 
-    const updateQuantity = useCallback((productId: number, quantity: number) => {
-        setItems((prev) =>
-            prev.map((i) => (i.productId === productId ? { ...i, quantity: Math.max(1, quantity) } : i)),
-        );
+    const updateQuantity = useCallback((key: string, quantity: number) => {
+        setItems((prev) => prev.map((i) => (i.key === key ? { ...i, quantity: Math.max(1, quantity) } : i)));
     }, []);
 
-    const updateNotes = useCallback((productId: number, notes: string) => {
-        setItems((prev) => prev.map((i) => (i.productId === productId ? { ...i, notes } : i)));
+    const updateNotes = useCallback((key: string, notes: string) => {
+        setItems((prev) => prev.map((i) => (i.key === key ? { ...i, notes } : i)));
     }, []);
 
-    const removeItem = useCallback((productId: number) => {
-        setItems((prev) => prev.filter((i) => i.productId !== productId));
+    const removeItem = useCallback((key: string) => {
+        setItems((prev) => prev.filter((i) => i.key !== key));
     }, []);
 
     const clearCart = useCallback(() => setItems([]), []);
