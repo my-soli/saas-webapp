@@ -61,11 +61,14 @@ function AdminCreateQuotePageContent() {
     const editId = searchParams.get("edit");
     const isEditMode = !!editId;
     const quoteId = editId ? Number(editId) : null;
+    // Pre-fill from a storefront quote request (/admin/quote-requests → Create quote).
+    const prefillLeadId = searchParams.get("lead");
+    const prefillRef = searchParams.get("ref");
 
-    const [clientType, setClientType] = useState<"client" | "lead">("client");
+    const [clientType, setClientType] = useState<"client" | "lead">(!editId && prefillLeadId ? "lead" : "client");
     const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-    const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
-    const [referenceNumber, setReferenceNumber] = useState("");
+    const [selectedLeadId, setSelectedLeadId] = useState<number | null>(!editId && prefillLeadId ? Number(prefillLeadId) || null : null);
+    const [referenceNumber, setReferenceNumber] = useState(!editId && prefillRef ? prefillRef : "");
     const [projectName, setProjectName] = useState("");
     const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split("T")[0]);
     const [expiryDate, setExpiryDate] = useState(

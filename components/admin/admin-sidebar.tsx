@@ -35,6 +35,7 @@ import {
     Banknote,
     Globe,
     Megaphone,
+    Inbox,
 } from "lucide-react";
 import { logoutUserSession } from "@/lib/api/auth";
 import PortalSwitcher from "@/components/shared/PortalSwitcher";
@@ -65,6 +66,7 @@ const menuSections: MenuSection[] = [
             { label: "Clients", href: "/admin/clients", icon: UserCircle },
             { label: "Leads", href: "/admin/leads", icon: Users },
             { label: "Quotes", href: "/admin/quotes", icon: FileText },
+            { label: "Quote Requests", href: "/admin/quote-requests", icon: Inbox },
             { label: "Payments", href: "/admin/payments", icon: CreditCard },
         ],
     },
