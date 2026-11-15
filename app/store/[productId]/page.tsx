@@ -25,6 +25,17 @@ import PriceSummary from "@/features/store/components/PriceSummary";
 import ProductInfoTable from "@/features/store/components/ProductInfoTable";
 import ProductFAQSection from "@/features/store/components/ProductFAQSection";
 import ColorPicker, { getProductColors } from "@/features/store/components/ColorPicker";
+import SizeQuantityGrid, {
+    getProductSizes,
+    totalSizeQuantity,
+    describeSizeQuantities,
+    type SizeQuantities,
+} from "@/features/store/components/SizeQuantityGrid";
+import PriceBreaks from "@/features/store/components/PriceBreaks";
+import DeliveryEstimate from "@/features/store/components/DeliveryEstimate";
+import RelatedProducts from "@/features/store/components/RelatedProducts";
+import { BulkQuoteCta, DesignServicesBanner, TrustBadge } from "@/features/store/components/ProductExtras";
+import { UploadCloudIcon } from "lucide-react";
 import {
     buildInitialState,
     buildSelectionsPayload,
@@ -63,29 +74,88 @@ export default function ProductDetailPage(): ReactElement {
     const [showColorError, setShowColorError] = useState<boolean>(false);
     const colorMissing = colorRequired && !selectedColor;
 
+    // Size + quantity grid — only for quote-only products that have a "Size" spec
+    // group. Auto-priced products keep Size as a normal priced option instead.
+    const sizes = product && product.pricing_mode === "quote_only" ? getProductSizes(product) : [];
+    const [sizeQty, setSizeQty] = useState<SizeQuantities>({});
+    const [showSizeError, setShowSizeError] = useState<boolean>(false);
+    const sizeTotal = totalSizeQuantity(sizeQty);
+
     useEffect(() => {
         setSelectedColor(null);
         setShowColorError(false);
+        setSizeQty({});
+        setShowSizeError(false);
     }, [productId]);
 
-    const handleAddToQuote = (): void => {
-        if (!product) return;
-        if (colorMissing) {
-            setShowColorError(true);
-            return;
+    /** Human-readable summary of the options picked in the configurator. */
+    const describeConfiguration = (): string => {
+        if (!product) return "";
+        const parts: string[] = [];
+        for (const g of visibleGroups) {
+            const s = groupStates[g.id];
+            if (!s) continue;
+            const label = g.display_label || g.name;
+            const optName = (id: number | null): string | undefined => g.options.find((o) => o.id === id)?.name;
+            let value: string | undefined;
+            if (g.group_type === "multi_select_modifier") {
+                value = s.multiOptions.map((id) => optName(id)).filter(Boolean).join(", ") || undefined;
+            } else if (g.group_type === "numeric_input") {
+                value = s.numericValue.trim() || undefined;
+            } else if (g.group_type === "dimension_input") {
+                value = s.dimValue.width && s.dimValue.height ? `${s.dimValue.width} × ${s.dimValue.height} ${g.dim_unit}` : undefined;
+            } else if (g.group_type !== "display_only") {
+                value = optName(s.singleOption);
+            }
+            if (value) parts.push(`${label}: ${value}`);
         }
+        return parts.join(" · ");
+    };
+
+    /** Quantity picked in the configurator's Quantity Tier group, if any. */
+    const tierQuantity = (): number | null => {
+        const g = visibleGroups.find((grp) => grp.group_type === "quantity_tier");
+        const opt = g?.options.find((o) => o.id === groupStates[g.id]?.singleOption);
+        return opt?.quantity_value ?? null;
+    };
+
+    /** Validate colour/sizes and add the configured product to the quote request.
+     *  Returns false (and shows the relevant hint) when something required is missing. */
+    const addConfiguredToQuote = (): boolean => {
+        if (!product) return false;
+        let ok = true;
+        if (colorMissing) { setShowColorError(true); ok = false; }
+        if (sizes.length > 0 && sizeTotal === 0) { setShowSizeError(true); ok = false; }
+        if (!ok) return false;
+
         const colorImage = selectedColor
             ? product.images.find((img) => img.color_name === selectedColor && img.image_url)
             : undefined;
+        const sizeDesc = sizes.length > 0 ? describeSizeQuantities(sizes, sizeQty) : "";
+        const config = isQuoteOnly ? "" : describeConfiguration();
         addItem({
             productId: product.id,
             name: product.name,
             imageUrl: colorImage?.image_url ?? product.primary_image_url,
-            quantity: quoteQuantity,
+            quantity: sizeTotal || (isQuoteOnly ? quoteQuantity : tierQuantity() ?? quoteQuantity),
             color: selectedColor ?? "",
+            details: [sizeDesc && `Sizes: ${sizeDesc}`, config].filter(Boolean).join(" · "),
         });
+        return true;
+    };
+
+    const handleAddToQuote = (): void => {
+        if (!addConfiguredToQuote()) return;
         setAdded(true);
         setTimeout(() => setAdded(false), 2000);
+    };
+
+    const handleUploadDesign = (): void => {
+        if (addConfiguredToQuote()) router.push("/store/quote-request#artwork");
+    };
+
+    const handleBulkQuote = (): void => {
+        if (addConfiguredToQuote()) router.push("/store/quote-request");
     };
 
     useEffect(() => {
@@ -287,6 +357,9 @@ export default function ProductDetailPage(): ReactElement {
                             </div>
                         )}
 
+                        {/* Ready-by estimate */}
+                        <DeliveryEstimate product={product} />
+
                         {/* Colour (required when the product has colour-tagged images) */}
                         {colorRequired && (
                             <ColorPicker
@@ -300,6 +373,23 @@ export default function ProductDetailPage(): ReactElement {
                             />
                         )}
 
+                        {/* Size + quantity grid (products with sizes configured) */}
+                        {sizes.length > 0 && (
+                            <SizeQuantityGrid
+                                product={product}
+                                sizes={sizes}
+                                value={sizeQty}
+                                onChange={(v) => {
+                                    setSizeQty(v);
+                                    setShowSizeError(false);
+                                }}
+                                showError={showSizeError}
+                            />
+                        )}
+
+                        {/* Quantity price breaks (auto-priced products with tiers) */}
+                        {!isQuoteOnly && <PriceBreaks product={product} />}
+
                         {/* Configuration or quote */}
                         {isQuoteOnly ? (
                             <div className="rounded-2xl bg-gray-50 p-5 space-y-3">
@@ -308,17 +398,20 @@ export default function ProductDetailPage(): ReactElement {
                                     Add it to your quote request with the quantity you need — our team will confirm
                                     availability and get back to you with a tailored price.
                                 </p>
-                                <div className="flex items-center gap-3">
-                                    <label className="text-sm text-gray-600" htmlFor="quote-quantity">Quantity</label>
-                                    <input
-                                        id="quote-quantity"
-                                        type="number"
-                                        min={1}
-                                        value={quoteQuantity}
-                                        onChange={(e) => setQuoteQuantity(Math.max(1, Number(e.target.value) || 1))}
-                                        className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                                    />
-                                </div>
+                                {/* Single quantity box — replaced by the size grid above when the product has sizes */}
+                                {sizes.length === 0 && (
+                                    <div className="flex items-center gap-3">
+                                        <label className="text-sm text-gray-600" htmlFor="quote-quantity">Quantity</label>
+                                        <input
+                                            id="quote-quantity"
+                                            type="number"
+                                            min={1}
+                                            value={quoteQuantity}
+                                            onChange={(e) => setQuoteQuantity(Math.max(1, Number(e.target.value) || 1))}
+                                            className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                                        />
+                                    </div>
+                                )}
                                 <button
                                     type="button"
                                     onClick={handleAddToQuote}
@@ -354,6 +447,19 @@ export default function ProductDetailPage(): ReactElement {
                                 />
                             </div>
                         )}
+
+                        {/* Upload your design → adds to quote and jumps to the artwork upload */}
+                        <button
+                            type="button"
+                            onClick={handleUploadDesign}
+                            className="w-full inline-flex items-center justify-center gap-2 rounded-xl border-2 border-brand-blue px-5 py-3 text-sm font-bold text-brand-blue hover:bg-brand-blue/5 transition-colors"
+                        >
+                            <UploadCloudIcon className="h-4 w-4" />
+                            Upload your design
+                        </button>
+
+                        <BulkQuoteCta onRequest={handleBulkQuote} />
+                        <TrustBadge />
                     </div>
                 </div>
 
@@ -389,6 +495,12 @@ export default function ProductDetailPage(): ReactElement {
                         <ProductFAQSection faqs={product.faqs} />
                     </div>
                 )}
+
+                {/* Design services + related products */}
+                <div className="mt-16 space-y-12">
+                    <DesignServicesBanner />
+                    <RelatedProducts product={product} />
+                </div>
             </div>
         </div>
     );

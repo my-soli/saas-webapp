@@ -38,8 +38,16 @@ export default function QuoteRequestPage(): ReactElement {
 
     const handleSubmit = async (): Promise<void> => {
         if (items.length === 0) return;
-        if (!name.trim() || !email.trim() || !phone.trim()) {
-            setError("Please fill in your name, email, and phone number.");
+        if (!name.trim()) {
+            setError("Please enter your name.");
+            return;
+        }
+        if (!email.trim() && !phone.trim()) {
+            setError("Please enter your email or phone number so we can reach you.");
+            return;
+        }
+        if (email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            setError("Please enter a valid email address.");
             return;
         }
         setError(null);
@@ -58,7 +66,7 @@ export default function QuoteRequestPage(): ReactElement {
                     quantity: item.quantity,
                     // Colour picked on the product page travels in the line's notes,
                     // which the sales team already sees on the request.
-                    notes: [item.color && `Colour: ${item.color}`, item.notes.trim()].filter(Boolean).join(" — "),
+                    notes: [item.color && `Colour: ${item.color}`, item.details, item.notes.trim()].filter(Boolean).join(" — "),
                 })),
                 specialNotes.trim(),
             );
@@ -152,6 +160,9 @@ export default function QuoteRequestPage(): ReactElement {
                                     {item.color && (
                                         <p className="mt-0.5 text-xs text-gray-500">Colour: <span className="font-medium text-gray-700">{item.color}</span></p>
                                     )}
+                                    {item.details && (
+                                        <p className="mt-0.5 text-xs text-gray-500">{item.details}</p>
+                                    )}
                                 </div>
                                 <button
                                     type="button"
@@ -186,7 +197,7 @@ export default function QuoteRequestPage(): ReactElement {
             </div>
 
             {/* Artwork upload */}
-            <div className="mt-8">
+            <div id="artwork" className="mt-8 scroll-mt-24">
                 <h2 className="text-sm font-bold text-gray-900 mb-2">Logo / Artwork (optional)</h2>
                 <label className="flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 py-8 cursor-pointer hover:border-brand-blue/40 transition-colors">
                     <UploadCloudIcon className="h-7 w-7 text-gray-300" />
@@ -212,10 +223,11 @@ export default function QuoteRequestPage(): ReactElement {
                 <h2 className="text-sm font-bold text-gray-900 mb-3">Your Details</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input type="text" placeholder="Full name *" value={name} onChange={(e) => setName(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30" />
-                    <input type="email" placeholder="Email *" value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30" />
-                    <input type="tel" placeholder="Phone *" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30" />
+                    <input type="email" placeholder="Email (or phone) *" value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30" />
+                    <input type="tel" placeholder="Phone (or email) *" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30" />
                     <input type="text" placeholder="Company (optional)" value={company} onChange={(e) => setCompany(e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/30" />
                 </div>
+                <p className="mt-2 text-xs text-gray-500">Give us at least an email or a phone number. Both is best.</p>
                 <textarea
                     placeholder="Anything else we should know? (optional)"
                     value={specialNotes}

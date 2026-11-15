@@ -15,9 +15,11 @@ export interface QuoteCartItem {
     notes: string;
     /** Colour chosen on the product page (blank when the product has no colours). */
     color: string;
+    /** Size breakdown / chosen options from the product page, e.g. "S×10, M×20". */
+    details: string;
 }
 
-type NewQuoteCartItem = Omit<QuoteCartItem, "notes" | "key" | "color"> & { color?: string };
+type NewQuoteCartItem = Omit<QuoteCartItem, "notes" | "key" | "color" | "details"> & { color?: string; details?: string };
 
 interface QuoteCartContextValue {
     items: QuoteCartItem[];
@@ -31,7 +33,7 @@ interface QuoteCartContextValue {
 
 const QuoteCartContext = createContext<QuoteCartContextValue | null>(null);
 
-const itemKey = (productId: number, color: string): string => `${productId}:${color}`;
+const itemKey = (productId: number, color: string, details = ""): string => `${productId}:${color}:${details}`;
 
 function readStoredCart(): QuoteCartItem[] {
     if (typeof window === "undefined") return [];
@@ -48,7 +50,8 @@ function readStoredCart(): QuoteCartItem[] {
             quantity: i.quantity ?? 1,
             notes: i.notes ?? "",
             color: i.color ?? "",
-            key: i.key ?? itemKey(i.productId, i.color ?? ""),
+            details: i.details ?? "",
+            key: i.key ?? itemKey(i.productId, i.color ?? "", i.details ?? ""),
         }));
     } catch {
         return [];
@@ -75,13 +78,17 @@ export function QuoteCartProvider({ children }: { children: ReactNode }): ReactE
 
     const addItem = useCallback((item: NewQuoteCartItem) => {
         const color = item.color ?? "";
-        const key = itemKey(item.productId, color);
+        const details = item.details ?? "";
+        const key = itemKey(item.productId, color, details);
         setItems((prev) => {
             const existing = prev.find((i) => i.key === key);
+            // A size breakdown is an exact spec — re-adding it replaces rather than doubles it.
             if (existing) {
-                return prev.map((i) => (i.key === key ? { ...i, quantity: i.quantity + item.quantity } : i));
+                return prev.map((i) => (i.key === key
+                    ? { ...i, quantity: details ? item.quantity : i.quantity + item.quantity }
+                    : i));
             }
-            return [...prev, { ...item, color, key, notes: "" }];
+            return [...prev, { ...item, color, details, key, notes: "" }];
         });
     }, []);
 

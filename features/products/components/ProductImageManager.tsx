@@ -83,6 +83,18 @@ async function updateColor(imageId: number, color_name: string, color_hex: strin
     return response.json() as Promise<ProductImage>;
 }
 
+async function updateImageType(imageId: number, image_type: string): Promise<ProductImage> {
+    const csrf = await getCsrfToken();
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-images/${imageId}/`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify({ image_type }),
+    });
+    if (!response.ok) throw new Error(await extractErrorMessage(response, "Failed to update image"));
+    return response.json() as Promise<ProductImage>;
+}
+
 async function deleteImage(imageId: number): Promise<void> {
     const csrf = await getCsrfToken();
     const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-images/${imageId}/`, {
@@ -277,6 +289,15 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
         onError: (err: Error) => toast.error(err.message || "Failed to update colour"),
     });
 
+    const typeMutation = useMutation({
+        mutationFn: ({ id, type }: { id: number; type: string }) => updateImageType(id, type),
+        onSuccess: (updated) => {
+            queryClient.setQueryData<ProductImage[]>(queryKey, (old) =>
+                old?.map((i) => (i.id === updated.id ? updated : i)));
+        },
+        onError: (err: Error) => toast.error(err.message || "Failed to update image"),
+    });
+
     const handleFiles = (files: FileList | null): void => {
         if (!files) return;
         const isPrimaryFirst = images.length === 0;
@@ -308,7 +329,9 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                     <h2 className="text-base font-semibold text-gray-900">Product Images</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
                         Upload multiple images. Click a thumbnail to set it as primary. Tag an image with a
-                        colour to show it as a colour swatch on the storefront.
+                        colour to show it as a colour swatch on the storefront. Tick &quot;Size chart&quot; on an
+                        image to show it behind the store&apos;s &quot;Size chart&quot; link (hidden from the gallery; shown when
+                        the product has a &quot;Size&quot; spec group).
                     </p>
                 </div>
             </div>
@@ -407,6 +430,19 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                             image={img}
                             onSave={(name, hex) => colorMutation.mutate({ id: img.id, name, hex })}
                         />
+                        <label className="flex items-center gap-1.5 text-[11px] text-gray-600 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={img.image_type === "size-comparison"}
+                                disabled={typeMutation.isPending && typeMutation.variables?.id === img.id}
+                                onChange={(e) => typeMutation.mutate({
+                                    id: img.id,
+                                    type: e.target.checked ? "size-comparison" : "product-photo",
+                                })}
+                                className="h-3 w-3 rounded border-gray-300"
+                            />
+                            Size chart
+                        </label>
                         </div>
                     ))}
                 </div>

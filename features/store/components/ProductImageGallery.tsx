@@ -12,9 +12,10 @@ interface ProductImageGalleryProps {
     selectedColor?: string | null;
 }
 
-/** Images in display order: primary first, then display_order. Shared with the colour picker. */
+/** Gallery images in display order: primary first, then display_order. Size-chart
+ *  images are left out (they're shown behind the "Size chart" link instead). */
 export function sortProductImages(product: CatalogProduct): CatalogProduct["images"] {
-    return [...product.images].sort((a, b) => {
+    return product.images.filter((img) => img.image_type !== "size-comparison").sort((a, b) => {
         if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
         return a.display_order - b.display_order;
     });
