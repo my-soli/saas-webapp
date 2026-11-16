@@ -121,8 +121,9 @@ export async function fetchActionCenter(): Promise<import("@/types/dashboard").A
     return response.json();
 }
 
-export async function fetchDashboardReports(months = 12): Promise<import("@/types/dashboard").DashboardReports> {
-    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/dashboard/reports/?months=${months}`, {
+export async function fetchDashboardReports(months = 12, range?: { start: string; end: string }): Promise<import("@/types/dashboard").DashboardReports> {
+    const qs = range ? `start=${range.start}&end=${range.end}` : `months=${months}`;
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/dashboard/reports/?${qs}`, {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         cache: "no-store",
@@ -133,5 +134,42 @@ export async function fetchDashboardReports(months = 12): Promise<import("@/type
         throw new Error(`Failed to fetch dashboard reports: ${response.status} ${errorText}`);
     }
 
+    return response.json();
+}
+
+async function getJson<T>(path: string, what: string): Promise<T> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/${path}`, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+    });
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to fetch ${what}: ${response.status} ${errorText}`);
+    }
+    return response.json();
+}
+
+export function fetchDashboardInsights(start: string, end: string): Promise<import("@/types/dashboard").DashboardInsights> {
+    return getJson(`dashboard/insights/?start=${start}&end=${end}`, "dashboard insights");
+}
+
+export function fetchActivityFeed(): Promise<{ results: import("@/types/dashboard").ActivityFeedItem[] }> {
+    return getJson("dashboard/activity-feed/", "activity feed");
+}
+
+export async function setRevenueTarget(target: number): Promise<import("@/types/dashboard").RevenueTarget> {
+    const { getCsrfToken } = await import("@/lib/api/auth");
+    const csrf = await getCsrfToken();
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/dashboard/target/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(csrf ? { "X-CSRFToken": csrf } : {}) },
+        credentials: "include",
+        body: JSON.stringify({ target }),
+    });
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(errorText || "Failed to save target");
+    }
     return response.json();
 }

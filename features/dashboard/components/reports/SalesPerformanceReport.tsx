@@ -25,7 +25,8 @@ type Breakdown = "clients" | "products";
 interface Props {
     reports: DashboardReports;
     months: number;
-    onMonthsChange: (months: number) => void;
+    /** Omit when a page-level date range controls the period. */
+    onMonthsChange?: (months: number) => void;
     isFetching?: boolean;
     basePath?: string;
 }
@@ -102,6 +103,12 @@ export default function SalesPerformanceReport({ reports, months, onMonthsChange
     return (
         <Card
             title="Sales Performance"
+            exportName="sales-by-month"
+            exportRows={(): Record<string, string | number>[] => data.map((m) => ({
+                Month: m.month, Revenue: Math.round(m.revenue), Orders: m.orders, Invoiced: Math.round(m.invoiced),
+                Collected: Math.round(m.collected), "Quotes created": m.quotes_created, "Quotes approved": m.quotes_approved,
+                "Quotes lost": m.quotes_lost, "Jobs created": m.jobs_created, "Jobs completed": m.jobs_completed,
+            }))}
             subtitle={`${monthLabel(data[0]?.month ?? "", true)} – ${monthLabel(data[data.length - 1]?.month ?? "", true)} · click a month for its breakdown`}
             actions={
                 <>
@@ -125,7 +132,7 @@ export default function SalesPerformanceReport({ reports, months, onMonthsChange
                             { value: "table", label: "Table" },
                         ]}
                     />
-                    <Segmented
+                    {onMonthsChange && <Segmented
                         ariaLabel="Range"
                         value={months}
                         onChange={(v): void => { setSelected(null); onMonthsChange(v); }}
@@ -135,7 +142,7 @@ export default function SalesPerformanceReport({ reports, months, onMonthsChange
                             { value: 12, label: "12M" },
                             { value: 24, label: "24M" },
                         ]}
-                    />
+                    />}
                 </>
             }
         >
@@ -240,7 +247,7 @@ export default function SalesPerformanceReport({ reports, months, onMonthsChange
                     </div>
 
                     {/* Month breakdown */}
-                    <aside className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
+                    <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-4">
                         {focus ? (
                             <>
                                 <div className="flex items-center justify-between">
@@ -281,7 +288,7 @@ export default function SalesPerformanceReport({ reports, months, onMonthsChange
                         ) : (
                             <p className="text-sm text-gray-500">No data for this period.</p>
                         )}
-                    </aside>
+                    </div>
                 </div>
 
                 {/* Who and what drove it */}

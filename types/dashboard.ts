@@ -251,3 +251,79 @@ export interface DashboardReports {
     };
     job_metrics: { completed: number; on_time_rate: number | null };
 }
+
+export interface InsightJobItem { id: number; ref: string; client: string; name: string; owner: string | null; due: string | null }
+
+export interface RevenueTarget {
+    month: string;
+    target: number | null;
+    actual: number;
+    progress: number | null;
+    projected: number;
+    days_elapsed: number;
+    days_in_month: number;
+    last_year_to_date: number;
+    last_year_month: number;
+}
+
+export interface DashboardInsights {
+    start: string;
+    end: string;
+    receivables: {
+        total: number;
+        invoices: number;
+        buckets: { current: number; d1_30: number; d31_60: number; d61_90: number; d90_plus: number };
+        top_debtors: { id: number; name: string; balance: number; invoices: number; oldest_days: number }[];
+    };
+    profit: {
+        totals: { revenue: number; cost: number; profit: number; margin: number | null; costed_jobs: number; uncosted_jobs: number };
+        by_account_manager: { name: string; revenue: number; cost: number; profit: number; margin: number | null; jobs: number }[];
+        by_product: { name: string; revenue: number; cost: number; profit: number; margin: number | null }[];
+        lowest_margin_jobs: { quote_id: number; ref: string; job_id: number | null; job_number: string | null; client: string; revenue: number; cost: number; profit: number; margin: number | null }[];
+    };
+    today: {
+        due_today: { count: number; items: InsightJobItem[] };
+        due_tomorrow: { count: number; items: InsightJobItem[] };
+        due_this_week: { count: number; items: InsightJobItem[] };
+        dispatches_today: { count: number; items: { id: number; ref: string; client: string; location: string; status: string }[] };
+        quotes_expiring: { count: number; items: { id: number; ref: string; client: string; valid_until: string; value: number }[] };
+    };
+    capacity: {
+        team: { id: number; name: string; open_jobs: number; overdue: number; due_this_week: number; open_items: number }[];
+        unassigned_jobs: number;
+        next_14_days: { date: string; jobs: number }[];
+        avg_per_day: number;
+    };
+    team: {
+        sales: { name: string; created: number; sent: number; approved: number; lost: number; approved_value: number; win_rate: number | null; avg_days_to_send: number | null }[];
+        production: { name: string; completed: number; on_time: number; on_time_rate: number | null }[];
+    };
+    vendors: {
+        vendors: { id: number; name: string; spend: number; orders: number; completed: number; late: number; late_rate: number | null; avg_days_late: number }[];
+        total_spend: number;
+        overdue_orders: number;
+        unpaid_invoices: { count: number; total: number; items: { id: number; ref: string; vendor: string; amount: number; due: string | null; status: string }[] };
+    };
+    funnel: {
+        leads: { total: number; converted: number; conversion: number | null; by_source: { source: string; leads: number; converted: number; conversion: number | null }[]; by_status: Record<string, number> };
+        storefront: { requests: number; by_status: Record<string, number>; converted_to_quote: number; online_quotes: number; online_quotes_approved: number };
+    };
+    clients: {
+        new_clients: number;
+        buying_clients: number;
+        repeat_clients: number;
+        first_time_buyers: number;
+        top_clients: { id: number; name: string; this_month: number; last_month: number }[];
+        quiet_clients: { id: number; name: string; last_order: string; days_quiet: number; lifetime_value: number; orders: number }[];
+    };
+    target: RevenueTarget;
+}
+
+export interface ActivityFeedItem {
+    at: string;
+    type: string;
+    title: string;
+    detail: string;
+    by: string | null;
+    link: string | null;
+}

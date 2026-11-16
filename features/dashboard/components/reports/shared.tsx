@@ -75,15 +75,66 @@ export function Stat({ label, value, hint, tone }: { label: string; value: React
     );
 }
 
-export function Card({ title, subtitle, actions, children }: { title: string; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode }): ReactElement {
+export type CsvRow = Record<string, string | number | null | undefined>;
+
+/** Download rows as a CSV file (Excel-friendly, UTF-8 with BOM). */
+export function downloadCsv(filename: string, rows: CsvRow[]): void {
+    if (rows.length === 0) return;
+    const headers = Object.keys(rows[0]);
+    const esc = (v: unknown): string => {
+        const s = v === null || v === undefined ? "" : String(v);
+        return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers.join(","), ...rows.map((r) => headers.map((h) => esc(r[h])).join(","))].join("\r\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+
+export function Card({
+    title,
+    subtitle,
+    actions,
+    children,
+    exportName,
+    exportRows,
+}: {
+    title: string;
+    subtitle?: ReactNode;
+    actions?: ReactNode;
+    children: ReactNode;
+    /** When given, a CSV button downloads these rows. */
+    exportName?: string;
+    exportRows?: () => CsvRow[];
+}): ReactElement {
     return (
-        <article className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <article className="flex h-full flex-col rounded-2xl border border-gray-200 bg-white shadow-sm break-inside-avoid">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-gray-100 px-5 py-4">
                 <div className="min-w-0">
                     <h2 className="text-base font-semibold text-gray-900">{title}</h2>
                     {subtitle && <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>}
                 </div>
-                {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+                {(actions || exportRows) && (
+                    <div className="flex flex-wrap items-center gap-2" data-print-hide>
+                        {actions}
+                        {exportRows && (
+                            <button
+                                type="button"
+                                onClick={(): void => downloadCsv(exportName ?? title, exportRows())}
+                                className="rounded-lg border border-gray-200 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:border-brand-blue hover:text-brand-blue"
+                                title="Download as CSV"
+                            >
+                                CSV
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
             <div className="flex-1 p-5">{children}</div>
         </article>

@@ -64,6 +64,8 @@ export default function QuotePerformanceReport({ reports, basePath = "/admin" }:
 
     return (
         <Card
+            exportName="quotes-by-status"
+            exportRows={(): Record<string, string | number>[] => STATUS_ORDER.map((r) => ({ Status: r.label, Quotes: by[r.status] ?? 0 }))}
             title="Quote Performance"
             subtitle={`${total} quotes · click a stage or status to open the list`}
             actions={

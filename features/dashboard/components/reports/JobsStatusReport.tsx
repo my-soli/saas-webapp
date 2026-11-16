@@ -62,6 +62,8 @@ export default function JobsStatusReport({ reports, basePath = "/admin" }: Props
 
     return (
         <Card
+            exportName="jobs-by-status"
+            exportRows={(): Record<string, string | number>[] => rows.map((r) => ({ Status: r.label, Jobs: r.value }))}
             title="Jobs"
             subtitle={`${total} total · ${active} still open · click a status to see those jobs`}
             actions={
