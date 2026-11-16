@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Plus } from "lucide-react";
@@ -44,6 +44,20 @@ export default function AdminQuotesPage() {
     const [generateInvoiceQuoteId, setGenerateInvoiceQuoteId] = useState<number | null>(null);
     const [deleteConfirmQuoteId, setDeleteConfirmQuoteId] = useState<number | null>(null);
     const queryClient = useQueryClient();
+    const [pendingOpenId, setPendingOpenId] = useState<number | null>(null);
+
+    // Deep links from the dashboard: ?status=Approved filters the list,
+    // ?open=<id> opens that quote's detail view once it has loaded.
+    useEffect((): void => {
+        const params = new URLSearchParams(window.location.search);
+        const statusParam = params.get("status");
+        const allowed: QuoteStatus[] = ["Draft", "Sent to PT", "Costed", "Sent to Customer", "Approved", "Lost", "Rejected"];
+        if (statusParam && allowed.includes(statusParam as QuoteStatus)) {
+            setStatusFilter(statusParam as QuoteStatus);
+        }
+        const openParam = Number(params.get("open"));
+        if (openParam) setPendingOpenId(openParam);
+    }, []);
 
     const { data: stats, isLoading: statsLoading } = useQuery({
         queryKey: ["quote-stats"],
@@ -54,6 +68,17 @@ export default function AdminQuotesPage() {
         queryKey: ["multi-product-quotes", statusFilter, searchQuery],
         queryFn: () => fetchMultiProductQuotes(statusFilter, searchQuery),
     });
+
+    useEffect((): void => {
+        if (!pendingOpenId || quotesLoading) return;
+        const match = quotes.find((q) => q.id === pendingOpenId);
+        if (match) {
+            setSelectedQuote(match);
+        } else {
+            toast.info("That quote isn't in the current list. Try searching for it.");
+        }
+        setPendingOpenId(null);
+    }, [pendingOpenId, quotes, quotesLoading]);
 
     const cloneMutation = useMutation({
         mutationFn: cloneQuote,

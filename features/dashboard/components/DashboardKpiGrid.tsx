@@ -1,4 +1,5 @@
 import type { ReactElement } from "react";
+import Link from "next/link";
 import {
     BriefcaseBusinessIcon,
     ClipboardCheckIcon,
@@ -10,15 +11,18 @@ import type { DashboardAnalytics, DashboardOverview } from "@/types/dashboard";
 interface DashboardKpiGridProps {
     overview: DashboardOverview;
     analytics: DashboardAnalytics;
+    /** When set (e.g. "/admin"), each card links to the page behind it. */
+    basePath?: string;
 }
 
-export default function DashboardKpiGrid({ overview, analytics }: DashboardKpiGridProps): ReactElement {
+export default function DashboardKpiGrid({ overview, analytics, basePath }: DashboardKpiGridProps): ReactElement {
     const totalRevenue = Number(analytics.dashboard_stats.total_revenue || 0);
     const revenueTrend = Number(analytics.dashboard_stats.revenue_trend || 0);
 
     const cards = [
         {
             label: "Monthly Revenue",
+            path: "/financial",
             value: `KES ${totalRevenue.toLocaleString("en-US", {
                 maximumFractionDigits: 0,
             })}`,
@@ -31,6 +35,7 @@ export default function DashboardKpiGrid({ overview, analytics }: DashboardKpiGr
         },
         {
             label: "Jobs In Progress",
+            path: "/jobs",
             value: overview.jobs.in_progress.toLocaleString("en-US"),
             trend: `${overview.jobs.pending} pending approval`,
             icon: BriefcaseBusinessIcon,
@@ -39,6 +44,7 @@ export default function DashboardKpiGrid({ overview, analytics }: DashboardKpiGr
         },
         {
             label: "Pending Orders",
+            path: "/lpos",
             value: overview.lpos.pending.toLocaleString("en-US"),
             trend: `${overview.lpos.approved} approved`,
             icon: ClipboardCheckIcon,
@@ -47,6 +53,7 @@ export default function DashboardKpiGrid({ overview, analytics }: DashboardKpiGr
         },
         {
             label: "Active Quotes",
+            path: "/quotes",
             value: overview.quotes.total.toLocaleString("en-US"),
             trend: `${overview.quotes.approved} approved · ${overview.quotes.lost} lost`,
             icon: FileTextIcon,
@@ -59,10 +66,11 @@ export default function DashboardKpiGrid({ overview, analytics }: DashboardKpiGr
         <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
             {cards.map((card): ReactElement => {
                 const Icon = card.icon;
-                return (
+                const body = (
                     <article
-                        key={card.label}
-                        className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
+                        className={`h-full rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-all ${
+                            basePath ? "hover:-translate-y-0.5 hover:border-brand-blue/30 hover:shadow-md" : "hover:shadow-md"
+                        }`}
                     >
                         <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
@@ -77,6 +85,13 @@ export default function DashboardKpiGrid({ overview, analytics }: DashboardKpiGr
                             </div>
                         </div>
                     </article>
+                );
+                return basePath ? (
+                    <Link key={card.label} href={`${basePath}${card.path}`} className="block">
+                        {body}
+                    </Link>
+                ) : (
+                    <div key={card.label}>{body}</div>
                 );
             })}
         </section>

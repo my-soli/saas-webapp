@@ -426,8 +426,11 @@ export const deleteDispatchUnit = (unitId: number): Promise<void> =>
 export const approveDispatch = (unitId: number): Promise<DispatchUnit> =>
     post<DispatchUnit>(`dispatch-units/${unitId}/approve/`);
 
-export const markDelivered = (unitId: number, podSignedBy: string): Promise<DispatchUnit> =>
-    post<DispatchUnit>(`dispatch-units/${unitId}/mark_delivered/`, { pod_signed_by: podSignedBy });
+export const markDelivered = (unitId: number, podSignedBy: string, deliveredAt?: string): Promise<DispatchUnit> =>
+    post<DispatchUnit>(`dispatch-units/${unitId}/mark_delivered/`, {
+        pod_signed_by: podSignedBy,
+        ...(deliveredAt ? { delivered_at: deliveredAt } : {}),
+    });
 
 export const flagDispatchException = (unitId: number, notes: string): Promise<DispatchUnit> =>
     post<DispatchUnit>(`dispatch-units/${unitId}/flag_exception/`, { notes });

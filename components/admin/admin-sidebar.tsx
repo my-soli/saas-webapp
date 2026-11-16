@@ -67,7 +67,6 @@ const menuSections: MenuSection[] = [
             { label: "Leads", href: "/admin/leads", icon: Users },
             { label: "Quotes", href: "/admin/quotes", icon: FileText },
             { label: "Quote Requests", href: "/admin/quote-requests", icon: Inbox },
-            { label: "Payments", href: "/admin/payments", icon: CreditCard },
         ],
     },
     {
@@ -86,6 +85,7 @@ const menuSections: MenuSection[] = [
         title: "FINANCIAL",
         items: [
             { label: "Invoices", href: "/admin/financial", icon: Receipt },
+            { label: "Payments", href: "/admin/payments", icon: CreditCard },
             { label: "eTIMS Settings", href: "/admin/financial/etims-settings", icon: Settings },
             { label: "Tax Settings", href: "/admin/financial/tax-settings", icon: Percent },
             { label: "Expenses", href: "/admin/financial/expenses", icon: Wallet },

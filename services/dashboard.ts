@@ -105,3 +105,18 @@ export async function fetchAccountManagerDashboard(): Promise<AccountManagerDash
 
     return response.json();
 }
+
+export async function fetchActionCenter(): Promise<import("@/types/dashboard").ActionCenterResponse> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/dashboard/action-center/`, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to fetch action center: ${response.status} ${errorText}`);
+    }
+
+    return response.json();
+}

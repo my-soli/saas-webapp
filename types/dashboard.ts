@@ -190,3 +190,31 @@ export interface JobsChartPoint {
     status: string;
     count: number;
 }
+
+export type ActionCenterKind = "quote" | "job" | "dispatch" | "invoice";
+
+export interface ActionCenterItem {
+    id: number;
+    ref: string;
+    title: string;
+    subtitle: string;
+    amount?: number;
+    owner?: string | null;
+    due_date?: string | null;
+    job_id?: number;
+    age_days: number | null;
+}
+
+export interface ActionCenterSection {
+    key: string;
+    label: string;
+    kind: ActionCenterKind;
+    severity: "high" | "medium";
+    count: number;
+    items: ActionCenterItem[];
+}
+
+export interface ActionCenterResponse {
+    generated_at: string;
+    sections: ActionCenterSection[];
+}

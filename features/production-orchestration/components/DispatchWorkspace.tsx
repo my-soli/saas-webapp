@@ -15,6 +15,7 @@ import {
     PlusIcon,
     XIcon,
     PenLineIcon,
+    HistoryIcon,
     LinkIcon,
     CopyIcon,
     UserIcon,
@@ -142,11 +143,16 @@ ${unit.pod_signed_by ? `<p style="margin-top:24px;font-size:13px"><strong>POD Si
 interface NewDispatchModalProps {
     onClose: () => void;
     editUnit?: DispatchUnit;
+    /** Record a delivery that already happened but was never documented. */
+    pastDelivery?: boolean;
 }
 
-function NewDispatchModal({ onClose, editUnit }: NewDispatchModalProps): ReactElement {
+function NewDispatchModal({ onClose, editUnit, pastDelivery = false }: NewDispatchModalProps): ReactElement {
     const queryClient = useQueryClient();
     const isEdit = !!editUnit;
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const [deliveredOn, setDeliveredOn] = useState("");
+    const [receivedBy, setReceivedBy] = useState("");
 
     const [selectedJob, setSelectedJob] = useState<number | "">(editUnit?.job ?? "");
     const [dispatchType, setDispatchType] = useState(editUnit?.dispatch_type ?? DISPATCH_TYPES[0].value);
@@ -168,7 +174,13 @@ function NewDispatchModal({ onClose, editUnit }: NewDispatchModalProps): ReactEl
     });
 
     const createMut = useMutation({
-        mutationFn: (payload: CreateDispatchUnitPayload) => createDispatchUnit(payload),
+        mutationFn: async (payload: CreateDispatchUnitPayload) => {
+            const unit = await createDispatchUnit(payload);
+            if (pastDelivery) {
+                return markDelivered(unit.id, receivedBy.trim(), deliveredOn);
+            }
+            return unit;
+        },
         onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["dispatch-units"] }); onClose(); },
         onError: (err: Error) => setError(err.message),
     });
@@ -191,12 +203,17 @@ function NewDispatchModal({ onClose, editUnit }: NewDispatchModalProps): ReactEl
         setError("");
         if (!selectedJob) { setError("Please select a job."); return; }
         if (!deliveryLocation.trim()) { setError("Delivery location is required."); return; }
+        if (pastDelivery) {
+            if (!deliveredOn) { setError("Enter the date it was delivered."); return; }
+            if (deliveredOn > todayIso) { setError("Delivery date can't be in the future."); return; }
+            if (!receivedBy.trim()) { setError("Enter who received the delivery."); return; }
+        }
         const payload = {
             job: selectedJob as number,
             dispatch_type: dispatchType,
             courier: courier.trim(),
             delivery_location: deliveryLocation.trim(),
-            dispatch_date: dispatchDate || null,
+            dispatch_date: (pastDelivery ? dispatchDate || deliveredOn : dispatchDate) || null,
             components: selectedComponents,
         };
         if (isEdit) updateMut.mutate(payload);
@@ -214,8 +231,15 @@ function NewDispatchModal({ onClose, editUnit }: NewDispatchModalProps): ReactEl
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
                     <div className="flex items-center gap-3">
-                        <PackageCheckIcon className="h-5 w-5 text-brand-green" />
-                        <h2 className="text-lg font-bold text-gray-900">{isEdit ? `Edit ${editUnit!.dispatch_number}` : "New Dispatch Unit"}</h2>
+                        {pastDelivery ? <HistoryIcon className="h-5 w-5 text-brand-blue" /> : <PackageCheckIcon className="h-5 w-5 text-brand-green" />}
+                        <div>
+                            <h2 className="text-lg font-bold text-gray-900">
+                                {isEdit ? `Edit ${editUnit!.dispatch_number}` : pastDelivery ? "Record Past Delivery" : "New Dispatch Unit"}
+                            </h2>
+                            {pastDelivery && (
+                                <p className="text-xs text-gray-500">For a delivery that already happened but wasn&apos;t recorded. It&apos;s saved as delivered.</p>
+                            )}
+                        </div>
                     </div>
                     <button onClick={onClose} className="rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
                         <XIcon className="h-5 w-5" />
@@ -335,6 +359,31 @@ function NewDispatchModal({ onClose, editUnit }: NewDispatchModalProps): ReactEl
                         )}
                     </div>
 
+                    {pastDelivery && (
+                        <div className="grid grid-cols-1 gap-3 rounded-lg border border-brand-blue/20 bg-brand-blue/5 p-3 sm:grid-cols-2">
+                            <div>
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Delivered on *</label>
+                                <input
+                                    type="date"
+                                    value={deliveredOn}
+                                    max={todayIso}
+                                    onChange={(e) => setDeliveredOn(e.target.value)}
+                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Received by *</label>
+                                <input
+                                    type="text"
+                                    value={receivedBy}
+                                    onChange={(e) => setReceivedBy(e.target.value)}
+                                    placeholder="Name of person who received it"
+                                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-brand-blue focus:outline-none"
+                                />
+                            </div>
+                        </div>
+                    )}
+
                     {error && (
                         <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
                             <AlertCircleIcon className="h-4 w-4 shrink-0" />
@@ -357,8 +406,8 @@ function NewDispatchModal({ onClose, editUnit }: NewDispatchModalProps): ReactEl
                         className="flex items-center gap-2 rounded-lg bg-brand-green px-5 py-2 text-sm font-semibold text-white hover:bg-brand-green/90 disabled:opacity-50 transition-colors"
                     >
                         {isPending
-                            ? <><LoaderCircleIcon className="h-4 w-4 animate-spin" /> {isEdit ? "Saving…" : "Creating…"}</>
-                            : <><PackageCheckIcon className="h-4 w-4" /> {isEdit ? "Save Changes" : "Create Dispatch Unit"}</>
+                            ? <><LoaderCircleIcon className="h-4 w-4 animate-spin" /> {isEdit ? "Saving…" : pastDelivery ? "Recording…" : "Creating…"}</>
+                            : <><PackageCheckIcon className="h-4 w-4" /> {isEdit ? "Save Changes" : pastDelivery ? "Record Delivery" : "Create Dispatch Unit"}</>
                         }
                     </button>
                 </div>
@@ -542,6 +591,7 @@ export default function DispatchWorkspace(): ReactElement {
     const [flagNotes, setFlagNotes] = useState<Record<number, string>>({});
     const [showFlagInput, setShowFlagInput] = useState<Set<number>>(() => new Set());
     const [showNewModal, setShowNewModal] = useState(false);
+    const [showPastModal, setShowPastModal] = useState(false);
     const [editUnit, setEditUnit] = useState<DispatchUnit | null>(null);
     const [signatureUnit, setSignatureUnit] = useState<DispatchUnit | null>(null);
     const [deliveryLinks, setDeliveryLinks] = useState<{ dispatchNumber: string; riderLink: string; recipientLink: string } | null>(null);
@@ -610,6 +660,7 @@ export default function DispatchWorkspace(): ReactElement {
     return (
         <>
             {showNewModal && <NewDispatchModal onClose={() => setShowNewModal(false)} />}
+            {showPastModal && <NewDispatchModal pastDelivery onClose={() => setShowPastModal(false)} />}
             {editUnit && <NewDispatchModal onClose={() => setEditUnit(null)} editUnit={editUnit} />}
             {signatureUnit && (
                 <CaptureSignatureModal
@@ -655,6 +706,14 @@ export default function DispatchWorkspace(): ReactElement {
                         >
                             <PrinterIcon className="h-4 w-4" />
                             Download All Delivery Notes
+                        </button>
+                        <button
+                            onClick={() => setShowPastModal(true)}
+                            className="flex items-center gap-2 rounded-md border border-brand-blue px-4 py-2 text-sm font-semibold text-brand-blue hover:bg-brand-blue/5 transition-colors"
+                            title="Record a delivery that already happened but wasn't documented"
+                        >
+                            <HistoryIcon className="h-4 w-4" />
+                            Record Past Delivery
                         </button>
                         <button
                             onClick={() => setShowNewModal(true)}
