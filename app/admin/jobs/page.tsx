@@ -14,17 +14,17 @@ import JobsTable from "@/features/jobs/components/JobsTable";
 import JobsPagination from "@/features/jobs/components/JobsPagination";
 import JobsSkeleton from "@/features/jobs/components/JobsSkeleton";
 import JobsEmptyState from "@/features/jobs/components/JobsEmptyState";
-import AccountManagerJobAssignModal from "@/features/jobs/components/AccountManagerJobAssignModal";
+import AssignJobOwnerModal from "@/features/jobs/components/AssignJobOwnerModal";
 import {
     assignJobToProductionTeam,
     deleteJob,
     fetchJobs,
     sendJobReminder,
+    setJobStatus,
     syncJobToZoho,
+    updateJob,
 } from "@/services/jobs";
-import { fetchAllUsers } from "@/services/users";
 import type { Job, JobStatus, JobsQueryParams, JobsResponse } from "@/types/jobs";
-import type { ProductionUsersResponse } from "@/types/users";
 
 type TabType = "active" | "completed";
 
@@ -51,6 +51,9 @@ export default function AdminJobsPage(): ReactElement {
     const [isAssignOpen, setIsAssignOpen] = useState<boolean>(false);
     const [deleteConfirmJobId, setDeleteConfirmJobId] = useState<number | null>(null);
     const [syncingJobId, setSyncingJobId] = useState<number | null>(null);
+    const [selectedIds, setSelectedIds] = useState<number[]>([]);
+    const [bulkStatus, setBulkStatus] = useState<string>("");
+    const [bulkConfirm, setBulkConfirm] = useState<string | null>(null);
 
     useEffect((): (() => void) => {
         const timer = setTimeout((): void => setDebouncedSearch(search), 500);
@@ -89,20 +92,14 @@ export default function AdminJobsPage(): ReactElement {
         enabled: activeTab === "completed",
     });
 
-    const allUsersQuery = useQuery({
-        queryKey: ["all-users"],
-        queryFn: (): Promise<ProductionUsersResponse> => fetchAllUsers(),
-    });
-
     const assignMutation = useMutation({
-        mutationFn: ({ jobId, userId, notes, remindDays }: {
-            jobId: number; userId: number; notes: string; remindDays: number;
-        }) =>
-            assignJobToProductionTeam(jobId, {
-                user_id: userId,
-                assignment_notes: notes,
-                remind_days_before: remindDays,
-            }),
+        mutationFn: async ({ jobId, userId, jobName }: { jobId: number; userId: number; jobName: string }) => {
+            const current = jobs.find((j) => j.id === jobId);
+            if (jobName && current && jobName !== current.job_name) {
+                await updateJob(jobId, { job_name: jobName });
+            }
+            return assignJobToProductionTeam(jobId, { user_id: userId });
+        },
         onSuccess: (): void => {
             toast.success("Job assigned! Email and portal notification sent.");
             queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
@@ -150,7 +147,47 @@ export default function AdminJobsPage(): ReactElement {
     const jobs = (data?.results ?? []).filter((job) => job.status !== "completed");
     const totalCount = jobs.length;
     const completedJobs = completedQuery.data?.results ?? [];
-    const allUsers = allUsersQuery.data?.users ?? [];
+
+    const selectedJob = jobs.find((j) => j.id === selectedJobId) ?? null;
+
+    // Drop selections that are no longer on screen (filter, page or status change).
+    const visibleSelectedIds = selectedIds.filter((id) => jobs.some((j) => j.id === id));
+
+    const toggleSelect = (jobId: number): void => {
+        setSelectedIds((prev) => (prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]));
+    };
+    const toggleSelectAll = (): void => {
+        setSelectedIds(visibleSelectedIds.length === jobs.length ? [] : jobs.map((j) => j.id));
+    };
+
+    const BULK_STATUS_LABELS: Record<string, string> = {
+        pending: "Pending",
+        in_progress: "In Progress",
+        on_hold: "On Hold",
+        completed: "Completed",
+    };
+
+    const bulkStatusMutation = useMutation({
+        mutationFn: async ({ ids, nextStatus }: { ids: number[]; nextStatus: string }) => {
+            const results = await Promise.allSettled(ids.map((id) => setJobStatus(id, nextStatus)));
+            return {
+                ok: results.filter((r) => r.status === "fulfilled").length,
+                failed: results.filter((r) => r.status === "rejected").length,
+                nextStatus,
+            };
+        },
+        onSuccess: ({ ok, failed, nextStatus }): void => {
+            const label = BULK_STATUS_LABELS[nextStatus] ?? nextStatus;
+            if (ok) toast.success(`${ok} job${ok === 1 ? "" : "s"} marked ${label}.`);
+            if (failed) toast.error(`${failed} job${failed === 1 ? "" : "s"} could not be updated.`);
+            queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-jobs-completed"], exact: false });
+            setSelectedIds([]);
+            setBulkStatus("");
+            setBulkConfirm(null);
+        },
+        onError: (): void => { toast.error("Unable to update jobs. Please try again."); },
+    });
 
     const openAssignModal = (job: Job): void => {
         setSelectedJobId(job.id);
@@ -166,9 +203,9 @@ export default function AdminJobsPage(): ReactElement {
         setReminderModal(null);
     };
 
-    const handleAssignSubmit = (userId: number, notes: string, remindDays: number): void => {
+    const handleAssignSubmit = (userId: number, jobName: string): void => {
         if (!selectedJobId) return;
-        assignMutation.mutate({ jobId: selectedJobId, userId, notes, remindDays });
+        assignMutation.mutate({ jobId: selectedJobId, userId, jobName });
     };
 
     const handleResetFilters = (): void => { setSearch(""); setStatus("all"); setPage(1); };
@@ -253,12 +290,61 @@ export default function AdminJobsPage(): ReactElement {
 
                             {!isLoading && !error && jobs.length > 0 && (
                                 <>
+                                    {visibleSelectedIds.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-3 border-b border-brand-blue/20 bg-brand-blue/5 px-4 py-3">
+                                            <span className="text-sm font-semibold text-gray-900">
+                                                {visibleSelectedIds.length} selected
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={(): void => setBulkConfirm("completed")}
+                                                disabled={bulkStatusMutation.isPending}
+                                                className="inline-flex items-center gap-1.5 rounded-md bg-brand-green px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-green/90 disabled:opacity-50"
+                                            >
+                                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                                Mark as Completed
+                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <select
+                                                    value={bulkStatus}
+                                                    onChange={(e): void => setBulkStatus(e.target.value)}
+                                                    className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                                                    aria-label="Change status to"
+                                                >
+                                                    <option value="">Change status to…</option>
+                                                    {Object.entries(BULK_STATUS_LABELS).map(([value, label]) => (
+                                                        <option key={value} value={value}>{label}</option>
+                                                    ))}
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    onClick={(): void => { if (bulkStatus) setBulkConfirm(bulkStatus); }}
+                                                    disabled={!bulkStatus || bulkStatusMutation.isPending}
+                                                    className="rounded-md border border-brand-blue px-3 py-1.5 text-xs font-semibold text-brand-blue hover:bg-brand-blue/5 disabled:opacity-50"
+                                                >
+                                                    Apply
+                                                </button>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={(): void => setSelectedIds([])}
+                                                className="ml-auto text-xs font-medium text-gray-500 hover:text-gray-800"
+                                            >
+                                                Clear selection
+                                            </button>
+                                        </div>
+                                    )}
                                     <JobsTable
                                         jobs={jobs}
+                                        selectedIds={visibleSelectedIds}
+                                        onToggleSelect={toggleSelect}
+                                        onToggleSelectAll={toggleSelectAll}
                                         onViewDetails={(job): void => router.push(`/admin/jobs/${job.id}`)}
                                         onSendReminder={handleSendReminder}
                                         onEdit={(job): void => router.push(`/admin/jobs/${job.id}/edit`)}
                                         onDelete={(job): void => setDeleteConfirmJobId(job.id)}
+                                        onAssign={openAssignModal}
+                                        showAssignButton={false}
                                         showReminderButton
                                         hideActionsWhenCompleted
                                         remindingJobId={remindingJobId ?? undefined}
@@ -388,14 +474,26 @@ export default function AdminJobsPage(): ReactElement {
                 )}
             </main>
 
-            <AccountManagerJobAssignModal
-                open={isAssignOpen}
-                jobId={selectedJobId}
-                productionUsers={allUsers}
-                onClose={(): void => setIsAssignOpen(false)}
-                onSubmit={handleAssignSubmit}
-                isSubmitting={assignMutation.isPending}
-            />
+            {isAssignOpen && selectedJob && (
+                <AssignJobOwnerModal
+                    job={selectedJob}
+                    onClose={(): void => setIsAssignOpen(false)}
+                    onConfirm={handleAssignSubmit}
+                    isLoading={assignMutation.isPending}
+                />
+            )}
+
+            {bulkConfirm && (
+                <ConfirmModal
+                    title={bulkConfirm === "completed" ? "Mark Jobs as Completed" : "Update Job Status"}
+                    message={`Set ${visibleSelectedIds.length} selected job${visibleSelectedIds.length === 1 ? "" : "s"} to "${BULK_STATUS_LABELS[bulkConfirm] ?? bulkConfirm}"?${bulkConfirm === "completed" ? " Completed jobs move to the Completed tab." : ""}`}
+                    confirmText={bulkStatusMutation.isPending ? "Updating…" : "Confirm"}
+                    confirmColor={bulkConfirm === "completed" ? "green" : "blue"}
+                    isLoading={bulkStatusMutation.isPending}
+                    onClose={(): void => setBulkConfirm(null)}
+                    onConfirm={(): void => bulkStatusMutation.mutate({ ids: visibleSelectedIds, nextStatus: bulkConfirm })}
+                />
+            )}
 
             {deleteConfirmJobId && (
                 <ConfirmModal

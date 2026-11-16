@@ -323,7 +323,6 @@ export default function ProductDetailPage(): ReactElement {
                             <p className="text-sm text-gray-500">
                                 Starting from{" "}
                                 <span className="text-lg font-bold text-brand-blue">{formatKES(product.starting_price)}</span>
-                                {product.starting_price_moq && ` for ${product.starting_price_moq} pcs`}
                             </p>
                         )}
 

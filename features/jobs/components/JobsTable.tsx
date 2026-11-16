@@ -15,6 +15,10 @@ interface JobsTableProps {
     hideActionsWhenCompleted?: boolean;
     remindingJobId?: number;
     deletingJobId?: number;
+    /** When provided, a checkbox column is shown for bulk actions. */
+    selectedIds?: number[];
+    onToggleSelect?: (jobId: number) => void;
+    onToggleSelectAll?: () => void;
 }
 
 const statusStyles: Record<JobStatus, string> = {
@@ -42,6 +46,9 @@ export default function JobsTable({
     hideActionsWhenCompleted = false,
     remindingJobId,
     deletingJobId,
+    selectedIds,
+    onToggleSelect,
+    onToggleSelectAll,
 }: JobsTableProps): ReactElement {
     const formatDate = (value: string | null): string => {
         if (!value) {
@@ -68,6 +75,23 @@ export default function JobsTable({
             <table className="w-full">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-gray-200">
+                        {onToggleSelect && (
+                            <th className="w-10 py-3 pl-4">
+                                <input
+                                    type="checkbox"
+                                    aria-label="Select all jobs"
+                                    checked={jobs.length > 0 && (selectedIds?.length ?? 0) === jobs.length}
+                                    ref={(el): void => {
+                                        if (el) {
+                                            const n = selectedIds?.length ?? 0;
+                                            el.indeterminate = n > 0 && n < jobs.length;
+                                        }
+                                    }}
+                                    onChange={(): void => onToggleSelectAll?.()}
+                                    className="h-4 w-4 rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
+                                />
+                            </th>
+                        )}
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Job #</th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Client</th>
                         <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
@@ -82,7 +106,21 @@ export default function JobsTable({
                     {jobs.map((job: Job): ReactElement => {
                         const overdue = isOverdue(job);
                         return (
-                            <tr key={job.id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                            <tr
+                                key={job.id}
+                                className={`border-b border-gray-100 last:border-0 hover:bg-gray-50 ${selectedIds?.includes(job.id) ? "bg-brand-blue/5" : ""}`}
+                            >
+                                {onToggleSelect && (
+                                    <td className="w-10 py-3 pl-4">
+                                        <input
+                                            type="checkbox"
+                                            aria-label={`Select ${job.job_number}`}
+                                            checked={selectedIds?.includes(job.id) ?? false}
+                                            onChange={(): void => onToggleSelect(job.id)}
+                                            className="h-4 w-4 rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
+                                        />
+                                    </td>
+                                )}
                                 <td className="py-3 px-4 text-sm font-semibold text-gray-900">
                                     {job.job_number || "—"}
                                 </td>
@@ -102,9 +140,27 @@ export default function JobsTable({
                                     </span>
                                 </td>
                                 <td className="py-3 px-4 text-sm text-gray-700">
-                                    {job.person_in_charge
-                                        ? `${job.person_in_charge.first_name} ${job.person_in_charge.last_name}`
-                                        : "—"}
+                                    {job.person_in_charge ? (
+                                        `${job.person_in_charge.first_name} ${job.person_in_charge.last_name}`
+                                    ) : onAssign && job.status !== "completed" ? (
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="inline-flex items-center gap-1 rounded-full bg-brand-red/10 px-2 py-0.5 text-xs font-semibold text-brand-red">
+                                                <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                                                </svg>
+                                                Unassigned
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={(): void => onAssign(job)}
+                                                className="text-xs font-semibold text-brand-blue hover:underline"
+                                            >
+                                                Assign
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        "—"
+                                    )}
                                 </td>
                                 <td className="py-3 px-4 text-sm">
                                     <span className={overdue ? "text-brand-red font-semibold" : "text-gray-700"}>

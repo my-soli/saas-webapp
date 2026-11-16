@@ -587,6 +587,26 @@ export async function convertQuoteToJob(
     return response.json();
 }
 
+/**
+ * Staff approve a quote on the client's behalf (approved by WhatsApp, phone or
+ * in person). The backend creates the LPO and an unassigned Job automatically.
+ */
+export async function approveQuoteForClient(quoteId: number, approvedByName: string): Promise<QuoteActionResponse> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/quotes/${quoteId}/approve-for-client/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ approved_by_name: approvedByName }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(parseErrorMessage(errorText, "Failed to approve quote"));
+    }
+
+    return response.json();
+}
+
 export interface GenerateInvoiceResponse {
     detail: string;
     invoice_id: number;

@@ -17,6 +17,7 @@ interface QuoteDetailModalProps {
     isSendingToCustomer?: boolean;
     onMarkLost: (quoteId: number) => void;
     onConvertToJob: (quoteId: number) => void;
+    onApproveForClient?: (quoteId: number) => void;
     onGenerateInvoice: (quoteId: number) => void;
     onDownloadPdf: (quoteId: string) => void;
     onEdit?: (quoteId: number) => void;
@@ -30,6 +31,7 @@ export default function QuoteDetailModal({
     isSendingToCustomer,
     onMarkLost,
     onConvertToJob,
+    onApproveForClient,
     onGenerateInvoice,
     onDownloadPdf,
     onEdit,
@@ -369,13 +371,27 @@ export default function QuoteDetailModal({
                                 </button>
                             )}
 
-                            {(quote.status === "Sent to Customer" || quote.status === "Approved") && (
+                            {onApproveForClient && (quote.status === "Draft" || quote.status === "Costed" || quote.status === "Sent to Customer") && (
                                 <button
-                                    onClick={(): void => onConvertToJob(quote.id)}
+                                    onClick={(): void => onApproveForClient(quote.id)}
                                     className="px-4 py-2 text-sm font-medium bg-brand-green text-white hover:bg-brand-green/90 rounded transition-colors"
                                     type="button"
+                                    title="Record the client's approval (WhatsApp, call, in person). The job is created automatically."
                                 >
-                                    Convert to Job
+                                    Approve for Client
+                                </button>
+                            )}
+
+                            {/* Approval now creates the job automatically. This stays only as a
+                                fallback for quotes approved before that change, which may have no job. */}
+                            {quote.status === "Approved" && (
+                                <button
+                                    onClick={(): void => onConvertToJob(quote.id)}
+                                    className="px-4 py-2 text-sm font-medium border border-brand-green text-brand-green hover:bg-brand-green/5 rounded transition-colors"
+                                    type="button"
+                                    title="Creates the job if this approved quote doesn't have one yet"
+                                >
+                                    Create Job
                                 </button>
                             )}
 

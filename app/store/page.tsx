@@ -149,7 +149,7 @@ const ProductCard = memo(function ProductCard({ product }: { product: CatalogPro
                         {startingPrice !== null ? (
                             <div>
                                 <span className="text-[10px] text-gray-400 block">
-                                    Starting from{startingPrice.moq ? ` (${startingPrice.moq} pcs)` : ""}
+                                    Starting from
                                 </span>
                                 <span className="text-base font-extrabold text-brand-blue">
                                     {formatKES(startingPrice.price)}

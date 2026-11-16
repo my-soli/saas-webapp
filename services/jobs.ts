@@ -179,6 +179,23 @@ export async function updateJob(jobId: number, payload: Partial<Job>): Promise<J
     return response.json();
 }
 
+/** Set a job's overall status (pending | in_progress | on_hold | completed). */
+export async function setJobStatus(jobId: number, status: string): Promise<{ detail: string; status: string }> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/${jobId}/advance/`, {
+        method: "POST",
+        headers: await buildWriteHeaders(),
+        credentials: "include",
+        body: JSON.stringify({ status }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text().catch((_error: unknown): string => "Unknown error");
+        throw new Error(`Failed to update job status: ${response.status} ${errorText}`);
+    }
+
+    return response.json();
+}
+
 export async function deleteJob(jobId: number): Promise<void> {
     const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/jobs/${jobId}/`, {
         method: "DELETE",

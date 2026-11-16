@@ -14,17 +14,16 @@ import JobsTable from "@/features/jobs/components/JobsTable";
 import JobsPagination from "@/features/jobs/components/JobsPagination";
 import JobsSkeleton from "@/features/jobs/components/JobsSkeleton";
 import JobsEmptyState from "@/features/jobs/components/JobsEmptyState";
-import AccountManagerJobAssignModal from "@/features/jobs/components/AccountManagerJobAssignModal";
+import AssignJobOwnerModal from "@/features/jobs/components/AssignJobOwnerModal";
 import {
     assignJobToProductionTeam,
     deleteJob,
     fetchJobs,
     sendJobReminder,
     syncJobToZoho,
+    updateJob,
 } from "@/services/jobs";
-import { fetchAllUsers } from "@/services/users";
 import type { Job, JobStatus, JobsQueryParams, JobsResponse } from "@/types/jobs";
-import type { ProductionUsersResponse } from "@/types/users";
 
 type TabType = "active" | "completed";
 
@@ -82,20 +81,14 @@ export default function AccountManagerJobsPage(): ReactElement {
         enabled: activeTab === "completed",
     });
 
-    const allUsersQuery = useQuery({
-        queryKey: ["all-users"],
-        queryFn: (): Promise<ProductionUsersResponse> => fetchAllUsers(),
-    });
-
     const assignMutation = useMutation({
-        mutationFn: ({ jobId, userId, notes, remindDays }: {
-            jobId: number; userId: number; notes: string; remindDays: number;
-        }) =>
-            assignJobToProductionTeam(jobId, {
-                user_id: userId,
-                assignment_notes: notes,
-                remind_days_before: remindDays,
-            }),
+        mutationFn: async ({ jobId, userId, jobName }: { jobId: number; userId: number; jobName: string }) => {
+            const current = jobs.find((j) => j.id === jobId);
+            if (jobName && current && jobName !== current.job_name) {
+                await updateJob(jobId, { job_name: jobName });
+            }
+            return assignJobToProductionTeam(jobId, { user_id: userId });
+        },
         onSuccess: (): void => {
             toast.success("Job assigned! Email and portal notification sent.");
             queryClient.invalidateQueries({ queryKey: ["account-manager-jobs"] });
@@ -143,7 +136,8 @@ export default function AccountManagerJobsPage(): ReactElement {
     const jobs = (data?.results ?? []).filter((job) => job.status !== "completed");
     const totalCount = jobs.length;
     const completedJobs = completedQuery.data?.results ?? [];
-    const allUsers = allUsersQuery.data?.users ?? [];
+
+    const selectedJob = jobs.find((j) => j.id === selectedJobId) ?? null;
 
     const openAssignModal = (job: Job): void => {
         setSelectedJobId(job.id);
@@ -159,9 +153,9 @@ export default function AccountManagerJobsPage(): ReactElement {
         setReminderModal(null);
     };
 
-    const handleAssignSubmit = (userId: number, notes: string, remindDays: number): void => {
+    const handleAssignSubmit = (userId: number, jobName: string): void => {
         if (!selectedJobId) return;
-        assignMutation.mutate({ jobId: selectedJobId, userId, notes, remindDays });
+        assignMutation.mutate({ jobId: selectedJobId, userId, jobName });
     };
 
     const handleResetFilters = (): void => { setSearch(""); setStatus("all"); setPage(1); };
@@ -252,6 +246,8 @@ export default function AccountManagerJobsPage(): ReactElement {
                                         onSendReminder={handleSendReminder}
                                         onEdit={(job): void => router.push(`/account-manager/jobs/${job.id}/edit`)}
                                         onDelete={(job): void => setDeleteConfirmJobId(job.id)}
+                                        onAssign={openAssignModal}
+                                        showAssignButton={false}
                                         showReminderButton
                                         hideActionsWhenCompleted
                                         remindingJobId={remindingJobId ?? undefined}
@@ -384,14 +380,14 @@ export default function AccountManagerJobsPage(): ReactElement {
                 )}
             </main>
 
-            <AccountManagerJobAssignModal
-                open={isAssignOpen}
-                jobId={selectedJobId}
-                productionUsers={allUsers}
-                onClose={(): void => setIsAssignOpen(false)}
-                onSubmit={handleAssignSubmit}
-                isSubmitting={assignMutation.isPending}
-            />
+            {isAssignOpen && selectedJob && (
+                <AssignJobOwnerModal
+                    job={selectedJob}
+                    onClose={(): void => setIsAssignOpen(false)}
+                    onConfirm={handleAssignSubmit}
+                    isLoading={assignMutation.isPending}
+                />
+            )}
 
             {deleteConfirmJobId && (
                 <ConfirmModal

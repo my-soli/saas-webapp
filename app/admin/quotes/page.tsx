@@ -13,6 +13,7 @@ import SelectProductionMemberModal from "@/features/quotes/components/SelectProd
 import MarkLostModal from "@/features/quotes/components/MarkLostModal";
 import ConfirmModal from "@/features/quotes/components/ConfirmModal";
 import ConvertToJobModal from "@/features/quotes/components/ConvertToJobModal";
+import ApproveForClientModal from "@/features/quotes/components/ApproveForClientModal";
 import type { MultiProductQuote, QuoteStatus } from "@/types/quotes";
 import {
     fetchMultiProductQuotes,
@@ -23,6 +24,7 @@ import {
     sendQuoteToCustomer,
     markQuoteLost,
     convertQuoteToJob,
+    approveQuoteForClient,
     generateInvoiceFromQuote,
     deleteQuote,
     fetchMultiProductQuoteDetail,
@@ -38,6 +40,7 @@ export default function AdminQuotesPage() {
     const [markLostModalQuoteId, setMarkLostModalQuoteId] = useState<number | null>(null);
     const [cloneConfirmQuoteId, setCloneConfirmQuoteId] = useState<number | null>(null);
     const [convertToJobQuote, setConvertToJobQuote] = useState<MultiProductQuote | null>(null);
+    const [approveForClientQuote, setApproveForClientQuote] = useState<MultiProductQuote | null>(null);
     const [generateInvoiceQuoteId, setGenerateInvoiceQuoteId] = useState<number | null>(null);
     const [deleteConfirmQuoteId, setDeleteConfirmQuoteId] = useState<number | null>(null);
     const queryClient = useQueryClient();
@@ -108,14 +111,28 @@ export default function AdminQuotesPage() {
     const convertToJobMutation = useMutation({
         mutationFn: ({ quoteId, ownerUserId, assignments, jobName }: { quoteId: number; ownerUserId: number | null; assignments: LineItemAssignment[]; jobName?: string }) =>
             convertQuoteToJob(quoteId, ownerUserId, assignments, jobName),
-        onSuccess: () => {
-            toast.success("Quote converted to job!");
+        onSuccess: (data) => {
+            toast.success(data.detail === "Quote already approved" ? "This quote already has a job." : "Job created from quote!");
             queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
             queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
             setSelectedQuote(null);
             setConvertToJobQuote(null);
         },
         onError: () => toast.error("Failed to convert quote to job."),
+    });
+
+    const approveForClientMutation = useMutation({
+        mutationFn: ({ quoteId, approvedByName }: { quoteId: number; approvedByName: string }) =>
+            approveQuoteForClient(quoteId, approvedByName),
+        onSuccess: (data) => {
+            toast.success(`Quote approved. Job ${data.job_number ?? ""} created. Assign an owner from Jobs.`);
+            queryClient.invalidateQueries({ queryKey: ["multi-product-quotes"] });
+            queryClient.invalidateQueries({ queryKey: ["quote-stats"] });
+            queryClient.invalidateQueries({ queryKey: ["admin-jobs"] });
+            setSelectedQuote(null);
+            setApproveForClientQuote(null);
+        },
+        onError: (error: Error) => toast.error(error.message || "Failed to approve quote."),
     });
 
     const generateInvoiceMutation = useMutation({
@@ -331,6 +348,10 @@ export default function AdminQuotesPage() {
                 isSendingToCustomer={sendToCustomerMutation.isPending}
                 onMarkLost={handleMarkLost}
                 onConvertToJob={handleConvertToJob}
+                onApproveForClient={(quoteId: number): void => {
+                    const found = quotes.find((q) => q.id === quoteId) ?? selectedQuote;
+                    if (found) setApproveForClientQuote(found);
+                }}
                 onGenerateInvoice={handleGenerateInvoice}
                 onDownloadPdf={handleDownloadPdf}
                 onEdit={handleEdit}
@@ -369,6 +390,17 @@ export default function AdminQuotesPage() {
                     onClose={() => setConvertToJobQuote(null)}
                     onConfirm={handleConfirmConvertToJob}
                     isLoading={convertToJobMutation.isPending}
+                />
+            )}
+
+            {approveForClientQuote && (
+                <ApproveForClientModal
+                    quote={approveForClientQuote}
+                    onClose={() => setApproveForClientQuote(null)}
+                    onConfirm={(approvedByName: string) =>
+                        approveForClientMutation.mutate({ quoteId: approveForClientQuote.id, approvedByName })
+                    }
+                    isLoading={approveForClientMutation.isPending}
                 />
             )}
 
