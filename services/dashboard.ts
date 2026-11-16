@@ -120,3 +120,18 @@ export async function fetchActionCenter(): Promise<import("@/types/dashboard").A
 
     return response.json();
 }
+
+export async function fetchDashboardReports(months = 12): Promise<import("@/types/dashboard").DashboardReports> {
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/dashboard/reports/?months=${months}`, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        const errorText = await extractErrorDetail(response);
+        throw new Error(`Failed to fetch dashboard reports: ${response.status} ${errorText}`);
+    }
+
+    return response.json();
+}

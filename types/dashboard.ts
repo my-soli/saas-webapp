@@ -218,3 +218,36 @@ export interface ActionCenterResponse {
     generated_at: string;
     sections: ActionCenterSection[];
 }
+
+export interface ReportMonth {
+    month: string;
+    revenue: number;
+    orders: number;
+    invoiced: number;
+    collected: number;
+    quotes_created: number;
+    quote_value: number;
+    quotes_approved: number;
+    approved_value: number;
+    quotes_lost: number;
+    jobs_created: number;
+    jobs_completed: number;
+}
+
+export interface DashboardReports {
+    months: number;
+    start: string;
+    monthly: ReportMonth[];
+    top_clients: { id: number; name: string; revenue: number; orders: number }[];
+    top_products: { name: string; revenue: number; quantity: number; quotes: number }[];
+    jobs_by_status: Record<string, number>;
+    quotes_by_status: Record<string, number>;
+    quote_metrics: {
+        created: number;
+        approved: number;
+        win_rate: number | null;
+        avg_value: number;
+        avg_days_to_approve: number | null;
+    };
+    job_metrics: { completed: number; on_time_rate: number | null };
+}

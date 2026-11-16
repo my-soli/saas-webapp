@@ -1,23 +1,24 @@
 ﻿"use client";
 
 import type { ReactElement } from "react";
-import { useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircleIcon, FilePlus2Icon, PackagePlusIcon, RefreshCwIcon, TruckIcon } from "lucide-react";
 import AdminLayout from "@/components/admin/admin-layout";
 import ActionCenter from "@/features/dashboard/components/ActionCenter";
 import DashboardAlerts from "@/features/dashboard/components/DashboardAlerts";
-import DashboardCharts from "@/features/dashboard/components/DashboardCharts";
 import DashboardKpiGrid from "@/features/dashboard/components/DashboardKpiGrid";
-import JobsStatusChart from "@/features/dashboard/components/JobsStatusChart";
 import QuotePipeline from "@/features/dashboard/components/QuotePipeline";
-import QuotesStatusChart from "@/features/dashboard/components/QuotesStatusChart";
+import JobsStatusReport from "@/features/dashboard/components/reports/JobsStatusReport";
+import QuotePerformanceReport from "@/features/dashboard/components/reports/QuotePerformanceReport";
+import SalesPerformanceReport from "@/features/dashboard/components/reports/SalesPerformanceReport";
 import {
     fetchActionCenter,
     fetchDashboardAlerts,
     fetchDashboardAnalytics,
     fetchDashboardOverview,
+    fetchDashboardReports,
 } from "@/services/dashboard";
 import { getCurrentUser } from "@/services/users";
 import type {
@@ -25,7 +26,7 @@ import type {
     DashboardAlertsResponse,
     DashboardAnalytics,
     DashboardOverview,
-    RevenueChartPoint,
+    DashboardReports,
 } from "@/types/dashboard";
 
 function greeting(): string {
@@ -66,25 +67,24 @@ export default function DashboardPage(): ReactElement {
         queryFn: getCurrentUser,
     });
 
-    const revenueSeries = useMemo((): RevenueChartPoint[] => {
-        const trend = analyticsQuery.data?.sales_performance_trend ?? [];
-        return trend.map((item): RevenueChartPoint => ({
-            label: item.month,
-            revenue: Number(item.revenue || 0),
-            orders: Number(item.orders || 0),
-        }));
-    }, [analyticsQuery.data?.sales_performance_trend]);
+    const [reportMonths, setReportMonths] = useState<number>(12);
+    const reportsQuery = useQuery({
+        queryKey: ["dashboard", "reports", reportMonths],
+        queryFn: (): Promise<DashboardReports> => fetchDashboardReports(reportMonths),
+        placeholderData: (prev) => prev,
+    });
 
     const topAlerts = alertsQuery.data?.results ?? [];
-    const hasError = overviewQuery.isError || analyticsQuery.isError || alertsQuery.isError || actionCenterQuery.isError;
+    const hasError = overviewQuery.isError || analyticsQuery.isError || alertsQuery.isError || actionCenterQuery.isError || reportsQuery.isError;
     const isRefreshing =
-        overviewQuery.isFetching || analyticsQuery.isFetching || alertsQuery.isFetching || actionCenterQuery.isFetching;
+        overviewQuery.isFetching || analyticsQuery.isFetching || alertsQuery.isFetching || actionCenterQuery.isFetching || reportsQuery.isFetching;
 
     const refreshAll = (): void => {
         void overviewQuery.refetch();
         void analyticsQuery.refetch();
         void alertsQuery.refetch();
         void actionCenterQuery.refetch();
+        void reportsQuery.refetch();
     };
 
     const firstName = userQuery.data?.first_name;
@@ -166,35 +166,32 @@ export default function DashboardPage(): ReactElement {
                 {/* 3. Flow from quote to finished job */}
                 {overviewQuery.data ? <QuotePipeline overview={overviewQuery.data} basePath="/admin" /> : null}
 
-                {/* 4. Trends — use the full width: revenue beside job status,
-                       quote status beside alerts. */}
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                    <div className="xl:col-span-2">
-                        {analyticsQuery.isLoading ? (
+                {/* 4. Reports — interactive charts with drill-down */}
+                {reportsQuery.isLoading ? (
+                    <>
+                        <SkeletonBlock className="h-[640px]" />
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                             <SkeletonBlock className="h-[420px]" />
-                        ) : analyticsQuery.data ? (
-                            <DashboardCharts revenueSeries={revenueSeries} />
-                        ) : null}
-                    </div>
-                    <div>
-                        {overviewQuery.isLoading ? (
                             <SkeletonBlock className="h-[420px]" />
-                        ) : overviewQuery.data ? (
-                            <JobsStatusChart overview={overviewQuery.data} />
-                        ) : null}
-                    </div>
-                </div>
-
-                {overviewQuery.data ? (
-                    <div className={`grid grid-cols-1 gap-6 ${topAlerts.length > 0 ? "xl:grid-cols-3" : ""}`}>
-                        <QuotesStatusChart overview={overviewQuery.data} />
-                        {topAlerts.length > 0 ? (
-                            <div className="xl:col-span-2">
-                                <DashboardAlerts alerts={topAlerts} />
-                            </div>
-                        ) : null}
-                    </div>
+                        </div>
+                    </>
+                ) : reportsQuery.data ? (
+                    <>
+                        <SalesPerformanceReport
+                            reports={reportsQuery.data}
+                            months={reportMonths}
+                            onMonthsChange={setReportMonths}
+                            isFetching={reportsQuery.isFetching}
+                            basePath="/admin"
+                        />
+                        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                            <JobsStatusReport reports={reportsQuery.data} basePath="/admin" />
+                            <QuotePerformanceReport reports={reportsQuery.data} basePath="/admin" />
+                        </div>
+                    </>
                 ) : null}
+
+                {topAlerts.length > 0 ? <DashboardAlerts alerts={topAlerts} /> : null}
             </main>
         </AdminLayout>
     );

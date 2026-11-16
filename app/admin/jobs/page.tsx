@@ -40,6 +40,17 @@ export default function AdminJobsPage(): ReactElement {
     const [search, setSearch] = useState<string>("");
     const [debouncedSearch, setDebouncedSearch] = useState<string>("");
     const [status, setStatus] = useState<"all" | JobStatus>("all");
+
+    // Deep links from the dashboard charts: /admin/jobs?status=on_hold
+    useEffect((): void => {
+        const param = new URLSearchParams(window.location.search).get("status");
+        if (!param) return;
+        if (param === "completed") {
+            setActiveTab("completed");
+        } else {
+            setStatus(param as JobStatus);
+        }
+    }, []);
     const [page, setPage] = useState<number>(1);
     const [pageSize, setPageSize] = useState<number>(20);
     const [completedSearch, setCompletedSearch] = useState<string>("");
