@@ -115,7 +115,16 @@ const FILE_SLOT_DEFS: { slot: ComponentFileSlot; label: string; icon: ReactEleme
     { slot: "delivery_note", label: "Delivery Note",         icon: <FileIcon      className="h-5 w-5" /> },
 ];
 
-const tabs: { key: Tab; label: string; icon: ReactElement }[] = [
+// ── Archived sections ─────────────────────────────────────────────────────────
+// Dependencies, Tasks and QC Checkpoints were taken out of the component page
+// (meeting, 16 Nov 2026): components now keep a single "Files & Assets" area.
+// Their code below is kept, not deleted. To bring a section back, remove its
+// key from this list (and, for dependencies, set COMPONENT_DEPENDENCIES_ARCHIVED
+// = False in the API's orchestration_views.py).
+const ARCHIVED_TABS: readonly Tab[] = ["deps", "tasks", "qc"];
+const isArchived = (tab: Tab): boolean => ARCHIVED_TABS.includes(tab);
+
+const allTabs: { key: Tab; label: string; icon: ReactElement }[] = [
     { key: "deps",       label: "Dependencies",   icon: <LinkIcon className="h-4 w-4" /> },
     { key: "tasks",      label: "Tasks",          icon: <ListChecksIcon className="h-4 w-4" /> },
     { key: "qc",         label: "QC Checkpoints", icon: <ClipboardCheckIcon className="h-4 w-4" /> },
@@ -125,6 +134,8 @@ const tabs: { key: Tab; label: string; icon: ReactElement }[] = [
     { key: "adjustment", label: "Adjustment",     icon: <AlertCircleIcon className="h-4 w-4" /> },
     { key: "audit",      label: "Audit Log",      icon: <ActivityIcon className="h-4 w-4" /> },
 ];
+const tabs = allTabs.filter((t) => !isArchived(t.key));
+const DEFAULT_TAB: Tab = tabs[0]?.key ?? "files";
 
 const compStatusColor = (status: string) => {
     if (["DEP_BLOCKED", "SEQ_BLOCKED", "QC_FAILED"].includes(status)) return "bg-brand-red/10 text-brand-red";
@@ -215,17 +226,17 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
     const depsQuery = useQuery({
         queryKey: ["component-deps", numericCompId],
         queryFn: () => fetchDependencies(numericCompId),
-        enabled: isNumericComp,
+        enabled: isNumericComp && !isArchived("deps"),
     });
     const tasksQuery = useQuery({
         queryKey: ["component-tasks", numericCompId],
         queryFn: () => fetchTasks(numericCompId),
-        enabled: isNumericComp,
+        enabled: isNumericComp && !isArchived("tasks"),
     });
     const qcQuery = useQuery({
         queryKey: ["component-qc", numericCompId],
         queryFn: () => fetchQCResults(numericCompId),
-        enabled: isNumericComp,
+        enabled: isNumericComp && !isArchived("qc"),
     });
     const usersQuery = useQuery({
         queryKey: ["production-users"],
@@ -235,6 +246,7 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
     const customTemplatesQuery = useQuery({
         queryKey: ["qc-custom-templates"],
         queryFn: fetchQCCustomTemplates,
+        enabled: !isArchived("qc"),
         staleTime: 2 * 60_000,
     });
     const vendorsQuery = useQuery({
@@ -545,7 +557,7 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
     };
 
     // Local UI state
-    const [activeTab, setActiveTab] = useState<Tab>("deps");
+    const [activeTab, setActiveTab] = useState<Tab>(DEFAULT_TAB);
     const [selectedTemplate, setSelectedTemplate] = useState("");
     const [briefMasked, setBriefMasked] = useState(true);
     const [showVendorPicker, setShowVendorPicker] = useState(false);
@@ -583,7 +595,7 @@ export default function ComponentDetailWorkspace({ basePath = "/production-team"
     const [taskError, setTaskError] = useState("");
 
     useEffect(() => {
-        setActiveTab("deps");
+        setActiveTab(DEFAULT_TAB);
         setShowAddDep(false);
         setShowAddTask(false);
         setDepForm({ description: "", dependency_type: "artwork_approval", due_by: "" });
