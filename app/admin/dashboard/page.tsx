@@ -52,6 +52,26 @@ function greeting(): string {
     return "Good evening";
 }
 
+/** A section the API couldn't build comes back as { error }. */
+function failed(section: unknown): string | null {
+    return section && typeof section === "object" && "error" in section ? String((section as { error: unknown }).error) : null;
+}
+
+function SectionError({ title, error }: { title: string; error: string }): ReactElement {
+    return (
+        <article className="rounded-2xl border border-brand-red/30 bg-brand-red/5 p-5">
+            <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+            <p className="mt-1 text-sm text-brand-red">This section couldn&apos;t load.</p>
+            <p className="mt-2 break-words font-mono text-xs text-gray-500">{error}</p>
+        </article>
+    );
+}
+
+function Section({ title, data, children }: { title: string; data: unknown; children: () => ReactElement }): ReactElement {
+    const err = failed(data);
+    return err ? <SectionError title={title} error={err} /> : children();
+}
+
 function SkeletonBlock({ className }: { className: string }): ReactElement {
     return <div className={`animate-pulse rounded-2xl border border-gray-200 bg-white ${className}`} />;
 }
@@ -201,8 +221,10 @@ export default function DashboardPage(): ReactElement {
                 {/* 4. Right now: today's workload + this month's target */}
                 {insights ? (
                     <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                        <div className="xl:col-span-2"><TodayStrip today={insights.today} basePath="/admin" /></div>
-                        <TargetCard key={String(insights.target.target)} target={insights.target} canEdit={isAdmin} />
+                        <div className="xl:col-span-2">
+                            <Section title="Today & this week" data={insights.today}>{() => <TodayStrip today={insights.today} basePath="/admin" />}</Section>
+                        </div>
+                        <Section title="Monthly target" data={insights.target}>{() => <TargetCard key={String(insights.target.target)} target={insights.target} canEdit={isAdmin} />}</Section>
                     </div>
                 ) : insightsQuery.isLoading ? (
                     <SkeletonBlock className="h-72" />
@@ -237,19 +259,19 @@ export default function DashboardPage(): ReactElement {
                 {insights ? (
                     <>
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                            <ReceivablesCard data={insights.receivables} basePath="/admin" />
-                            <ProfitCard data={insights.profit} basePath="/admin" />
+                            <Section title="Money owed to us" data={insights.receivables}>{() => <ReceivablesCard data={insights.receivables} basePath="/admin" />}</Section>
+                            <Section title="Profit" data={insights.profit}>{() => <ProfitCard data={insights.profit} basePath="/admin" />}</Section>
                         </div>
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                            <CapacityCard data={insights.capacity} />
-                            <TeamCard data={insights.team} />
+                            <Section title="Production capacity" data={insights.capacity}>{() => <CapacityCard data={insights.capacity} />}</Section>
+                            <Section title="Team performance" data={insights.team}>{() => <TeamCard data={insights.team} />}</Section>
                         </div>
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                            <VendorCard data={insights.vendors} basePath="/admin" />
-                            <FunnelCard data={insights.funnel} basePath="/admin" />
+                            <Section title="Vendor performance" data={insights.vendors}>{() => <VendorCard data={insights.vendors} basePath="/admin" />}</Section>
+                            <Section title="Leads & storefront" data={insights.funnel}>{() => <FunnelCard data={insights.funnel} basePath="/admin" />}</Section>
                         </div>
                         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                            <div className="xl:col-span-2"><ClientHealthCard data={insights.clients} /></div>
+                            <div className="xl:col-span-2"><Section title="Client health" data={insights.clients}>{() => <ClientHealthCard data={insights.clients} />}</Section></div>
                             <ActivityFeed />
                         </div>
                     </>
