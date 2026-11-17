@@ -161,3 +161,10 @@
     @apply bg-background text-foreground;
   }
 }
+/* Hide scrollbars on horizontally scrolling strips (category pills, product rows). */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

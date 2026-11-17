@@ -68,7 +68,10 @@ export default function StoreNavbar(): ReactElement {
             } else {
                 next.delete("q");
             }
-            router.push(`/store?${next.toString()}`);
+            // replace (not push) so each keystroke doesn't add a history entry, and
+            // scroll: false so typing doesn't throw the page back to the top.
+            const qs = next.toString();
+            router.replace(qs ? `/store?${qs}` : "/store", { scroll: false });
         }, 400);
     };
 
@@ -124,6 +127,7 @@ export default function StoreNavbar(): ReactElement {
                             <Link
                                 key={cat.id}
                                 href={buildCategoryHref(cat.id)}
+                                scroll={!isStoreListing}
                                 className={cn(
                                     "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
                                     isCatActive(cat.id)
@@ -156,6 +160,7 @@ export default function StoreNavbar(): ReactElement {
                                             <Link
                                                 key={cat.id}
                                                 href={buildCategoryHref(cat.id)}
+                                scroll={!isStoreListing}
                                                 onClick={() => setShowMore(false)}
                                                 className={cn(
                                                     "block px-4 py-2 text-sm transition-colors",
@@ -255,6 +260,7 @@ export default function StoreNavbar(): ReactElement {
                         <Link
                             key={cat.id}
                             href={buildCategoryHref(cat.id)}
+                                scroll={!isStoreListing}
                             onClick={() => setMobileOpen(false)}
                             className={cn(
                                 "block rounded-xl px-4 py-2.5 text-sm font-medium transition-colors",
