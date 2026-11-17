@@ -95,9 +95,7 @@ export default function NotificationBell(): ReactElement {
             <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                className={`relative flex items-center justify-center w-12 h-12 rounded-full shadow-xl ring-4 ring-white transition-all hover:scale-105 ${
-                    unreadCount > 0 ? "bg-brand-blue text-white" : "bg-white text-brand-blue border border-gray-200"
-                }`}
+                className="relative flex items-center justify-center w-12 h-12 rounded-full bg-brand-blue text-white shadow-xl ring-4 ring-white transition-all hover:scale-105 hover:bg-brand-blue/90"
                 aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
             >
                 {unreadCount > 0 && (
