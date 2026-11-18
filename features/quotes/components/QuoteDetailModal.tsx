@@ -16,8 +16,7 @@ interface QuoteDetailModalProps {
     onSendToPT: (quoteId: number) => void;
     onSendToCustomer: (quoteId: number, emailFields: SendEmailFields) => void;
     isSendingToCustomer?: boolean;
-    /** No longer used: expired quotes are marked Lost automatically. Kept so callers still compile. */
-    onMarkLost?: (quoteId: number) => void;
+    onMarkLost: (quoteId: number) => void;
     onConvertToJob: (quoteId: number) => void;
     onApproveForClient?: (quoteId: number) => void;
     onGenerateInvoice: (quoteId: number) => void;
@@ -31,6 +30,7 @@ export default function QuoteDetailModal({
     onSendToPT,
     onSendToCustomer,
     isSendingToCustomer,
+    onMarkLost,
     onConvertToJob,
     onApproveForClient,
     onGenerateInvoice,
@@ -413,8 +413,15 @@ export default function QuoteDetailModal({
                                 Generate Invoice
                             </button>
 
-                            {/* "Mark as Lost" removed: quotes past their valid-until date are
-                                marked Lost automatically by the API (clientapp/quote_expiry.py). */}
+                            {quote.status !== "Approved" && quote.status !== "Lost" && (
+                                <button
+                                    onClick={(): void => onMarkLost(quote.id)}
+                                    className="px-4 py-2 text-sm font-medium bg-brand-red text-white hover:bg-brand-red/90 rounded transition-colors"
+                                    type="button"
+                                >
+                                    Mark as Lost
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
