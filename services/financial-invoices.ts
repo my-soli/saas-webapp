@@ -49,6 +49,15 @@ export interface InvoiceLineItem {
     sort_order?: number;
 }
 
+export interface InvoicePaymentSummary {
+    id: number;
+    payment_date: string | null;
+    amount: number;
+    payment_method: string;
+    payment_method_display: string;
+    reference_number: string;
+}
+
 export interface FinancialInvoice {
     id: number;
     invoice_number: string;
@@ -67,6 +76,17 @@ export interface FinancialInvoice {
     total: string;
     amount_paid: number;
     balance_due: number;
+    /** Zoho-style: worked out from payments and applied credit. */
+    payment_status?: "unpaid" | "partially_paid" | "paid";
+    /** Money received against this invoice (can be more than the total). */
+    payments_received?: number;
+    /** Client credit used to pay this invoice. */
+    credit_applied?: number;
+    /** Part of the payments above the total, kept as client credit. */
+    overpayment_credited?: number;
+    /** Credit the client has available to use on this invoice. */
+    client_credit_available?: number;
+    payments?: InvoicePaymentSummary[];
     notes: string;
     terms: string;
     payment_options: string;
@@ -167,6 +187,18 @@ export async function voidInvoice(id: number): Promise<FinancialInvoice> {
     });
     await throwIfBad(res);
     return res.json() as Promise<FinancialInvoice>;
+}
+
+/** Use the client's account credit on this invoice (all that fits, or `amount`). */
+export async function applyInvoiceCredit(id: number, amount?: number): Promise<FinancialInvoice & { applied: number }> {
+    const res = await fetch(`${BASE}${id}/apply-credit/`, {
+        method: "POST",
+        headers: { ...(await headers()), "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(amount ? { amount } : {}),
+    });
+    await throwIfBad(res);
+    return res.json() as Promise<FinancialInvoice & { applied: number }>;
 }
 
 export async function resendInvoice(id: number): Promise<FinancialInvoice> {

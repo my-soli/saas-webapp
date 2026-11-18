@@ -20,7 +20,14 @@ const INVOICE_STATUS_TONE: Record<string, StatusPillTone> = {
     paid: "success",
     overdue: "danger",
     void: "neutral",
+    partially_paid: "warning",
 };
+
+/** Status shown in the list: a part-paid invoice reads "Partially Paid" (Zoho-style). */
+function displayStatus(inv: FinancialInvoice): string {
+    if (inv.status !== "void" && inv.payment_status === "partially_paid") return "partially_paid";
+    return inv.effective_status;
+}
 
 const ETIMS_STATUS_TONE: Record<string, StatusPillTone> = {
     not_submitted: "neutral",
@@ -42,6 +49,7 @@ const STATUS_LABEL: Record<string, string> = {
     paid: "Paid",
     overdue: "Overdue",
     void: "Void",
+    partially_paid: "Partially Paid",
 };
 
 function RecordPaymentModal({ invoice, onClose }: { invoice: FinancialInvoice; onClose: () => void }): ReactElement {
@@ -85,9 +93,21 @@ function RecordPaymentModal({ invoice, onClose }: { invoice: FinancialInvoice; o
                     </button>
                 </div>
                 <form onSubmit={(e) => { e.preventDefault(); saveMutation.mutate(); }} className="p-6 space-y-4">
-                    <div className="rounded-lg bg-gray-50 p-3 flex justify-between text-sm">
-                        <span className="text-gray-500">Balance Due</span>
-                        <span className="font-semibold text-gray-900">KES {invoice.balance_due.toLocaleString()}</span>
+                    <div className="rounded-lg bg-gray-50 p-3 space-y-1 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-gray-500">Invoice total</span>
+                            <span className="text-gray-900">KES {Number(invoice.total).toLocaleString()}</span>
+                        </div>
+                        {invoice.amount_paid > 0 && (
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Already paid</span>
+                                <span className="text-brand-red">(-) KES {invoice.amount_paid.toLocaleString()}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between font-semibold">
+                            <span className="text-gray-700">Balance Due</span>
+                            <span className="text-gray-900">KES {invoice.balance_due.toLocaleString()}</span>
+                        </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
@@ -126,6 +146,26 @@ function RecordPaymentModal({ invoice, onClose }: { invoice: FinancialInvoice; o
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-blue focus:border-transparent" />
                         </div>
                     </div>
+                    {(() => {
+                        const amt = parseFloat(String(form.amount)) || 0;
+                        if (amt <= 0) return null;
+                        if (amt > invoice.balance_due) {
+                            return (
+                                <p className="rounded-lg border border-brand-green/30 bg-brand-green/5 px-3 py-2 text-xs text-gray-700">
+                                    This is <span className="font-semibold">KES {(amt - invoice.balance_due).toLocaleString()}</span> more than the
+                                    balance. The invoice will be marked Paid and the extra kept as credit on the client&apos;s account for their next invoice.
+                                </p>
+                            );
+                        }
+                        if (amt < invoice.balance_due) {
+                            return (
+                                <p className="rounded-lg border border-brand-orange/30 bg-brand-orange/5 px-3 py-2 text-xs text-gray-700">
+                                    Part payment: <span className="font-semibold">KES {(invoice.balance_due - amt).toLocaleString()}</span> will still be due.
+                                </p>
+                            );
+                        }
+                        return null;
+                    })()}
                     <div className="space-y-1">
                         <label className="text-sm font-medium text-gray-700">Notes</label>
                         <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} rows={2}
@@ -274,7 +314,7 @@ export default function FinancialInvoicesPage(): ReactElement {
                                             {inv.status === "void" ? "—" : `KES ${inv.balance_due.toLocaleString()}`}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <StatusPill label={STATUS_LABEL[inv.effective_status] ?? inv.status_display} tone={INVOICE_STATUS_TONE[inv.effective_status] ?? "neutral"} />
+                                            <StatusPill label={STATUS_LABEL[displayStatus(inv)] ?? inv.status_display} tone={INVOICE_STATUS_TONE[displayStatus(inv)] ?? "neutral"} />
                                         </td>
                                         <td className="px-4 py-3">
                                             <StatusPill label={ETIMS_STATUS_LABEL[inv.etims_status] ?? inv.etims_status} tone={ETIMS_STATUS_TONE[inv.etims_status] ?? "neutral"} />

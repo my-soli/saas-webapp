@@ -66,7 +66,9 @@ const menuSections: MenuSection[] = [
             { label: "Control Tower", href: "/production-team/orchestration", icon: Zap },
             { label: "Dispatch", href: "/production-team/dispatch", icon: PackageCheck },
             { label: "Reconciliation", href: "/production-team/reconciliation", icon: Scale },
-            { label: "QC Templates", href: "/production-team/qc-templates", icon: ClipboardCheck },
+            // Archived (meeting, 17 Nov 2026): QC templates are hidden from the menu along with
+            // the QC Checkpoints tab. The page still exists; uncomment to bring it back.
+            // { label: "QC Templates", href: "/production-team/qc-templates", icon: ClipboardCheck },
         ],
     },
     {

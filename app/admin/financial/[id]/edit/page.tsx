@@ -6,6 +6,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import Link from "next/link";
 import AdminLayout from "@/components/admin/admin-layout";
+import InvoiceBalancePanel from "@/features/payments/components/InvoiceBalancePanel";
 import SearchableSelect from "@/components/admin/searchable-select";
 import TaxRateSelect from "@/components/admin/tax-rate-select";
 import {
@@ -510,6 +511,13 @@ export default function EditInvoicePage(): ReactElement {
                     <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-5 text-sm">
                         This invoice is void and cannot be edited.
                     </div>
+                </div>
+            )}
+
+            {/* Zoho-style payment summary: shows what's been paid and what's still owed. */}
+            {invoice && (invoice.status !== "draft" || (invoice.payments_received ?? 0) > 0) && (
+                <div className="px-4 pt-4 lg:px-8 lg:pt-8">
+                    <InvoiceBalancePanel invoice={invoice} />
                 </div>
             )}
 
