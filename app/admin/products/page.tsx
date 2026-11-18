@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactElement } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlusIcon } from "lucide-react";
+import { DownloadIcon, PlusIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AdminLayout from "@/components/admin/admin-layout";
@@ -19,6 +19,8 @@ import ProductsTable from "@/features/products/components/ProductsTable";
 import ProductsPagination from "@/features/products/components/ProductsPagination";
 import ProductsSkeleton from "@/features/products/components/ProductsSkeleton";
 import ProductsEmptyState from "@/features/products/components/ProductsEmptyState";
+import ProductsExportModal from "@/features/products/components/ProductsExportModal";
+import { fetchPrintCategories, fetchProductCategories } from "@/services/product-catalog-setup";
 import { resolveProductsBasePath } from "@/lib/product-routes";
 
 export default function AdminProductsPage(): ReactElement {
@@ -27,12 +29,35 @@ export default function AdminProductsPage(): ReactElement {
     const queryClient = useQueryClient();
     const basePath = resolveProductsBasePath(pathname);
 
-    const [search, setSearch] = useState<string>("");
-    const [debouncedSearch, setDebouncedSearch] = useState<string>("");
-    const [status, setStatus] = useState<ProductStatus | "all">("all");
-    const [pricingMode, setPricingMode] = useState<ProductPricingMode | "all">("all");
-    const [printCategory, setPrintCategory] = useState<string>("");
-    const [category, setCategory] = useState<string>("");
+    // Filters are remembered for the browser session (like the page number), so
+    // coming back from editing a product keeps the same filtered list.
+    const filtersStorageKey = `products-list-filters:${basePath}`;
+    const savedFilters = ((): Partial<Record<"search" | "status" | "pricingMode" | "printCategory" | "category", string>> => {
+        if (typeof window === "undefined") return {};
+        try {
+            return JSON.parse(sessionStorage.getItem(filtersStorageKey) ?? "{}") as Record<string, string>;
+        } catch {
+            return {};
+        }
+    })();
+    const [search, setSearch] = useState<string>(savedFilters.search ?? "");
+    const [debouncedSearch, setDebouncedSearch] = useState<string>(savedFilters.search ?? "");
+    const [status, setStatus] = useState<ProductStatus | "all">((savedFilters.status as ProductStatus | "all") ?? "all");
+    const [pricingMode, setPricingMode] = useState<ProductPricingMode | "all">((savedFilters.pricingMode as ProductPricingMode | "all") ?? "all");
+    const [printCategory, setPrintCategory] = useState<string>(savedFilters.printCategory ?? "");
+    const [category, setCategory] = useState<string>(savedFilters.category ?? "");
+    const [showExport, setShowExport] = useState<boolean>(false);
+
+    useEffect((): void => {
+        try {
+            sessionStorage.setItem(
+                filtersStorageKey,
+                JSON.stringify({ search: debouncedSearch, status, pricingMode, printCategory, category }),
+            );
+        } catch {
+            // storage unavailable — filters just won't be remembered
+        }
+    }, [filtersStorageKey, debouncedSearch, status, pricingMode, printCategory, category]);
 
     // Remembered per list (admin/business/production-team each have their own
     // products list) so returning via a sidebar link — not browser back —
@@ -70,8 +95,31 @@ export default function AdminProductsPage(): ReactElement {
 
     const { data, isLoading, isError } = useQuery({
         queryKey: ["products", queryParams],
-        queryFn: () => fetchProducts(queryParams),
+        queryFn: async () => {
+            try {
+                return await fetchProducts(queryParams);
+            } catch (e) {
+                // A remembered page number can be past the end once products change
+                // (the API answers 404): go back to page 1 instead of showing an error.
+                if (queryParams.page > 1 && String((e as Error).message).includes("404")) {
+                    setPage(1);
+                    return fetchProducts({ ...queryParams, page: 1 });
+                }
+                throw e;
+            }
+        },
     });
+
+    // Names for the export summary (same cached queries the filters use).
+    const { data: printCategories = [] } = useQuery({ queryKey: ["print-categories"], queryFn: fetchPrintCategories, staleTime: 5 * 60_000 });
+    const { data: productCategories = [] } = useQuery({ queryKey: ["product-categories"], queryFn: fetchProductCategories, staleTime: 5 * 60_000 });
+    const filterSummary = [
+        debouncedSearch && `"${debouncedSearch}"`,
+        status !== "all" && status.charAt(0).toUpperCase() + status.slice(1),
+        pricingMode !== "all" && (pricingMode === "auto_calculate" ? "Auto Calculate" : "Quote Only"),
+        printCategory && (printCategories.find((c) => String(c.id) === printCategory)?.name ?? "Print category"),
+        category && (productCategories.find((c) => String(c.id) === category)?.name ?? "Category"),
+    ].filter((x): x is string => Boolean(x));
 
     const deleteMutation = useMutation({
         mutationFn: deleteProduct,
@@ -132,6 +180,17 @@ export default function AdminProductsPage(): ReactElement {
                             </p>
                         )}
                     </div>
+                    <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowExport(true)}
+                        disabled={!data || count === 0}
+                        className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                        title="Export the products matching the current filters"
+                    >
+                        <DownloadIcon className="h-4 w-4" />
+                        Export
+                    </button>
                     <button
                         type="button"
                         onClick={() => router.push(`${basePath}/new`)}
@@ -140,6 +199,7 @@ export default function AdminProductsPage(): ReactElement {
                         <PlusIcon className="h-4 w-4" />
                         New Product
                     </button>
+                    </div>
                 </div>
             </header>
 
@@ -192,6 +252,15 @@ export default function AdminProductsPage(): ReactElement {
                     </>
                 )}
             </main>
+
+            {showExport && (
+                <ProductsExportModal
+                    params={queryParams}
+                    count={count}
+                    filterSummary={filterSummary}
+                    onClose={() => setShowExport(false)}
+                />
+            )}
 
             {/* Delete confirmation modal */}
             {deleteConfirmId !== null && (

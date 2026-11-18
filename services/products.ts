@@ -309,3 +309,52 @@ export async function reorderSpecGroups(
     });
     if (!response.ok) throw new Error(`Failed to reorder spec groups: ${response.status}`);
 }
+
+/** Columns available in the product export (keys match the API's product_export.COLUMNS). */
+export const PRODUCT_EXPORT_COLUMNS: { key: string; label: string; default: boolean }[] = [
+    { key: "image", label: "Product image", default: true },
+    { key: "name", label: "Name", default: true },
+    { key: "internal_code", label: "Code", default: true },
+    { key: "category", label: "Category", default: true },
+    { key: "sub_category", label: "Sub-category", default: false },
+    { key: "print_category", label: "Print category", default: false },
+    { key: "pricing_mode", label: "Pricing", default: true },
+    { key: "starting_price", label: "Starting price", default: true },
+    { key: "status", label: "Status", default: true },
+    { key: "visibility", label: "Visibility", default: false },
+    { key: "product_type", label: "Product type", default: false },
+    { key: "short_description", label: "Description", default: false },
+    { key: "turnaround", label: "Turnaround days", default: false },
+    { key: "vendor", label: "Vendor", default: false },
+    { key: "updated_at", label: "Last edited", default: false },
+];
+
+/** Download the products matching `params` (page/pageSize ignored) as Excel or CSV. */
+export async function exportProducts(
+    params: ProductsQueryParams,
+    columns: string[],
+    format: "xlsx" | "csv",
+): Promise<void> {
+    const qs = new URLSearchParams(buildQueryString(params));
+    qs.delete("page");
+    qs.delete("page_size");
+    qs.set("columns", columns.join(","));
+    qs.set("export_format", format);
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-admin/export/?${qs.toString()}`, {
+        credentials: "include",
+        cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Export failed (${response.status}). Please try again.`);
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") ?? "";
+    const match = /filename="?([^"]+)"?/.exec(disposition);
+    const filename = match?.[1] ?? `products.${format}`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
