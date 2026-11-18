@@ -27,7 +27,7 @@ import {
     ChevronRightIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fetchCatalogProducts, type CatalogProduct } from "@/services/store";
+import { fetchAllCatalog, fetchCatalogProducts, type CatalogProduct } from "@/services/store";
 import type { SpecOption } from "@/types/products";
 
 interface ProductCategory {
@@ -43,17 +43,6 @@ async function fetchCategories(): Promise<ProductCategory[]> {
     return Array.isArray(data) ? data : (data.results ?? []);
 }
 
-/** Whole published catalog, for the browse-by-category view (100 per request). */
-async function fetchAllCatalog(): Promise<CatalogProduct[]> {
-    const out: CatalogProduct[] = [];
-    for (let page = 1; page <= 20; page++) {
-        const res = await fetchCatalogProducts({ page_size: 100, page });
-        out.push(...res.results);
-        if (res.results.length === 0 || out.length >= res.count) break;
-    }
-    return out;
-}
-
 interface CategoryGroup {
     key: string;
     id: number | null;
@@ -65,10 +54,11 @@ interface CategoryGroup {
 function groupByCategory(products: CatalogProduct[], categories: ProductCategory[]): CategoryGroup[] {
     const map = new Map<string, CategoryGroup>();
     for (const p of products) {
-        const key = p.primary_category ? String(p.primary_category) : "other";
+        const catId = p.category_id ?? p.primary_category;
+        const key = catId ? String(catId) : "other";
         let g = map.get(key);
         if (!g) {
-            g = { key, id: p.primary_category, name: p.primary_category_name || "More products", products: [] };
+            g = { key, id: catId ?? null, name: p.category_name || p.primary_category_name || "More products", products: [] };
             map.set(key, g);
         }
         g.products.push(p);
@@ -190,9 +180,9 @@ const ProductCard = memo(function ProductCard({ product }: { product: CatalogPro
             </div>
 
             <div className="flex flex-1 flex-col gap-1 p-4">
-                {product.primary_category_name && (
+                {(product.category_name || product.primary_category_name) && (
                     <span className="truncate text-[10px] font-semibold uppercase tracking-widest text-brand-blue/70">
-                        {product.primary_category_name}
+                        {product.category_name || product.primary_category_name}
                     </span>
                 )}
                 <h3 className="line-clamp-2 break-words text-sm font-bold leading-snug text-gray-900 group-hover:text-brand-blue">
@@ -257,6 +247,13 @@ function StorePageInner(): ReactElement {
         enabled: !hasFilters,
     });
     const groups = useMemo(() => groupByCategory(browse.data ?? [], categoriesData), [browse.data, categoriesData]);
+    // Once the catalog is loaded, only offer categories that actually have products
+    // (an empty category pill just leads to "No products").
+    const shopCategories = useMemo(() => {
+        if (!browse.data) return categoriesData;
+        const withProducts = new Set(groups.map((g) => g.key));
+        return categoriesData.filter((c) => withProducts.has(String(c.id)) || String(c.id) === activeCategoryId);
+    }, [browse.data, groups, categoriesData, activeCategoryId]);
     const popular = useMemo(
         () => (browse.data ?? []).filter((p) => p.bestseller_badge || p.feature_product || p.on_sale_badge || p.new_arrival).slice(0, 12),
         [browse.data],
@@ -387,7 +384,7 @@ function StorePageInner(): ReactElement {
                             {categoriesData.length > 0 && (
                                 <div className="mt-6 flex flex-wrap items-center gap-2">
                                     <span className="text-xs font-medium text-white/60">Popular:</span>
-                                    {categoriesData.slice(0, 5).map((cat) => (
+                                    {shopCategories.slice(0, 5).map((cat) => (
                                         <button
                                             key={cat.id}
                                             type="button"
@@ -478,7 +475,7 @@ function StorePageInner(): ReactElement {
                             <FilterPill active={!activeCategoryId} onClick={() => setFilters({ category: null })}>
                                 All categories
                             </FilterPill>
-                            {categoriesData.map((cat) => (
+                            {shopCategories.map((cat) => (
                                 <FilterPill
                                     key={cat.id}
                                     active={activeCategoryId === String(cat.id)}
@@ -670,7 +667,7 @@ function StorePageInner(): ReactElement {
                         <div>
                             <h4 className="mb-3 text-sm font-bold text-brand-yellow">Shop</h4>
                             <ul className="space-y-2">
-                                {categoriesData.slice(0, 5).map((cat) => (
+                                {shopCategories.slice(0, 5).map((cat) => (
                                     <li key={cat.id}>
                                         <button
                                             type="button"

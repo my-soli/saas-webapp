@@ -16,12 +16,13 @@ import { createMultiProductQuote, fetchQuote, updateQuote, sendQuoteToPT, upload
 import { getCurrentUser } from "@/services/users";
 import QuoteTopBar from "@/features/quotes/components/QuoteTopBar";
 import QuoteHeaderSection from "@/features/quotes/components/QuoteHeaderSection";
-import QuoteLineItemsTable from "@/features/quotes/components/QuoteLineItemsTable";
+import QuoteLineItemsTable, { isMissingProductionCost } from "@/features/quotes/components/QuoteLineItemsTable";
 import QuoteNotesSection from "@/features/quotes/components/QuoteNotesSection";
 import QuoteTotalsSidebar from "@/features/quotes/components/QuoteTotalsSidebar";
 import QuotePTCostBanner from "@/features/quotes/components/QuotePTCostBanner";
 import QuoteAttachmentsSection from "@/features/quotes/components/QuoteAttachmentsSection";
 import SelectProductionMemberModal from "@/features/quotes/components/SelectProductionMemberModal";
+import WhatsAppCopyModal, { buildQuoteWhatsAppMessage } from "@/features/quotes/components/WhatsAppCopyModal";
 
 import { toast } from "sonner";
 
@@ -64,6 +65,8 @@ function CreateQuotePageContent() {
     const quoteId = editId ? Number(editId) : null;
 
     const [clientType, setClientType] = useState<"client" | "lead">("client");
+    const [whatsAppMessage, setWhatsAppMessage] = useState<string | null>(null);
+    const [highlightMissingCost, setHighlightMissingCost] = useState(false);
     const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
     const [selectedLeadId, setSelectedLeadId] = useState<number | null>(null);
     const [referenceNumber, setReferenceNumber] = useState("");
@@ -408,6 +411,17 @@ function CreateQuotePageContent() {
             return;
         }
 
+        // Production cost per unit is compulsory, except when sending to PT (the
+        // production team does the costing there).
+        if (action !== "send_pt") {
+            const missingCost = lineItems.filter(isMissingProductionCost);
+            if (missingCost.length > 0) {
+                setHighlightMissingCost(true);
+                toast.error(`Enter the production cost per unit on ${missingCost.length === 1 ? "1 line item" : `${missingCost.length} line items`} before saving.`);
+                return;
+            }
+        }
+        setHighlightMissingCost(false);
         if (action === "send_customer" && calculateGrandTotal() === 0) {
             toast.error("Cannot send a quote with KES 0 total to the client. Set the Rate (KES) on each line item first.");
             return;
@@ -476,7 +490,6 @@ function CreateQuotePageContent() {
 
         const clientLabel = resolveDisplayName();
         const quoteRef = existingQuote?.quote_id || savedQuoteDisplayId || "";
-        const refLabel = quoteRef ? ` *${quoteRef}*` : referenceNumber ? ` (Ref: ${referenceNumber})` : "";
 
         let approvalUrl = "";
         try {
@@ -486,11 +499,8 @@ function CreateQuotePageContent() {
             console.error("Failed to get approval link for WhatsApp:", err);
         }
 
-        const linkLine = approvalUrl
-            ? `\nKindly review and approve your quote here:\n${approvalUrl}\n`
-            : "";
-        const msg = `Hello ${clientLabel},\n\nPlease find your quote${refLabel} from Print Duka Ltd.${linkLine}\nThank you!`;
-        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
+        const msg = buildQuoteWhatsAppMessage({ clientName: clientLabel, quoteRef, total: calculateGrandTotal(), validUntil: expiryDate, approvalUrl });
+        setWhatsAppMessage(msg);
     };
 
     if (isEditMode && quoteLoading) {
@@ -608,6 +618,7 @@ function CreateQuotePageContent() {
                                 onUpdateItem={updateLineItem}
                                 includeVat={enableTax}
                                 taxRate={taxRate}
+                                highlightMissingCost={highlightMissingCost}
                             />
 
                             <QuoteNotesSection
@@ -653,6 +664,8 @@ function CreateQuotePageContent() {
                 </div>
             </div>
 
+            <WhatsAppCopyModal message={whatsAppMessage} onClose={() => setWhatsAppMessage(null)} />
+
             {showPTModal && savedQuoteId && (
                 <SelectProductionMemberModal
                     quoteId={String(savedQuoteId)}
@@ -694,9 +707,8 @@ function CreateQuotePageContent() {
                                 onClick={(): void => {
                                     const clientLabel = resolveDisplayName();
                                     const quoteRef = existingQuote?.quote_id || savedQuoteDisplayId || "";
-                                    const refLabel = quoteRef ? ` *${quoteRef}*` : "";
-                                    const msg = `Hello ${clientLabel},\n\nPlease find your quote${refLabel} from Print Duka Ltd.\n\nKindly review and approve your quote here:\n${quoteLink}\n\nThank you!`;
-                                    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
+                                    const msg = buildQuoteWhatsAppMessage({ clientName: clientLabel, quoteRef, total: calculateGrandTotal(), validUntil: expiryDate, approvalUrl: quoteLink });
+                                    setWhatsAppMessage(msg);
                                 }}
                                 className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white text-sm font-medium py-2.5 px-4 rounded-lg hover:bg-green-700 transition-colors"
                             >

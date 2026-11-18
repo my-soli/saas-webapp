@@ -161,6 +161,8 @@ export interface Product {
     pricing_mode: ProductPricingMode;
     starting_price: string | null;
     starting_price_moq: number | null;
+    turnaround_standard_days?: number | null;
+    turnaround_rush_days?: number | null;
     status: ProductStatus;
     is_visible: boolean;
     visibility: ProductVisibility;
@@ -232,6 +234,8 @@ export interface ProductFormValues {
     pricing_mode: ProductPricingMode;
     starting_price: string;
     starting_price_moq: string;
+    turnaround_standard_days: string;
+    turnaround_rush_days: string;
     status: ProductStatus;
     is_visible: boolean;
     visibility: ProductVisibility;
@@ -277,6 +281,8 @@ export interface CreateProductPayload {
     pricing_mode: ProductPricingMode;
     starting_price: string | null;
     starting_price_moq: number | null;
+    turnaround_standard_days?: number | null;
+    turnaround_rush_days?: number | null;
     status: ProductStatus;
     is_visible: boolean;
     visibility: ProductVisibility;

@@ -15,7 +15,12 @@ interface QuoteLineItemsTableProps {
     onUpdateItem: (tempId: string, field: keyof LineItem, value: string | number) => void;
     includeVat?: boolean;
     taxRate?: number;
+    /** Outline lines with no production cost in red (set after a failed save). */
+    highlightMissingCost?: boolean;
 }
+
+/** Production cost per unit is required on every line before a quote is saved or sent. */
+export const isMissingProductionCost = (item: LineItem): boolean => !(Number(item.estimated_cost) > 0);
 
 const formatCurrency = (value: number): string =>
     new Intl.NumberFormat("en-KE", {
@@ -49,6 +54,7 @@ export default function QuoteLineItemsTable({
     onUpdateItem,
     includeVat = false,
     taxRate = 16,
+    highlightMissingCost = false,
 }: QuoteLineItemsTableProps): ReactElement {
     const [productSearch, setProductSearch] = useState("");
     const [showResults, setShowResults] = useState(false);
@@ -262,7 +268,7 @@ export default function QuoteLineItemsTable({
                                         </td>
                                         <td colSpan={2} className="px-4 pb-3 pt-0 align-top">
                                             <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">
-                                                Production Cost/unit (KES)
+                                                Production Cost/unit (KES) <span className="text-brand-red">*</span>
                                             </label>
                                             <input
                                                 type="number"
@@ -272,9 +278,18 @@ export default function QuoteLineItemsTable({
                                                 }
                                                 min="0"
                                                 step="0.01"
-                                                placeholder="optional"
-                                                className="w-full px-2 py-1.5 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue text-right placeholder:text-gray-300"
+                                                required
+                                                placeholder="required"
+                                                aria-invalid={highlightMissingCost && isMissingProductionCost(item)}
+                                                className={`w-full px-2 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-brand-blue text-right placeholder:text-gray-300 ${
+                                                    highlightMissingCost && isMissingProductionCost(item)
+                                                        ? "border-brand-red bg-brand-red/5"
+                                                        : "border-gray-200"
+                                                }`}
                                             />
+                                            {highlightMissingCost && isMissingProductionCost(item) && (
+                                                <p className="mt-1 text-[11px] font-medium text-brand-red text-right">Enter the production cost</p>
+                                            )}
                                             {!!item.estimated_cost && (
                                                 <p className="mt-1 text-[11px] text-gray-400 text-right">
                                                     Line cost: {formatCurrency(item.estimated_cost * (Number(item.quantity) || 0))}

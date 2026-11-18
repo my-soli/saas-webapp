@@ -15,6 +15,9 @@ export interface CatalogProduct {
     primary_category_name: string | null;
     sub_category: number | null;
     sub_category_name: string | null;
+    /** Storefront category: primary category, else the sub-category's parent. */
+    category_id?: number | null;
+    category_name?: string | null;
     product_type: string;
     tags: Array<{ id: number; name: string; slug: string }>;
     pricing_mode: ProductPricingMode;
@@ -73,6 +76,18 @@ export async function fetchCatalogProducts(params?: {
     const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) throw new Error(`Failed to fetch catalog: ${response.status}`);
     return response.json() as Promise<{ count: number; results: CatalogProduct[] }>;
+}
+
+/** Whole published catalog (100 per request). Shared by the /store browse view and
+ *  the store navbar (query key ["catalog-all"]). */
+export async function fetchAllCatalog(): Promise<CatalogProduct[]> {
+    const out: CatalogProduct[] = [];
+    for (let page = 1; page <= 20; page++) {
+        const res = await fetchCatalogProducts({ page_size: 100, page });
+        out.push(...res.results);
+        if (res.results.length === 0 || out.length >= res.count) break;
+    }
+    return out;
 }
 
 export async function fetchCatalogProduct(productId: number): Promise<CatalogProduct> {

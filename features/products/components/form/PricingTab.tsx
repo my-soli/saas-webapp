@@ -95,6 +95,37 @@ export default function PricingTab({ values, onValuesChange, isNew = false }: Pr
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
+                    label="Standard turnaround (working days)"
+                    hint="Shown on the product page as “Standard · N working days” with the ready date. Leave blank to use the default (7)."
+                >
+                    <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className={inputCls}
+                        placeholder="Default: 7"
+                        value={values.turnaround_standard_days}
+                        onChange={(e) => set("turnaround_standard_days", e.target.value)}
+                    />
+                </FormField>
+                <FormField
+                    label="Rush turnaround (working days)"
+                    hint="Shown as “Rush · N working days”. Leave blank to use the default (3)."
+                >
+                    <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className={inputCls}
+                        placeholder="Default: 3"
+                        value={values.turnaround_rush_days}
+                        onChange={(e) => set("turnaround_rush_days", e.target.value)}
+                    />
+                </FormField>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
                     label="Status"
                     hint={isNew ? "New products are always saved as Draft — publish them after adding spec groups and pricing" : "Draft: only visible to admins. Published: live on the store. Archived: hidden and inactive."}
                 >

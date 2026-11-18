@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuoteCart } from "@/features/store/quote-cart-context";
+import { fetchAllCatalog } from "@/services/store";
 
 const MAX_NAV_CATS = 5;
 
@@ -52,8 +53,20 @@ export default function StoreNavbar(): ReactElement {
         staleTime: 5 * 60_000,
     });
 
-    const visibleCats = categories.slice(0, MAX_NAV_CATS);
-    const overflowCats = categories.slice(MAX_NAV_CATS);
+    // Read the catalog the /store page loads (never fetched from here) so the
+    // menu can hide categories that have no products.
+    const { data: catalog } = useQuery({
+        queryKey: ["catalog-all"],
+        queryFn: fetchAllCatalog,
+        enabled: false,
+        staleTime: 5 * 60_000,
+    });
+    const shopCategories = catalog
+        ? categories.filter((c) => catalog.some((p) => (p.category_id ?? p.primary_category) === c.id))
+        : categories;
+
+    const visibleCats = shopCategories.slice(0, MAX_NAV_CATS);
+    const overflowCats = shopCategories.slice(MAX_NAV_CATS);
 
     const buildCategoryHref = (id: number): string =>
         `/store?category=${id}`;
@@ -256,7 +269,7 @@ export default function StoreNavbar(): ReactElement {
                     >
                         All Products
                     </Link>
-                    {categories.map((cat) => (
+                    {shopCategories.map((cat) => (
                         <Link
                             key={cat.id}
                             href={buildCategoryHref(cat.id)}

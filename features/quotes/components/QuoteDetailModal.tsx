@@ -8,6 +8,7 @@ import type { MultiProductQuote, QuoteLineItemDetailed } from "@/types/quotes";
 import type { SendEmailFields } from "@/services/quotes";
 import { getApprovalLink } from "@/services/quotes";
 import { getCurrentUser } from "@/services/users";
+import WhatsAppCopyModal, { buildQuoteWhatsAppMessage } from "./WhatsAppCopyModal";
 
 interface QuoteDetailModalProps {
     quote: MultiProductQuote | null;
@@ -15,7 +16,8 @@ interface QuoteDetailModalProps {
     onSendToPT: (quoteId: number) => void;
     onSendToCustomer: (quoteId: number, emailFields: SendEmailFields) => void;
     isSendingToCustomer?: boolean;
-    onMarkLost: (quoteId: number) => void;
+    /** No longer used: expired quotes are marked Lost automatically. Kept so callers still compile. */
+    onMarkLost?: (quoteId: number) => void;
     onConvertToJob: (quoteId: number) => void;
     onApproveForClient?: (quoteId: number) => void;
     onGenerateInvoice: (quoteId: number) => void;
@@ -29,7 +31,6 @@ export default function QuoteDetailModal({
     onSendToPT,
     onSendToCustomer,
     isSendingToCustomer,
-    onMarkLost,
     onConvertToJob,
     onApproveForClient,
     onGenerateInvoice,
@@ -43,6 +44,8 @@ export default function QuoteDetailModal({
     const [emailCc, setEmailCc] = useState("");
     const [emailSubject, setEmailSubject] = useState("");
     const [emailBody, setEmailBody] = useState("");
+    const [whatsAppMessage, setWhatsAppMessage] = useState<string | null>(null);
+    const [preparingWhatsApp, setPreparingWhatsApp] = useState(false);
 
     const { data: currentUser } = useQuery({
         queryKey: ["current-user"],
@@ -81,18 +84,23 @@ export default function QuoteDetailModal({
     };
 
     const handleWhatsApp = async (): Promise<void> => {
+        setPreparingWhatsApp(true);
         let approvalUrl = "";
         try {
             const result = await getApprovalLink(quote.id);
             approvalUrl = result.approval_url;
         } catch {
             // proceed without link if fetch fails
+        } finally {
+            setPreparingWhatsApp(false);
         }
-        const linkLine = approvalUrl
-            ? `\nKindly review and approve your quote here:\n${approvalUrl}\n`
-            : "";
-        const msg = `Hello ${quote.client_name || ""},\n\nPlease find your quote *${quote.quote_id}* from Print Duka Ltd.\n\n*Total: KES ${quote.total_value.toLocaleString()}*\nValid Until: ${quote.valid_until}\n${linkLine}\nThank you!`;
-        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
+        setWhatsAppMessage(buildQuoteWhatsAppMessage({
+            clientName: quote.client_name,
+            quoteRef: quote.quote_id,
+            total: quote.total_value,
+            validUntil: quote.valid_until,
+            approvalUrl,
+        }));
     };
 
     const formatCurrency = (value: number) => {
@@ -343,12 +351,13 @@ export default function QuoteDetailModal({
 
                             {quote.status !== "Lost" && quote.status !== "Rejected" && (
                                 <button
-                                    onClick={handleWhatsApp}
-                                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-green-500 text-white hover:bg-green-600 rounded transition-colors"
+                                    onClick={() => void handleWhatsApp()}
+                                    disabled={preparingWhatsApp}
+                                    className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium bg-green-500 text-white hover:bg-green-600 rounded transition-colors disabled:opacity-60"
                                     type="button"
-                                    title="Share via WhatsApp"
+                                    title="Copy the WhatsApp message for this quote"
                                 >
-                                    <MessageCircle className="w-4 h-4" />
+                                    {preparingWhatsApp ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
                                     WhatsApp
                                 </button>
                             )}
@@ -404,19 +413,14 @@ export default function QuoteDetailModal({
                                 Generate Invoice
                             </button>
 
-                            {quote.status !== "Approved" && quote.status !== "Lost" && (
-                                <button
-                                    onClick={(): void => onMarkLost(quote.id)}
-                                    className="px-4 py-2 text-sm font-medium bg-brand-red text-white hover:bg-brand-red/90 rounded transition-colors"
-                                    type="button"
-                                >
-                                    Mark as Lost
-                                </button>
-                            )}
+                            {/* "Mark as Lost" removed: quotes past their valid-until date are
+                                marked Lost automatically by the API (clientapp/quote_expiry.py). */}
                         </div>
                     </div>
                 </div>
             </div>
+
+            <WhatsAppCopyModal message={whatsAppMessage} onClose={() => setWhatsAppMessage(null)} />
 
             {/* Email Composer */}
             {showEmailDraft && (
