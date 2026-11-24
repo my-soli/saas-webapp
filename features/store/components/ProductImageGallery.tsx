@@ -17,7 +17,7 @@ interface ProductImageGalleryProps {
 export function sortProductImages(product: CatalogProduct): CatalogProduct["images"] {
     return product.images.filter((img) => img.image_type !== "size-comparison").sort((a, b) => {
         if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
-        return a.display_order - b.display_order;
+        return a.display_order - b.display_order || a.id - b.id;
     });
 }
 

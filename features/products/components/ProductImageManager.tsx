@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import type { ReactElement, ChangeEvent, DragEvent } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
-import { StarIcon, Trash2Icon, UploadCloudIcon, CheckCircleIcon } from "lucide-react";
+import { StarIcon, Trash2Icon, UploadCloudIcon, CheckCircleIcon, ChevronLeftIcon, ChevronRightIcon, GripVerticalIcon } from "lucide-react";
 import { toast } from "sonner";
 import { getCsrfToken } from "@/lib/api/auth";
 
@@ -69,6 +69,27 @@ async function setPrimary(imageId: number): Promise<ProductImage> {
     });
     if (!response.ok) throw new Error(await extractErrorMessage(response, "Failed to set primary"));
     return response.json() as Promise<ProductImage>;
+}
+
+/** Save the image order; the first image becomes the primary one. */
+async function reorderImages(productId: number, order: number[]): Promise<ProductImage[]> {
+    const csrf = await getCsrfToken();
+    const response = await fetch(`${PROXY_BASE}/api/proxy/api/v1/product-images/reorder/`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+        body: JSON.stringify({ product: productId, order }),
+    });
+    if (!response.ok) throw new Error(await extractErrorMessage(response, "Failed to save the image order"));
+    return response.json() as Promise<ProductImage[]>;
+}
+
+/** Display order: primary first, then display_order, then upload order. */
+function sortImages(images: ProductImage[]): ProductImage[] {
+    return [...images].sort((a, b) => {
+        if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
+        return a.display_order - b.display_order || a.id - b.id;
+    });
 }
 
 async function updateColor(imageId: number, color_name: string, color_hex: string): Promise<ProductImage> {
@@ -255,6 +276,9 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
     const queryKey = ["product-images", productId];
     const inputRef = useRef<HTMLInputElement>(null);
     const [dragging, setDragging] = useState(false);
+    // Reordering: the image being dragged and the slot it's hovering over.
+    const [dragId, setDragId] = useState<number | null>(null);
+    const [overId, setOverId] = useState<number | null>(null);
 
     const { data: images = [], isLoading } = useQuery<ProductImage[]>({
         queryKey,
@@ -268,8 +292,41 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
         onError: (err: Error) => toast.error(err.message || "Upload failed"),
     });
 
+    // Optimistic: the new order shows at once and is rolled back if saving fails.
+    const reorderMutation = useMutation({
+        mutationFn: (order: number[]) => reorderImages(productId, order),
+        onMutate: async (order: number[]) => {
+            await queryClient.cancelQueries({ queryKey });
+            const previous = queryClient.getQueryData<ProductImage[]>(queryKey);
+            queryClient.setQueryData<ProductImage[]>(queryKey, (old) => {
+                if (!old) return old;
+                const byId = new Map(old.map((i) => [i.id, i]));
+                return order
+                    .map((id, idx) => {
+                        const img = byId.get(id);
+                        return img ? { ...img, display_order: idx, is_primary: idx === 0 } : null;
+                    })
+                    .filter((i): i is ProductImage => i !== null);
+            });
+            return { previous };
+        },
+        onSuccess: (saved) => {
+            queryClient.setQueryData<ProductImage[]>(queryKey, saved);
+            toast.success("Image order saved");
+        },
+        onError: (err: Error, _order, ctx) => {
+            if (ctx?.previous) queryClient.setQueryData(queryKey, ctx.previous);
+            toast.error(err.message || "Failed to save the image order");
+        },
+    });
+
+    // "Set primary" = move that image to the front of the order.
     const primaryMutation = useMutation({
-        mutationFn: (imageId: number) => setPrimary(imageId),
+        mutationFn: async (imageId: number) => {
+            const ids = sortImages(images).map((i) => i.id);
+            if (!ids.includes(imageId)) return setPrimary(imageId);
+            return reorderImages(productId, [imageId, ...ids.filter((id) => id !== imageId)]);
+        },
         onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
         onError: (err: Error) => toast.error(err.message || "Failed to set primary"),
     });
@@ -317,10 +374,29 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
         handleFiles(e.dataTransfer.files);
     };
 
-    const sorted = [...images].sort((a, b) => {
-        if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
-        return a.display_order - b.display_order;
-    });
+    const sorted = sortImages(images);
+
+    /** Move `id` to the position of `targetId` (drag) and save. */
+    const moveTo = (id: number, targetId: number): void => {
+        if (id === targetId) return;
+        const ids = sorted.map((i) => i.id);
+        const from = ids.indexOf(id);
+        const to = ids.indexOf(targetId);
+        if (from < 0 || to < 0) return;
+        ids.splice(from, 1);
+        ids.splice(to, 0, id);
+        reorderMutation.mutate(ids);
+    };
+
+    /** Move `id` one place left (-1) or right (+1) and save. */
+    const nudge = (id: number, dir: -1 | 1): void => {
+        const ids = sorted.map((i) => i.id);
+        const from = ids.indexOf(id);
+        const to = from + dir;
+        if (from < 0 || to < 0 || to >= ids.length) return;
+        [ids[from], ids[to]] = [ids[to], ids[from]];
+        reorderMutation.mutate(ids);
+    };
 
     return (
         <div className="p-6 space-y-5">
@@ -328,7 +404,8 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                 <div>
                     <h2 className="text-base font-semibold text-gray-900">Product Images</h2>
                     <p className="text-xs text-gray-500 mt-0.5">
-                        Upload multiple images. Click a thumbnail to set it as primary. Tag an image with a
+                        Upload multiple images. Drag images (or use the arrows) to set their order; the store shows them
+                        in this order and the first one is the primary image. Tag an image with a
                         colour to show it as a colour swatch on the storefront. Tick &quot;Size chart&quot; on an
                         image to show it behind the store&apos;s &quot;Size chart&quot; link (hidden from the gallery; shown when
                         the product has a &quot;Size&quot; spec group).
@@ -359,6 +436,10 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                 />
             </div>
 
+            {reorderMutation.isPending && (
+                <p className="text-xs text-brand-blue animate-pulse">Saving image order…</p>
+            )}
+
             {uploadMutation.isPending && (
                 <p className="text-xs text-brand-blue animate-pulse">Uploading…</p>
             )}
@@ -368,12 +449,39 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
             {/* Image grid */}
             {sorted.length > 0 && (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                    {sorted.map((img) => (
-                        <div key={img.id} className="space-y-1.5">
+                    {sorted.map((img, index) => (
+                        <div
+                            key={img.id}
+                            className={`space-y-1.5 rounded-xl transition-opacity ${dragId === img.id ? "opacity-40" : ""}`}
+                            draggable={sorted.length > 1 && !reorderMutation.isPending}
+                            onDragStart={(e) => {
+                                setDragId(img.id);
+                                e.dataTransfer.effectAllowed = "move";
+                                e.dataTransfer.setData("text/plain", String(img.id));
+                            }}
+                            onDragOver={(e) => {
+                                if (dragId === null) return; // a file drop, not a reorder
+                                e.preventDefault();
+                                e.dataTransfer.dropEffect = "move";
+                                if (overId !== img.id) setOverId(img.id);
+                            }}
+                            onDragLeave={() => { if (overId === img.id) setOverId(null); }}
+                            onDrop={(e) => {
+                                if (dragId === null) return;
+                                e.preventDefault();
+                                e.stopPropagation();
+                                moveTo(dragId, img.id);
+                                setDragId(null);
+                                setOverId(null);
+                            }}
+                            onDragEnd={() => { setDragId(null); setOverId(null); }}
+                        >
                         <div
                             className={`relative group rounded-xl overflow-hidden aspect-square bg-gray-100 ${
-                                img.is_primary ? "ring-2 ring-brand-blue ring-offset-2" : "ring-1 ring-gray-200"
-                            }`}
+                                overId === img.id && dragId !== img.id
+                                    ? "ring-2 ring-brand-orange ring-offset-2"
+                                    : img.is_primary ? "ring-2 ring-brand-blue ring-offset-2" : "ring-1 ring-gray-200"
+                            } ${sorted.length > 1 ? "cursor-grab active:cursor-grabbing" : ""}`}
                         >
                             {img.image_url ? (
                                 <Image
@@ -409,6 +517,35 @@ export default function ProductImageManager({ productId }: ProductImageManagerPr
                                     >
                                         <StarIcon className="h-3 w-3 text-brand-yellow" />
                                         Set primary
+                                    </button>
+                                </div>
+                            )}
+                            {/* Position + move controls */}
+                            {sorted.length > 1 && (
+                                <div className="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-0.5 rounded-full bg-white/90 px-1 py-0.5 shadow">
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); nudge(img.id, -1); }}
+                                        disabled={index === 0 || reorderMutation.isPending}
+                                        className="rounded-full p-0.5 text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                                        aria-label="Move image left"
+                                        title="Move left"
+                                    >
+                                        <ChevronLeftIcon className="h-3.5 w-3.5" />
+                                    </button>
+                                    <span className="flex items-center text-[10px] font-semibold text-gray-600" title="Drag to reorder">
+                                        <GripVerticalIcon className="h-3 w-3 text-gray-400" />
+                                        {index + 1}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => { e.stopPropagation(); nudge(img.id, 1); }}
+                                        disabled={index === sorted.length - 1 || reorderMutation.isPending}
+                                        className="rounded-full p-0.5 text-gray-600 hover:bg-gray-100 disabled:opacity-30"
+                                        aria-label="Move image right"
+                                        title="Move right"
+                                    >
+                                        <ChevronRightIcon className="h-3.5 w-3.5" />
                                     </button>
                                 </div>
                             )}
